@@ -1,5 +1,5 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
@@ -69,8 +69,35 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
   }
 }
 
-function drawUnit(c: CanvasRenderingContext2D, u: Unit) {
+/** shovel, flying dirt, and a trench line growing under a squad that is digging in */
+function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
+  const r = u.def.r, k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
+  c.save(); c.translate(u.x, u.y);
+  // the trench taking shape
+  c.globalAlpha = 0.25 + 0.75 * k; c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round';
+  const w = 4 + 16 * k; c.beginPath(); c.moveTo(-w, r + 2); c.lineTo(-w / 2, r + 8); c.lineTo(0, r + 2); c.lineTo(w / 2, r + 8); c.lineTo(w, r + 2); c.stroke();
+  c.strokeStyle = '#8a7a58'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-w, r - 2); c.lineTo(-w / 2, r + 4); c.lineTo(0, r - 2); c.lineTo(w / 2, r + 4); c.lineTo(w, r - 2); c.stroke();
+  // dirt clods thrown up in rhythm
+  for (let i = 0; i < 6; i++) {
+    const ph = ((now / 900) + i * 0.37) % 1, ang = i * 1.05 + now / 1400, dist = 6 + ph * 16;
+    c.globalAlpha = (1 - ph) * 0.9; c.fillStyle = i % 2 ? '#6b5a3e' : '#4e4030';
+    c.beginPath(); c.arc(Math.cos(ang) * dist, 2 - ph * 18 + ph * ph * 22, 1.6 + (1 - ph), 0, TAU); c.fill();
+  }
+  // shovel swinging
+  const swing = Math.sin(now / 110);
+  c.globalAlpha = 1; c.strokeStyle = '#d8d4c4'; c.lineWidth = 2; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(r + 1, -1); c.lineTo(r + 9, -3 - swing * 6); c.stroke();
+  c.fillStyle = '#9a978c'; c.beginPath(); c.arc(r + 10, -3 - swing * 6, 2.2, 0, TAU); c.fill();
+  // progress ring and countdown
+  c.strokeStyle = '#e0a030'; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, r + 6, -Math.PI / 2, -Math.PI / 2 + TAU * k); c.stroke();
+  c.font = '600 10px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = 'rgba(12,14,10,0.9)';
+  const label = 'digging in ' + Math.ceil(u.digT ?? DIG_TIME) + 's'; c.strokeText(label, 0, r + 18); c.fillStyle = '#ffd60a'; c.fillText(label, 0, r + 18);
+  c.restore();
+}
+
+function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0) {
   const d = u.def, r = d.r;
+  if (u.order.kind === 'dig') drawDigging(c, u, now);
   const team = u.team < 0 ? { color: '#efeadf', stroke: '#5d584c' } : TEAMS[u.team];
   c.save(); c.translate(u.x, u.y);
   if (d.air) { c.save(); c.translate(7, 9); c.rotate(u.angle); c.globalAlpha = 0.28; c.fillStyle = '#000'; shapePath(c, d.shape, r); c.fill(); c.restore(); }
@@ -306,7 +333,7 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.rally.x, s.rally.y); ctx.stroke(); ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(s.rally.x, s.rally.y, 5, 0, Math.PI * 2); ctx.stroke();
     }
-    for (const u of g.units) if (!u.def.air && (u.seenBy[PL] || u.team === PL)) drawUnit(ctx, u);
+    for (const u of g.units) if (!u.def.air && (u.seenBy[PL] || u.team === PL)) drawUnit(ctx, u, now);
     drawProjectiles(ctx, g.projectiles);
     for (const u of g.units) if (u.def.air && u.seenBy[PL]) drawUnit(ctx, u);
     drawEffects(ctx, g.effects, PL, g); drawEffects(ctx, this.localFx, PL);
