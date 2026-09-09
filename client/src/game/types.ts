@@ -13,6 +13,14 @@ export interface Unit {
   cover?: string; onRoad?: boolean; operator?: Unit | null; drones?: Unit[]; grounded?: boolean; lostT?: number;
   batt?: number; landed?: boolean; rechargeT?: number; grace?: number; digT?: number; morale?: number; shaken?: boolean;
   swarm?: Swarm | null; cargo?: string; src?: Site | null; value?: number; stuck?: number; nation?: number; waitT?: number; idleT?: number; lastHitBy?: number;
+  /** confirmed kills (veterancy) */
+  kills?: number;
+  /** drone operators in a squad (1 to OPS_MAX); each extra one is a person from the pool */
+  ops?: number;
+  /** rounds left for artillery; ammoTruckId tracks the truck already on its way */
+  ammo?: number; ammoTruckId?: number; ammoWarned?: boolean;
+  /** seconds a firing gun stays exposed to enemy radar */
+  revealT?: number;
 }
 
 export interface Struct {
@@ -33,13 +41,17 @@ export interface PumpSite { team: number; x: number; y: number; struct: Struct |
 
 export interface Projectile {
   x: number; y: number; sx: number; sy: number; tx: number; ty: number; t: number; dur: number; dmg: number; splash: number; team: number;
-  arc: number; rocket: boolean; dead: boolean;
+  arc: number; rocket: boolean; dead: boolean; srcId?: number;
 }
 
 export interface Effect {
-  kind: 'boom' | 'tracer' | 'hit' | 'flash' | 'mark' | 'heal' | 'caught' | 'text';
-  x: number; y: number; t: number; dur: number; r?: number; tx?: number; ty?: number; team?: number; red?: boolean; green?: boolean; text?: string;
+  kind: 'boom' | 'tracer' | 'hit' | 'flash' | 'mark' | 'heal' | 'caught' | 'text' | 'bark';
+  x: number; y: number; t: number; dur: number; r?: number; tx?: number; ty?: number; team?: number; red?: boolean; green?: boolean; text?: string; delay?: number;
 }
+
+export type LogKind = 'kill' | 'loss' | 'capture' | 'struct' | 'truck' | 'research' | 'wave' | 'defect' | 'info';
+/** battle log entry; team is the side the event is about (-1 = both) */
+export interface LogEntry { at: number; team: number; kind: LogKind; text: string }
 
 export interface Swarm { id: number; team: number; members: Unit[]; leader: Unit; formation: FormationType; dead: boolean; t: number }
 
@@ -47,7 +59,7 @@ export interface Supply { food: number; fuel: number; power: number; foodUsed: n
 
 export interface Bot {
   team: number; staging: Pt; spendT: number; attackT: number; shahedT: number; warnT: number; warnName: string; defendT: number; artyT: number;
-  pending: string | null; raidT?: number; resT?: number;
+  pending: string | null; raidT?: number; resT?: number; opsT?: number;
 }
 
 export interface Notice { team: number; text: string; at: number }
@@ -66,4 +78,6 @@ export type Command =
   | { kind: 'place'; type: string; x: number; y: number }
   | { kind: 'enqueue'; facId: number; type: string }
   | { kind: 'cancel'; facId: number; index: number }
-  | { kind: 'upgrade'; key: string };
+  | { kind: 'upgrade'; key: string }
+  | { kind: 'wave' }
+  | { kind: 'ops'; ids: number[]; delta: 1 | -1 };

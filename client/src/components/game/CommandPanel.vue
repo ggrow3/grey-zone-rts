@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
-import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, upgLabel } from '../../game/data';
+import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, WAVE_COST, upgLabel, RU } from '../../game/data';
 import { clamp } from '../../game/dmath';
 
 const props = defineProps<{ ctl: Controller; tick: number }>();
@@ -48,6 +48,10 @@ function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSele
         <button v-for="type in BUILDABLE" :key="type" type="button" class="cmd" :class="[type, { owned: ctl.view.placing === type }]" :title="buildTitle(type)" @click="ctl.startPlacing(type)">
           <div class="name">{{ STRUCTS[type].label }}</div>
           <div class="meta"><span>{{ STRUCTS[type].cost }} funds</span><span>{{ STRUCTS[type].time }}s</span></div>
+        </button>
+        <button v-if="ctl.team === RU" type="button" class="cmd wave" :disabled="g().waveT > 0" title="Three Geran-2 drones and four Gerbera decoys from the north, east, and south, aimed at Ukrainian buildings, the substation first" @click="ctl.geranWave()">
+          <div class="name">Geran wave</div>
+          <div class="meta"><span>{{ WAVE_COST }} funds</span><span>{{ g().waveT > 0 ? 'reload ' + Math.ceil(g().waveT) + 's' : 'ready' }}</span></div>
         </button>
       </div>
       <div id="cmdbody" v-else>

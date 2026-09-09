@@ -17,6 +17,8 @@ export interface UnitDef {
   air?: boolean; jammable?: boolean; netted?: boolean; acquire?: number; tether?: boolean; recon?: boolean; fuelDrone?: boolean; large?: boolean;
   structuresOnly?: boolean; prefer?: string[]; minRange?: number; indirect?: boolean; shellSpeed?: number; salvo?: number; jam?: number;
   auto?: boolean; civ?: boolean; jet?: boolean; hollow?: boolean; blurb?: string;
+  /** rounds carried by artillery; resupplied by trucks and near the depot */
+  ammo?: number;
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -38,31 +40,31 @@ export const UNITS: Record<string, UnitDef> = {
     cost: 130, crew: 3, time: 8, factory: 'barracks', vision: 160, canCapture: true, troop: true, targets: ['inf', 'struct'], vsStruct: 0.2,
     blurb: 'Fast and fragile. Rushes through the kill zone to grab a town before the drones react.' },
   fpv: { label: ['FPV quadcopter', 'FPV quadcopter'], shape: 'tri', r: 6, hp: 30, evade: 0.35, speed: 190, kamikaze: true, dmg: 130, splash: 22,
-    cost: 25, crew: 0, operated: true, endurance: 70, recharge: 25, electric: true, link: 650, time: 0.4, factory: 'droneWorks', vision: 150, air: true, jammable: true, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
+    cost: 25, crew: 0, operated: true, endurance: 70, recharge: 25, electric: true, link: 650, time: 0.2, factory: 'droneWorks', vision: 150, air: true, jammable: true, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
     blurb: 'Seven to ten inch racing-style quads built by the hundred thousand a month. One to two kilo warhead, radio link, ten or so kilometers of reach. Jammers drop it and nets catch it.' },
   fiberFpv: { label: ['Fiber-optic FPV', 'Knyaz Vandal fiber FPV'], shape: 'tritail', r: 6, hp: 30, evade: 0.35, speed: 140, kamikaze: true, dmg: 130, splash: 22,
-    cost: 45, crew: 0, operated: true, tether: true, endurance: 60, recharge: 25, electric: true, link: 500, time: 0.5, factory: 'droneWorks', vision: 150, air: true, jammable: false, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
+    cost: 45, crew: 0, operated: true, tether: true, endurance: 60, recharge: 25, electric: true, link: 500, time: 0.25, factory: 'droneWorks', vision: 150, air: true, jammable: false, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
     blurb: 'A spool of fiber instead of a radio link. Nothing to jam; the spool limits speed. Nets still catch it.' },
-  mavic: { label: ['Mavic recon quad', 'Mavic recon quad'], shape: 'diamond', r: 6, hp: 40, evade: 0.3, speed: 135, dmg: 0, cost: 40, crew: 0, operated: true, endurance: 110, recharge: 30, electric: true, link: 650, time: 0.5, recon: true,
+  mavic: { label: ['Mavic recon quad', 'Mavic recon quad'], shape: 'diamond', r: 6, hp: 40, evade: 0.3, speed: 135, dmg: 0, cost: 40, crew: 0, operated: true, endurance: 110, recharge: 30, electric: true, link: 650, time: 0.25, recon: true,
     factory: 'droneWorks', vision: 360, air: true, jammable: true,
     blurb: 'DJI Mavic 3 with a thermal camera: the standard tactical eye on both sides. Cheap, everywhere, easily jammed. Artillery can only fire at what your side can see.' },
-  fwRecon: { label: ['Shark recon plane', 'Orlan-10 recon plane'], shape: 'plane', r: 8, hp: 80, evade: 0.25, speed: 160, dmg: 0, cost: 150, fuelDrone: true, crew: 0, operated: true, endurance: 600, recharge: 60, link: 1400, large: true, time: 2.5, recon: true,
+  fwRecon: { label: ['Shark recon plane', 'Orlan-10 recon plane'], shape: 'plane', r: 8, hp: 80, evade: 0.25, speed: 160, dmg: 0, cost: 150, fuelDrone: true, crew: 0, operated: true, endurance: 600, recharge: 60, link: 1400, large: true, time: 1, recon: true,
     factory: 'launchSite', vision: 520, air: true, jammable: true, highAlt: true,
     blurb: 'Fixed-wing spotter. Flies too high for machine guns; air defense and interceptors can reach it. Its vision is what makes the artillery accurate.' },
   interceptor: { label: ['Sting interceptor', 'Yolka interceptor'], shape: 'star', r: 7, hp: 35, evade: 0.4, speed: 215, range: 70, dmg: 22, rof: 0.5,
-    cost: 35, crew: 0, operated: true, endurance: 80, recharge: 25, electric: true, link: 650, time: 0.4, factory: 'droneWorks', vision: 260, air: true, jammable: true, targets: ['air'], acquire: 330,
+    cost: 35, crew: 0, operated: true, endurance: 80, recharge: 25, electric: true, link: 650, time: 0.2, factory: 'droneWorks', vision: 260, air: true, jammable: true, targets: ['air'], acquire: 330,
     blurb: 'Purpose-built high-speed quad that rams or shoots drones. Patrols on its own. Easy prey for air defense.' },
   bomber: { label: ['Vampire heavy bomber (Baba Yaga)', 'Heavy bomber hexacopter'], shape: 'hex', r: 9, hp: 140, evade: 0.15, speed: 130, range: 70, dmg: 50, splash: 34, rof: 2.2,
-    cost: 120, crew: 0, operated: true, endurance: 160, recharge: 45, electric: true, link: 650, large: true, time: 1.5, factory: 'droneWorks', vision: 190, air: true, jammable: true, targets: ['inf', 'veh', 'struct'],
+    cost: 120, crew: 0, operated: true, endurance: 160, recharge: 45, electric: true, link: 650, large: true, time: 0.6, factory: 'droneWorks', vision: 190, air: true, jammable: true, targets: ['inf', 'veh', 'struct'],
     blurb: 'Carries mortar bombs, drops them, flies home for more. Slow, reusable, brutal against infantry clusters and nets.' },
   liutyi: { label: ['Liutyi strike drone (An-196)', 'Liutyi strike drone'], shape: 'plane', r: 9, hp: 120, evade: 0.2, speed: 150, kamikaze: true, dmg: 350, splash: 45,
-    cost: 300, fuelDrone: true, crew: 2, large: true, time: 6, factory: 'launchSite', vision: 120, air: true, jammable: true, targets: ['struct'], structuresOnly: true, acquire: 700, side: 0,
+    cost: 300, fuelDrone: true, crew: 2, large: true, time: 2, factory: 'launchSite', vision: 120, air: true, jammable: true, targets: ['struct'], structuresOnly: true, acquire: 700, side: 0,
     blurb: 'Ukraine\'s workhorse deep-strike drone with a 50 kg warhead. Here it flies at enemy buildings. Only air defense and interceptors stop it.' },
   lancet: { label: ['Lancet loitering munition', 'Lancet loitering munition'], shape: 'plane', r: 7, hp: 60, evade: 0.3, speed: 165, kamikaze: true, dmg: 200, splash: 30,
-    cost: 120, crew: 0, operated: true, endurance: 240, recharge: 60, electric: true, link: 1400, time: 1.5, factory: 'launchSite', vision: 200, air: true, jammable: true, targets: ['veh', 'struct', 'inf'], acquire: 420, side: 1, prefer: ['howitzer', 'mlrs', 'aa', 'jammer', 'tank'],
+    cost: 120, crew: 0, operated: true, endurance: 240, recharge: 60, electric: true, link: 1400, time: 0.6, factory: 'launchSite', vision: 200, air: true, jammable: true, targets: ['veh', 'struct', 'inf'], acquire: 420, side: 1, prefer: ['howitzer', 'mlrs', 'aa', 'jammer', 'tank'],
     blurb: 'Russia\'s counter-battery and air-defense killer: it loiters until a howitzer, jammer, or launcher shows itself, then dives. Nets do not catch it.' },
   molniya: { label: ['Molniya fixed-wing FPV', 'Molniya fixed-wing FPV'], shape: 'plane', r: 7, hp: 55, evade: 0.3, speed: 150, kamikaze: true, dmg: 160, splash: 30,
-    cost: 60, crew: 0, operated: true, endurance: 200, recharge: 60, electric: true, link: 1400, time: 0.8, factory: 'launchSite', vision: 160, air: true, jammable: true, targets: ['inf', 'veh', 'struct'], acquire: 500, side: 1,
+    cost: 60, crew: 0, operated: true, endurance: 200, recharge: 60, electric: true, link: 1400, time: 0.4, factory: 'launchSite', vision: 160, air: true, jammable: true, targets: ['inf', 'veh', 'struct'], acquire: 500, side: 1,
     blurb: 'Plywood-and-foam fixed-wing drone with a few kilos of explosive and 40 km of reach. Cheap, jammable, not caught by nets.' },
   tank: { label: ['Main battle tank', 'Main battle tank'], shape: 'rect', r: 13, hp: 420, speed: 52, roadMul: 1.25, range: 160, dmg: 60, splash: 44, rof: 2.4,
     cost: 900, crew: 3, time: 30, factory: 'armorPlant', vision: 190, targets: ['veh', 'struct'],
@@ -77,11 +79,11 @@ export const UNITS: Record<string, UnitDef> = {
     cost: 400, crew: 2, time: 18, factory: 'armorPlant', vision: 180,
     blurb: 'Disrupts radio-controlled drones inside its radius until they fall. Cannot stop fiber-optic FPVs.' },
   howitzer: { label: ['Howitzer', 'Howitzer'], shape: 'pent', r: 11, hp: 160, speed: 34, roadMul: 1.4, range: 430, minRange: 110, dmg: 95, splash: 42, rof: 5.5,
-    cost: 700, crew: 4, time: 28, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 260,
-    blurb: 'Long range, slow reload, splash damage. Needs a recon drone to see its targets.' },
+    cost: 700, crew: 4, time: 28, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 260, ammo: 12,
+    blurb: 'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it.' },
   mlrs: { label: ['Rocket artillery', 'Rocket artillery'], shape: 'wedge', r: 12, hp: 170, speed: 50, roadMul: 1.4, range: 620, minRange: 220, dmg: 55, splash: 38, rof: 14, salvo: 6,
-    cost: 1200, crew: 3, time: 36, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 340,
-    blurb: 'Six-rocket salvos across most of the map. Long reload.' },
+    cost: 1200, crew: 3, time: 36, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 340, ammo: 18,
+    blurb: 'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more.' },
   truck: { label: ['Supply truck', 'Supply truck'], shape: 'truck', r: 9, hp: 80, speed: 70, roadMul: 1.8, dmg: 0, cost: 0, crew: 1, time: 0, factory: null, vision: 120, auto: true,
     blurb: 'Carries funds from headquarters to each town you hold. Drones love them.' },
   defector: { label: ['Russian volunteer squad', 'Russian volunteer squad'], shape: 'band', r: 7, hp: 80, speed: 42, roadMul: 1.3, range: 95, dmg: 8, rof: 0.55,
@@ -107,8 +109,8 @@ export interface StructDef {
 export const STRUCTS: Record<string, StructDef> = {
   hq: { label: 'Headquarters', hp: 4500, r: 38, cost: 0, time: 0, vision: 260 },
   barracks: { label: 'Barracks', hp: 1000, r: 26, cost: 500, time: 12, vision: 180, produces: ['infantry', 'fireGroup', 'moto', 'merc', 'dprk'] },
-  droneWorks: { label: 'Drone works', hp: 1100, r: 28, cost: 700, time: 14, vision: 180, produces: ['fpv', 'fiberFpv', 'mavic', 'interceptor', 'bomber'], heatPer: 14, cool: 5 },
-  launchSite: { label: 'Launch site', hp: 900, r: 24, cost: 600, time: 12, vision: 180, produces: ['fwRecon', 'liutyi'], heatPer: 24, cool: 5 },
+  droneWorks: { label: 'Drone works', hp: 1100, r: 28, cost: 700, time: 14, vision: 180, produces: ['fpv', 'fiberFpv', 'mavic', 'interceptor', 'bomber'] },
+  launchSite: { label: 'Launch site', hp: 900, r: 24, cost: 600, time: 12, vision: 180, produces: ['fwRecon', 'liutyi', 'lancet', 'molniya'] },
   armorPlant: { label: 'Armor plant', hp: 1500, r: 32, cost: 1000, time: 18, vision: 180, produces: ['tank', 'ifv', 'aa', 'jammer'] },
   artyDepot: { label: 'Artillery depot', hp: 1100, r: 28, cost: 900, time: 16, vision: 180, produces: ['howitzer', 'mlrs'] },
   radar: { label: 'Radar post', hp: 700, r: 18, cost: 300, time: 8, vision: 380 },
@@ -141,7 +143,7 @@ export const CIV_SITES: [string, number, string, number, number][] = [
 export interface UpgradeDef { label: string; labelRU?: string; desc: string; cost: number; requires?: string; branch: string; tier: number }
 export const UPGRADES: Record<string, UpgradeDef> = {
   auto1: { label: 'Terminal guidance', desc: 'Drones finish their own approach: control range +150, and a drone survives losing its squad long enough to find another', cost: 800, branch: 'Drones', tier: 1 },
-  auto2: { label: 'Drone swarm control', desc: 'One infantry squad flies up to 4 drones instead of 1', cost: 1400, requires: 'auto1', branch: 'Drones', tier: 2 },
+  auto2: { label: 'Drone swarm control', desc: 'Each operator in a squad flies 6 drones instead of 3', cost: 1400, requires: 'auto1', branch: 'Drones', tier: 2 },
   auto3: { label: 'Full autonomy', desc: 'Your drones fly themselves like the Russian ones: no squad, no control range', cost: 2200, requires: 'auto2', branch: 'Drones', tier: 3 },
   armorDrone: { label: 'Hardened airframes', desc: 'New drones leave the works with 50% more health', cost: 900, branch: 'Airframes', tier: 1 },
   evasion: { label: 'Evasive flight profiles', desc: 'Your drones dodge 15% more of the shots fired at them', cost: 1200, requires: 'armorDrone', branch: 'Airframes', tier: 2 },
@@ -166,7 +168,8 @@ export const TECH_BRANCHES = ['Drones', 'Airframes', 'Links', 'Air defense', 'Gr
 export function upgLabel(team: number, k: string): string { const u = UPGRADES[k]; return team === RU && u.labelRU ? u.labelRU : u.label; }
 
 export const AUTO_SMALL = [1, 2, 4, 8], AUTO_LARGE = [1, 1, 2, 4];
-export const OP_CAP = [1, 1, 4, 8];
+/** drone operators a squad can hold, and drones each operator flies (doubled by Drone swarm control) */
+export const OPS_MAX = 4, DRONES_PER_OP = 3;
 export const HOTKEYS = ['Z', 'X', 'C', 'V', 'B'];
 export const TRUCK_LOAD = 100, TRUCK_PERIOD = 40, TOWN_BUILD_RADIUS = 200, BUILD_RADIUS = 500;
 export const FORMATIONS = ['wedge', 'line', 'column', 'ring'] as const;
@@ -182,7 +185,33 @@ export const COVER: Record<string, { give: number; take: number; drone: number; 
 };
 export const TARGET_WORDS: Record<TargetClass, string> = { inf: 'troops', veh: 'vehicles', struct: 'buildings', air: 'drones' };
 
-export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in under a second each, until the heat bar fills and the backlog waits for it to cool.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine, Orlan, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 70% less from drones, and are seen only within 110. Anyone can use it.' };
+// what the troops shout: transliterated for the screen, Cyrillic for the speech voice, indexed [team][kind]
+export type BarkKind = 'ack' | 'attack' | 'capture' | 'reply' | 'kill' | 'dig' | 'win';
+export const BARKS: Record<BarkKind, [string[], string[]]> = {
+  ack: [['Zrozumilo!', 'Pishly!', 'Vykonuiu!'], ['Ponyal!', 'Poshli!', 'Yest!']],
+  attack: [['Slava Ukraini!', 'Vohon!', 'Za Ukrainu!'], ['Ura!', 'Vperyod!', 'Ogon!']],
+  capture: [['Slava Ukraini!'], ['Ura!']],
+  reply: [['Heroiam slava!'], ['Ura! Ura!']],
+  kill: [['Mynus odyn!', 'Ye kontakt!'], ['Minus odin!', 'Yest popadaniye!']],
+  dig: [['Okopuiemos!'], ['Okapyvayemsya!']],
+  win: [['Slava Ukraini!'], ['Ura!']],
+};
+export const BARKS_TTS: Record<string, string> = {
+  'Zrozumilo!': 'Зрозуміло!', 'Pishly!': 'Пішли!', 'Vykonuiu!': 'Виконую!', 'Slava Ukraini!': 'Слава Україні!', 'Vohon!': 'Вогонь!', 'Za Ukrainu!': 'За Україну!',
+  'Heroiam slava!': 'Героям слава!', 'Mynus odyn!': 'Мінус один!', 'Ye kontakt!': 'Є контакт!', 'Okopuiemos!': 'Окопуємось!',
+  'Ponyal!': 'Понял!', 'Poshli!': 'Пошли!', 'Yest!': 'Есть!', 'Ura!': 'Ура!', 'Vperyod!': 'Вперёд!', 'Ogon!': 'Огонь!', 'Ura! Ura!': 'Ура! Ура!',
+  'Minus odin!': 'Минус один!', 'Yest popadaniye!': 'Есть попадание!', 'Okapyvayemsya!': 'Окапываемся!', 'Manse!': 'Мансе!',
+};
+export const BARK_GLOSS: Record<string, string> = {
+  'Zrozumilo!': 'Understood!', 'Pishly!': "Let's go!", 'Vykonuiu!': 'On it!', 'Slava Ukraini!': 'Glory to Ukraine!', 'Vohon!': 'Fire!', 'Za Ukrainu!': 'For Ukraine!',
+  'Heroiam slava!': 'Glory to the heroes!', 'Mynus odyn!': 'One down!', 'Ye kontakt!': 'Contact!', 'Okopuiemos!': 'Digging in!',
+  'Ponyal!': 'Got it!', 'Poshli!': "Let's go!", 'Yest!': 'Yes sir!', 'Ura!': 'Hurrah!', 'Vperyod!': 'Forward!', 'Ogon!': 'Fire!', 'Ura! Ura!': 'Hurrah!',
+  'Minus odin!': 'One down!', 'Yest popadaniye!': 'Hit confirmed!', 'Okapyvayemsya!': 'Digging in!', 'Manse!': 'Long live! (Korean)',
+};
+export const RANK_NAMES = ['Recruit', 'Trained', 'Veteran', 'Elite'];
+export const WAVE_COST = 600, WAVE_COOLDOWN = 90;
+
+export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine; the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 70% less from drones, and are seen only within 110. Anyone can use it.' };
 
 export const STRATEGY: [string, string][] = [
   ['The shape of the war', 'Everything on this map is either a drone, something that feeds and flies drones, or something drones are hunting. Nothing on the ground survives in the open for long, so the game is about who sees whom first, who has squads to fly, who has power to charge, and who keeps the roads and pipelines running. Wins come from grinding the enemy economy down and then walking artillery and fiber FPVs onto the headquarters, not from a single charge.'],

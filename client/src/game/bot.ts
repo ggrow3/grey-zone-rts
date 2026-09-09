@@ -62,6 +62,8 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
         const rng = g.rangeOf(u), minR = u.def.minRange || 0;
         const known = g.structs.filter(st => st.team === E && !st.dead).map(st => ({ x: st.x, y: st.y, w: st.type === 'pump' ? 3 : st.type === 'hq' ? 2 : 1 }))
           .concat(g.depots.filter(dp => dp.owner === E).map(dp => ({ x: dp.x, y: dp.y, w: 2 })))
+          // counter-battery: enemy guns caught firing by radar
+          .concat(g.units.filter(e => e.team === E && !e.dead && e.def.indirect && e.seenBy[T]).map(e => ({ x: e.x, y: e.y, w: 3 })))
           .filter(pnt => { const dd = dist(u, pnt); return dd <= rng && dd >= minR; });
         if (known.length) { known.sort((a, b) => b.w - a.w || dist(u, a) - dist(u, b)); u.order = { kind: 'bombard', x: known[0].x, y: known[0].y, target: null }; }
       }
@@ -85,6 +87,15 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
     if (bot.shahedT <= 0) { bot.shahedT = g.noGerans ? 20 : Math.max(55, 125 - t / 25); if (!g.noGerans) g.spawnShaheds(); }
   }
   if (bot.warnT > 0) { bot.warnT -= dt; if (bot.warnT <= 0) g.notify(E, 'Enemy column moving toward ' + bot.warnName); }
+  // squads take on extra operators when people are spare, so more drones can fly
+  bot.opsT = (bot.opsT === undefined ? 40 : bot.opsT) - dt;
+  if (bot.opsT <= 0) {
+    bot.opsT = 30;
+    if (g.needsOperator(UNITS.fpv, T) && g.freePeople(T) > 12) {
+      const sq = g.units.filter(u => u.team === T && !u.dead && u.def.operator && (u.ops || 1) < 4).sort((a, b) => (a.ops || 1) - (b.ops || 1))[0];
+      if (sq) g.apply(T, { kind: 'ops', ids: [sq.id], delta: 1 });
+    }
+  }
   bot.resT = (bot.resT === undefined ? 200 : bot.resT) - dt;
   if (bot.resT <= 0) {
     bot.resT = 90;

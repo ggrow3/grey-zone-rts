@@ -78,4 +78,11 @@ export const TOWNS: [string, number, number][] = [['Kozacha Lopan', 50.34, 36.30
 
 export function placePos(name: string): Pt { const p = PLACES.find(x => x[0] === name)!; return geo(p[1], p[2]); }
 export const KHARKIV = geo(49.99, 36.23);
+const PLACE_PX = PLACES.map(p => ({ name: p[0], ...geo(p[1], p[2]) }));
+/** name of the nearest town or city, for the battle log */
+export function nearestPlace(x: number, y: number): string {
+  let best = PLACE_PX[0], bd = Infinity;
+  for (const p of PLACE_PX) { const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y); if (d < bd) { bd = d; best = p; } }
+  return best.name;
+}
 export const BELGOROD = geo(50.60, 36.59);

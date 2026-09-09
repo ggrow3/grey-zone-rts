@@ -17,7 +17,7 @@ export class Controller {
   private pan: { mx: number; my: number; cx: number; cy: number } | null = null;
   onMessage: (text: string) => void = () => {};
   onSelectionChange: () => void = () => {};
-  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend') => void = () => {};
+  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend' | 'audio' | 'log') => void = () => {};
 
   constructor(public session: Session, team: number) {
     this.view = { team, cam: { x: 0, y: 0, z: 1 }, vw: 800, vh: 600, dpr: 1, selection: [], placing: null, mouse: { x: 0, y: 0, inside: false }, bombardMode: false, drag: null, marker: null };
@@ -115,8 +115,9 @@ export class Controller {
   // ---- selection
   clickSelect(x: number, y: number, shift: boolean) {
     const g = this.game, PL = this.team;
+    // aircraft hover over squads: prefer the ground unit under the click unless the drone itself was hit dead centre
     let best: Entity | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(u, { x, y }); if (dd <= u.def.r + 5 && dd < bd) { bd = dd; best = u; } }
+    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(u, { x, y }) + (u.def.air ? 3 : 0); if (dd <= u.def.r + 5 && dd < bd) { bd = dd; best = u; } }
     if (!best) for (const s of g.structs) if (s.team === PL && !s.dead && dist(s, { x, y }) <= s.r) best = s;
     if (!best) { if (!shift) this.selection = []; else this.onSelectionChange(); return; }
     let sel = this.view.selection;
@@ -201,6 +202,12 @@ export class Controller {
   enqueue(fac: Struct, type: string) { this.submit({ kind: 'enqueue', facId: fac.id, type }); }
   cancelQueued(fac: Struct, index: number) { this.submit({ kind: 'cancel', facId: fac.id, index }); }
   buyUpgrade(key: string) { this.submit({ kind: 'upgrade', key }); }
+  geranWave() { this.submit({ kind: 'wave' }); }
+  setOps(delta: 1 | -1) {
+    const squads = this.selUnits().filter(u => u.def.operator);
+    if (!squads.length) return this.onMessage('Select an infantry squad first');
+    this.submit({ kind: 'ops', ids: this.ids(squads), delta });
+  }
 
   // ---- keys
   keyDown(e: KeyboardEvent): boolean {
@@ -218,6 +225,9 @@ export class Controller {
     else if (e.code === 'KeyT') this.onToggle('tech');
     else if (e.code === 'KeyM') this.onToggle('manual');
     else if (e.code === 'KeyL') this.onToggle('legend');
+    else if (e.code === 'KeyN') this.onToggle('audio');
+    else if (e.code === 'KeyO') this.setOps(e.shiftKey ? -1 : 1);
+    else if (e.code === 'KeyK') this.onToggle('log');
     else if (e.code === 'KeyE' && !this.selFactories().length) { if (this.selUnits().some(x => x.def.troop)) this.digIn(); }
     else if (e.code === 'KeyB' && !this.selFactories().length) this.startBombard();
     else if (/^Digit[1-5]$/.test(e.code)) {

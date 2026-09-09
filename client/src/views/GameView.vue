@@ -7,10 +7,11 @@ import type { Session, TurnDto } from '../game/session';
 import { Controller } from '../game/controller';
 import { Renderer } from '../game/render';
 import { TerrainCanvas } from '../game/terrainCanvas';
+import { AudioDirector } from '../game/audio';
 import type { BasemapMode } from '../game/terrainCanvas';
 import { levelById } from '../game/levels';
 import type { Level } from '../game/levels';
-import { CIV_SITES, UA, TEAMS } from '../game/data';
+import { CIV_SITES, UA, TEAMS, UNITS } from '../game/data';
 import { MM_W, MM_H } from '../game/map';
 import { hub } from '../net/hub';
 import type { MatchInfo, ChatMsg } from '../net/hub';
@@ -24,12 +25,14 @@ import ManualPanel from '../components/game/ManualPanel.vue';
 import ObjectivesPanel from '../components/game/ObjectivesPanel.vue';
 import ChatPanel from '../components/game/ChatPanel.vue';
 import LegendPanel from '../components/game/LegendPanel.vue';
+import BattleLog from '../components/game/BattleLog.vue';
 
 const props = defineProps<{ mode: 'level' | 'skirmish' | 'multiplayer'; levelId?: string; side?: number; difficulty?: number; matchId?: string }>();
 const router = useRouter(); const auth = useAuth();
 
 const ready = ref(false), error = ref(''), hudTick = ref(0), msgText = ref(''), msgShow = ref(false);
-const showTech = ref(false), showManual = ref(false), showLegend = ref(false), paused = ref(false);
+const showTech = ref(false), showManual = ref(false), showLegend = ref(false), showLog = ref(false), paused = ref(false);
+const audio = new AudioDirector(); const audioMode = ref(audio.mode);
 const objIdx = ref(0), chat = ref<ChatMsg[]>([]), opponent = ref(''), netStatus = ref(''), basemap = ref<BasemapMode>('drawn');
 const result = ref<{ won: boolean; title: string; text: string; stats: [string, string][] } | null>(null);
 const level = shallowRef<Level | null>(null);
@@ -43,6 +46,11 @@ const offs: (() => void)[] = [];
 const cleanups: (() => void)[] = [];
 
 function msg(text: string) { msgText.value = text; msgShow.value = true; msgTimer = 2.6; }
+function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log') {
+  if (p === 'tech') showTech.value = !showTech.value; else if (p === 'manual') showManual.value = !showManual.value; else if (p === 'legend') showLegend.value = !showLegend.value;
+  else if (p === 'pause') togglePause(); else if (p === 'log') showLog.value = !showLog.value;
+  else if (p === 'audio') { audio.cycle(); audioMode.value = audio.mode; msg('Sound: ' + (audio.mode === 'on' ? 'effects and voice' : audio.mode === 'sfx' ? 'effects only' : 'off')); }
+}
 const isNet = computed(() => props.mode === 'multiplayer');
 
 onMounted(async () => {
@@ -63,7 +71,7 @@ function setupSolo() {
     level.value = l; side = l.side; difficulty = l.difficulty; passive = 0 < l.passiveUntil; noGerans = 0 < l.noGeransUntil;
   }
   team.value = side;
-  game = markRaw(new Game({ seed: (Math.random() * 0x7fffffff) | 0, bots: [side === 1, side === 0], difficulty, passive, noGerans }));
+  game = markRaw(new Game({ seed: (Math.random() * 0x7fffffff) | 0, bots: [side === 1, side === 0], difficulty, passive, noGerans, scenario: level.value?.scenario }));
   session = new LocalSession(game, side);
   api.post<{ id: string }>('/api/games', { mode: props.mode, levelId: props.levelId, side, difficulty }).then(r => { gameLogId = r.id; }).catch(e => console.warn('game log', e));
 }
@@ -101,14 +109,15 @@ function attach() {
   controller.onSelectionChange = () => { hudTick.value++; };
   controller.onToggle = onToggle;
   ctl.value = controller;
-  if (import.meta.env.DEV) (window as unknown as { gz: unknown }).gz = { game, ctl: controller, session };
+  if (import.meta.env.DEV) (window as unknown as { gz: unknown }).gz = { game, ctl: controller, session, audio };
+  level.value?.objectives[0]?.onStart?.(game);
   const resize = () => { const vw = st.clientWidth, vh = st.clientHeight, dpr = window.devicePixelRatio || 1; c.width = Math.floor(vw * dpr); c.height = Math.floor(vh * dpr); controller.resize(vw, vh, dpr); };
   resize(); const ro = new ResizeObserver(resize); ro.observe(st); cleanups.push(() => ro.disconnect());
   const hq = game.hq(team.value); if (hq) controller.centerOn(hq.x, hq.y + (team.value === UA ? -60 : 60));
   camStart = { x: controller.view.cam.x, y: controller.view.cam.y };
   const pos = (e: MouseEvent) => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, ev: K, fn: (e: HTMLElementEventMap[K]) => void, opts?: AddEventListenerOptions) => { el.addEventListener(ev, fn as EventListener, opts); cleanups.push(() => el.removeEventListener(ev, fn as EventListener, opts)); };
-  on(c, 'mousedown', e => { if (result.value) return; const p = pos(e); controller.mouseDown(p.x, p.y, e.button, e.shiftKey); if (e.button === 1) e.preventDefault(); });
+  on(c, 'mousedown', e => { audio.unlock(); if (result.value) return; const p = pos(e); controller.mouseDown(p.x, p.y, e.button, e.shiftKey); if (e.button === 1) e.preventDefault(); });
   on(c, 'mousemove', e => { const p = pos(e); controller.mouseMove(p.x, p.y); });
   on(c, 'mouseleave', () => controller.mouseLeave());
   on(c, 'dblclick', e => { if (result.value) return; const p = pos(e); controller.doubleClick(p.x, p.y); });
@@ -118,6 +127,7 @@ function attach() {
   on(mm, 'mousedown', e => { if (result.value) return; const r = mm.getBoundingClientRect(); controller.minimapDown((e.clientX - r.left) / MM_W, (e.clientY - r.top) / MM_H, e.button); });
   on(mm, 'contextmenu', e => e.preventDefault());
   on(window, 'keydown', e => {
+    audio.unlock();
     const t = e.target as HTMLElement | null, typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
     if (e.code === 'Enter' && !typing && isNet.value) { chatPanel.value?.focus(); e.preventDefault(); return; }
     if (typing) { if (e.code === 'Escape') (t as HTMLElement).blur(); return; }
@@ -138,12 +148,13 @@ function frame(now: number) {
   const elapsed = Math.min(0.25, (now - last) / 1000); last = now;
   const controller = ctl.value!;
   if (!result.value) session.advance(elapsed);
+  audio.scan(game, controller.view, now);
   controller.handleCamera(elapsed); controller.prune();
   for (const n of game.drainNotices(team.value)) msg(n);
   if (msgTimer > 0) { msgTimer -= elapsed; if (msgTimer <= 0) msgShow.value = false; }
   objT -= elapsed; if (objT <= 0) { objT = 0.5; checkLevel(); }
   if (game.gameOver && !result.value) onGameOver();
-  renderer.render(ctx, game, controller.view, now);
+  renderer.render(ctx, game, controller.view, now, audio.shake);
   renderer.renderMinimap(mmctx, game, controller.view);
   hudT -= elapsed; if (hudT <= 0) { hudT = 0.25; hudTick.value++; }
 }
@@ -159,7 +170,8 @@ function checkLevel() {
   if (o.done(game, ctx)) advanceObjective();
 }
 function advanceObjective() {
-  const l = level.value!; msg('Step done: ' + l.objectives[objIdx.value].title); objIdx.value++;
+  const l = level.value!; msg('Step done: ' + l.objectives[objIdx.value].title); audio.blip(); objIdx.value++;
+  if (objIdx.value < l.objectives.length) l.objectives[objIdx.value].onStart?.(game);
   if (objIdx.value >= l.objectives.length) { ctl.value!.view.marker = null; showResult(true, 'Level complete', l.title + ' finished. The enemy is fully awake from here: keep playing or move on to the next level.'); api.post('/api/progress', { levelId: l.id }).then(() => auth.markLevel(l.id)).catch(() => {}); }
 }
 
@@ -168,7 +180,8 @@ function statsFor(): [string, string][] {
   const fmt = (t: number) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; };
   return [[fmt(game.gameTime), 'Time'], [String(game.stats.lost[EN]), 'Enemy units destroyed'], [game.depots.filter(d => d.owner === PL).length + ' of ' + game.depots.length, 'Towns held'],
     [(civTotal - game.civ.lost[0]) + ' of ' + civTotal, 'Ukrainian civilian sites standing'], [String(game.civ.harmedByUA + game.civ.carsKilled[0]), 'Russian civilian sites and vehicles hit by Ukraine'], [String(game.civ.defectors), 'Russian volunteers and defectors'],
-    [PL === UA ? Math.round(game.support) + '%' : String(game.captured[PL]), PL === UA ? 'Support at the end' : 'Enemy trucks captured'], [game.resources.filter(r => r.owner === PL).length + ' of ' + game.resources.length, 'Gas and wheat sites held'], [String(game.tradeTotal[PL]), 'Funds from trade convoys']];
+    [PL === UA ? Math.round(game.support) + '%' : String(game.captured[PL]), PL === UA ? 'Support at the end' : 'Enemy trucks captured'], [game.resources.filter(r => r.owner === PL).length + ' of ' + game.resources.length, 'Gas and wheat sites held'], [String(game.tradeTotal[PL]), 'Funds from trade convoys'],
+    [String(game.stats.vets[PL]), 'Units that earned a rank'], [Object.entries(game.stats.killsOf[PL]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => n + ' ' + (UNITS[k] ? UNITS[k].label[EN].toLowerCase() : k)).join(', ') || 'none', 'Most destroyed'], [String(game.log.length), 'Battle log entries']];
 }
 function showResult(won: boolean, title: string, text: string) { result.value = { won, title, text, stats: statsFor() }; ctl.value!.view.placing = null; ctl.value!.view.bombardMode = false; }
 
@@ -191,7 +204,6 @@ function finishSolo(res: 'won' | 'lost' | 'abandoned') {
   const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime) }).catch(() => {});
   if (gameLogId) send(); else setTimeout(() => { if (gameLogId) send(); }, 1500);
 }
-function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause') { if (p === 'tech') showTech.value = !showTech.value; else if (p === 'manual') showManual.value = !showManual.value; else if (p === 'legend') showLegend.value = !showLegend.value; else if (p === 'pause') togglePause(); }
 function togglePause() { if (!session.canPause || result.value) return; session.paused = !session.paused; paused.value = session.paused; }
 function cycleBasemap() { const modes: BasemapMode[] = ['drawn', 'street', 'satellite']; basemap.value = modes[(modes.indexOf(basemap.value) + 1) % modes.length]; tc.loadBasemap(basemap.value); }
 function sendChat(text: string) { hub.send('SendMatchChat', props.matchId, text); }
@@ -203,14 +215,14 @@ async function leave() {
 function playAgain() { if (isNet.value) router.push('/lobby'); else router.replace({ path: router.currentRoute.value.path, query: { ...router.currentRoute.value.query, r: String(Date.now()) } }); }
 function continuePlaying() { result.value = null; }
 
-onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.forEach(f => f()); if (!game?.gameOver) finishSolo('abandoned'); session?.destroy(); });
+onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.forEach(f => f()); if (!game?.gameOver) finishSolo('abandoned'); session?.destroy(); audio.dispose(); });
 </script>
 
 <template>
   <div id="game-root">
     <div v-if="error" class="page"><div class="card"><h2>Could not start the game</h2><p class="err">{{ error }}</p><router-link to="/"><button type="button">Back</button></router-link></div></div>
     <template v-else-if="ready">
-      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :basemap="basemap" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
+      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
       <div id="stage" ref="stage">
         <canvas id="game" ref="canvas" />
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>
@@ -218,6 +230,8 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
         <div id="netstatus" v-if="netStatus || (isNet && (session as any)?.waiting)">{{ netStatus || 'Waiting for the server…' }}</div>
         <ObjectivesPanel v-if="level && objIdx < level.objectives.length" :level="level" :index="objIdx" @skip="advanceObjective" />
         <LegendPanel v-if="showLegend" />
+        <BattleLog v-if="showLog" :game="game" :team="team" :tick="hudTick" @close="showLog = false" />
+        <BattleLog v-else :game="game" :team="team" :tick="hudTick" feed />
         <TechPanel v-if="showTech && ctl" :ctl="ctl" :tick="hudTick" @close="showTech = false" />
         <ManualPanel v-if="showManual" @close="showManual = false" />
         <ChatPanel v-if="isNet" ref="chatPanel" :messages="chat" :opponent="opponent" @send="sendChat" />

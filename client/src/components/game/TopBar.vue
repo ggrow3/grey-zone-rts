@@ -3,8 +3,9 @@ import { computed } from 'vue';
 import type { Game } from '../../game/sim';
 import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE } from '../../game/data';
 
-const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; basemap: string; opponent?: string }>();
-const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
+const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; basemap: string; audio: string; opponent?: string }>();
+const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
+const hold = computed(() => { void props.tick; for (const T of [0, 1]) if (g().holdT[T] > 0) return { team: T, left: Math.max(0, Math.ceil(180 - g().holdT[T])) }; return null; });
 
 function fmtTime(t: number) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
 const g = () => props.game;
@@ -14,7 +15,7 @@ const slots = computed(() => {
   void props.tick;
   if (!g().needsOperator(UNITS.fpv, PL())) return { text: 'autonomous', color: '' };
   const fs = g().freeSlots(PL()), gr = g().units.filter(u => u.team === PL() && !u.dead && u.grounded).length;
-  return { text: fs + ' free (' + g().opCap(PL()) + ' per squad)' + (gr ? ', ' + gr + ' grounded' : ''), color: gr ? 'var(--ru)' : fs < 3 ? 'var(--warn)' : '' };
+  return { text: fs + ' free (' + g().opCap(PL()) + ' per operator)' + (gr ? ', ' + gr + ' grounded' : ''), color: gr ? 'var(--ru)' : fs < 3 ? 'var(--warn)' : '' };
 });
 const people = computed(() => { void props.tick; const fp = g().freePeople(PL()); return { text: Math.floor(fp) + ' free / ' + Math.floor(g().people[PL()].total), color: fp < 3 ? 'var(--ru)' : fp < 10 ? 'var(--warn)' : '' }; });
 const civTotal = CIV_SITES.filter(c => c[1] === 0).length;
@@ -43,11 +44,14 @@ function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()
     <div class="stat"><span class="lbl">Trade</span><span class="val small">+{{ game.tradeTotal[team] }}<span v-if="game.captured[team]">, {{ game.captured[team] }} trucks taken</span></span></div>
     <div class="stat"><span class="lbl">Supply</span><span class="val small" :style="{ color: supply.color }" :title="supplyTitle">{{ supply.text }}</span></div>
     <div class="spacer" />
+    <div class="stat" v-if="hold"><span class="lbl">{{ hold.team === team ? 'All towns held' : 'Enemy holds all towns' }}</span><span class="val small" :class="hold.team === team ? 'ok' : 'ru'">victory in {{ hold.left }} s</span></div>
     <div class="stat" v-if="opponent"><span class="lbl">vs</span><span class="val small">{{ opponent }}</span></div>
     <div class="stat"><span class="val">{{ fmtTime(game.gameTime) }}</span></div>
     <button type="button" @click="emit('basemap')" title="Cycle the background: drawn terrain, street map tiles, satellite imagery">Map: {{ basemap }}</button>
     <button type="button" @click="emit('toggle', 'manual')" title="Every unit, building, and the strategy behind them (M)">Manual</button>
     <button type="button" @click="emit('toggle', 'legend')" title="Unit shapes (L)">Legend</button>
+    <button type="button" @click="emit('toggle', 'log')" title="Battle log (K)">Log</button>
+    <button type="button" @click="emit('toggle', 'audio')" title="Sound effects and unit voices (N)">Sound: {{ audio === 'on' ? 'on' : audio === 'sfx' ? 'no voice' : 'off' }}</button>
     <button type="button" v-if="canPause" @click="emit('toggle', 'pause')">{{ paused ? 'Resume' : 'Pause' }}</button>
     <button type="button" class="danger" @click="emit('leave')">Leave</button>
   </div>

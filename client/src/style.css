@@ -166,3 +166,20 @@ table.log th { color: var(--ink-dim); font-weight: 500; }
 #chatpanel.min { height: auto; } #chatpanel.min .chat { display: none; }
 #netstatus { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(26,29,21,0.9); border: 1px solid var(--hud-edge); padding: 4px 12px; font-size: 13px; color: var(--warn); z-index: 10; }
 @media (max-width: 900px) { #selpanel { width: 170px; } #techGrid { grid-template-columns: repeat(3, 1fr); } }
+
+/* ---- barks, veterancy, battle log, two armies ---- */
+#objectives .side { color: var(--ink-dim); font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid var(--hud-edge); padding-bottom: 5px; }
+#objectives.ru { border-left-color: var(--ru); } #objectives.ru .step { color: #ff8a80; }
+#battlelog { right: 12px; top: 12px; width: 380px; max-height: 60%; display: flex; flex-direction: column; padding: 0; }
+#battlelog .head { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--hud-edge); } #battlelog .head h3 { font-size: 20px; } #battlelog .head button { margin-left: auto; }
+#battlelog .body { overflow: auto; padding: 6px 10px; font-size: 13px; line-height: 1.4; }
+#killfeed { position: absolute; left: 12px; bottom: 12px; width: 360px; pointer-events: none; font-size: 12px; line-height: 1.35; z-index: 5; }
+#killfeed .m { background: rgba(26,29,21,0.7); padding: 1px 6px; margin-top: 2px; }
+.m .t { color: var(--ink-dim); margin-right: 6px; font-family: 'Barlow Condensed', sans-serif; }
+.m.good { color: #c6e48b; } .m.bad { color: #ff9a80; } .m.both { color: var(--ink); }
+.cmd.wave { border-left-color: var(--ru); }
+table.armies { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+table.armies th, table.armies td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--hud-edge); font-size: 13px; }
+table.armies th.ua { color: var(--ua); } table.armies th.ru { color: #ff8a80; } table.armies td:first-child { color: var(--ink-dim); white-space: nowrap; }
+.levelgroup h3 { font-size: 18px; margin: 12px 0 4px; } .levelgroup h3.ua { color: var(--ua); } .levelgroup h3.ru { color: #ff8a80; }
+.tag.side1 { color: #ff8a80; border-color: #7a3030; } .tag.side0 { color: var(--ua); border-color: var(--ua); }

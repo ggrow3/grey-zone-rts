@@ -5,7 +5,8 @@ defineEmits<{ (e: 'skip'): void }>();
 </script>
 
 <template>
-  <div id="objectives" class="panel">
+  <div id="objectives" class="panel" :class="{ ru: level.side === 1 }">
+    <div class="side">{{ level.sideNote }}</div>
     <div class="head"><span class="step">{{ Math.min(index + 1, level.objectives.length) }} / {{ level.objectives.length }}</span><span class="title">{{ level.objectives[Math.min(index, level.objectives.length - 1)].title }}</span></div>
     <div class="text">{{ level.objectives[Math.min(index, level.objectives.length - 1)].text }}</div>
     <ol><li v-for="(o, i) in level.objectives" :key="i" :class="{ done: i < index, now: i === index }">{{ o.title }}</li></ol>

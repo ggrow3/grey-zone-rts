@@ -1,7 +1,9 @@
 # Grey Zone
 
 A browser real-time strategy game on the Kharkiv to Belgorod border: drones, jammers, trucks, trenches, and two headquarters.
-Play three short teaching levels, fight the computer, or match against another commander over the network and talk to them while you play.
+Play ten short teaching levels on both sides of the border, fight the computer, or match against another commander over the network and talk to them while you play.
+
+What makes it feel like the real front: the two armies are not mirrors (Ukrainian drones are flown by squads, Russian ones fly themselves; Geran waves, Lancets, North Koreans, defections, civilian support), squads shout "Slava Ukraini!" and "Ura!" (text bubbles, plus spoken voice through the browser's speech synthesis), units earn veteran ranks, artillery runs on shells that trucks bring up, radar spots guns that fire, every kill and capture goes into a battle log, and a squad can take on up to four drone operators, each flying three drones (six after Drone swarm control). Holding every town for three minutes wins outright.
 
 - **Client**: Vue 3 + TypeScript (Vite). The whole game simulation runs in the browser as a deterministic lockstep engine.
 - **Server**: C# ASP.NET Core (.NET 10) minimal API + SignalR. Accounts (JWT), lobby, matchmaking, chat, the authoritative match turn clock, level progress, and a log of every game played. SQLite via EF Core.
@@ -64,4 +66,4 @@ az webapp deploy --resource-group greyzone-rts-rg --name greyzone-rts --src-path
 
 ## Controls
 
-Left-drag selects, right-click moves or attacks, `Z X C V B` produce from a selected factory, `F` dives kamikaze drones at the nearest target, `G` forms a swarm, `E` digs in, `B` or Ctrl+right-click fires artillery at a map point, `T` opens research, `M` the manual, `L` the legend, Space jumps to your headquarters, Enter opens chat in multiplayer. The full list is in the in-game manual.
+Left-drag selects, right-click moves or attacks, `Z X C V B` produce from a selected factory, `F` dives kamikaze drones at the nearest target, `G` forms a swarm, `E` digs in, `O` adds a person to the selected squad as a drone operator (Shift+O removes one), `B` or Ctrl+right-click fires artillery at a map point, `T` opens research, `M` the manual (its "Two armies" tab lists every difference between the sides and what the troops shout), `K` the battle log, `L` the legend, `N` cycles sound (effects and voice, effects only, off), Space jumps to your headquarters, Enter opens chat in multiplayer. The full list is in the in-game manual.

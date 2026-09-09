@@ -2,9 +2,11 @@
 import { ref } from 'vue';
 import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS } from '../../game/data';
 import type { UnitDef } from '../../game/data';
+import { BARK_GLOSS } from '../../game/data';
+import { FACTION_FACTS } from '../../game/factions';
 
 defineEmits<{ (e: 'close'): void }>();
-const tab = ref<'units' | 'buildings' | 'strategy' | 'controls'>('units');
+const tab = ref<'units' | 'buildings' | 'armies' | 'strategy' | 'controls'>('units');
 const groups: [string, (k: string) => boolean][] = [['Drones', k => !!UNITS[k].air], ['Troops', k => !!UNITS[k].troop], ['Vehicles and artillery', k => !UNITS[k].air && !UNITS[k].troop && !UNITS[k].auto], ['Logistics and civilians', k => !!UNITS[k].auto]];
 function unitStats(d: UnitDef) {
   const bits: string[] = [];
@@ -20,7 +22,7 @@ function unitStats(d: UnitDef) {
 }
 const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-click', 'move, attack, or set a factory rally point'], ['Z X C V B', 'produce from the selected factory'],
   ['F', 'selected kamikaze drones dive at the nearest target they can see; a swarm spreads its dives'], ['Ctrl+right-click, or B then click', 'artillery fires on a map point, seen or unseen'], ['E', 'selected troops dig a trench where they stand'],
-  ['M', 'this manual'], ['T', 'research tree'], ['L', 'unit shape legend'], ['Double-click', 'select every drone on screen; double-click a drone to select all of that type'], ['G', 'form the selected drones into a swarm, or disband one'],
+  ['O / Shift+O', 'add a person to the selected squad as a drone operator, or send one back'], ['M', 'this manual'], ['T', 'research tree'], ['L', 'unit shape legend'], ['K', 'battle log'], ['N', 'sound: effects and voice, effects only, off'], ['Double-click', 'select every drone on screen; double-click a drone to select all of that type'], ['G', 'form the selected drones into a swarm, or disband one'],
   ['Ctrl+1 to 5', 'assign a group, digit to recall'], ['W A S D, arrows, screen edge, minimap', 'move the camera'], ['Mouse wheel, + and -', 'zoom'], ['Space', 'jump to headquarters'], ['P', 'pause (solo games)'], ['Enter', 'chat (multiplayer)'], ['Esc', 'cancel or deselect']];
 </script>
 
@@ -28,7 +30,7 @@ const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-cli
   <div id="manual" class="panel">
     <div id="manualHead">
       <h3>Field manual</h3>
-      <div id="manualTabs"><button v-for="[k, l] in [['units', 'Units'], ['buildings', 'Buildings'], ['strategy', 'Strategy'], ['controls', 'Controls']]" :key="k" type="button" :class="{ on: tab === k }" @click="tab = k as typeof tab">{{ l }}</button></div>
+      <div id="manualTabs"><button v-for="[k, l] in [['units', 'Units'], ['buildings', 'Buildings'], ['armies', 'Two armies'], ['strategy', 'Strategy'], ['controls', 'Controls']]" :key="k" type="button" :class="{ on: tab === k }" @click="tab = k as typeof tab">{{ l }}</button></div>
       <button type="button" class="close" @click="$emit('close')">Close (M)</button>
     </div>
     <div id="manualBody">
@@ -54,6 +56,19 @@ const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-cli
         </div>
         <h4>Sites on the map</h4>
         <p>Towns: captured by troops, send supply trucks, allow building nearby. Wheat fields: feed 6 squads each, add recruits and support, burn under heavy fire. Gas wells and the Belgorod fuel depot: pay 5 funds a second and fuel 6 vehicles each while the pipeline is intact.</p>
+      </template>
+      <template v-else-if="tab === 'armies'">
+        <h4>How the two armies differ</h4>
+        <table class="armies"><thead><tr><th>Topic</th><th class="ua">Ukraine</th><th class="ru">Russia</th></tr></thead>
+          <tbody><tr v-for="f in FACTION_FACTS" :key="f.topic"><td>{{ f.topic }}</td><td>{{ f.ua }}</td><td>{{ f.ru }}</td></tr></tbody></table>
+        <h4>What the troops shout</h4>
+        <p><span v-for="(gloss, phrase) in BARK_GLOSS" :key="phrase" style="display:inline-block;margin:0 14px 4px 0"><b>{{ phrase }}</b> <span class="dim">{{ gloss }}</span></span></p>
+        <h4>Veterans and shells</h4>
+        <p>Every two confirmed kills raise a unit one rank (Trained, Veteran, Elite): 6% more damage dealt and 6% less taken per rank, and drones dodge a little better. Chevrons under a unit show its rank. Howitzers carry 12 shells and rocket launchers three salvos; guns beside the artillery depot or headquarters refill slowly, and an ammunition truck leaves the headquarters for any gun below half. Trucks are captured and killed like any other. A gun that fires is shown to enemy radar for three seconds: expect counter-battery fire.</p>
+        <h4>Operators</h4>
+        <p>Ukrainian drones are flown by infantry squads. A squad starts with one operator and can take up to four (press O with the squad selected; each one is a person from your pool). Every operator flies three drones, six after Drone swarm control, so a squad of four flies a dozen. Drones link to the nearest squad with a free slot within 900 and must stay inside its control range.</p>
+        <h4>Winning</h4>
+        <p>Destroy the enemy headquarters, or hold all six towns for three minutes.</p>
       </template>
       <template v-else-if="tab === 'strategy'">
         <template v-for="[h, t] in STRATEGY" :key="h"><h4>{{ h }}</h4><p>{{ t }}</p></template>

@@ -2,7 +2,8 @@
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
 import type { Unit, Struct } from '../../game/types';
-import { UNITS, FORMATIONS, FUEL_USERS, TARGET_WORDS } from '../../game/data';
+import { UNITS, FORMATIONS, FUEL_USERS, TARGET_WORDS, RANK_NAMES } from '../../game/data';
+import { rankOf } from '../../game/sim';
 import { dist, clamp } from '../../game/dmath';
 
 const props = defineProps<{ ctl: Controller; tick: number }>();
@@ -19,6 +20,9 @@ function unitRows(e: Unit): [string, string][] {
   if (d.kamikaze) { rows.push(['Warhead', String(d.dmg)], ['Attack', 'one-way dive, dies on impact']); }
   else if (d.dmg) { rows.push(['Damage', d.dmg + (d.salvo ? ' x' + d.salvo : '')], ['Range', String(G.rangeOf(e))]); }
   rows.push(['Can hit', d.targets ? d.targets.map(k => TARGET_WORDS[k]).join(', ') : 'nothing']);
+  if (d.ammo) rows.push(['Shells', (e.ammo || 0) + ' / ' + d.ammo + (e.ammo === 0 ? ', waiting for a truck' : e.ammoTruckId ? ', truck on the way' : '')]);
+  if (e.revealT && e.revealT > 0 && d.indirect) rows.push(['Exposed', 'firing revealed you to radar for ' + Math.ceil(e.revealT) + ' s']);
+  if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)] + ' (' + (e.kills || 0) + ' kills)']);
   if (d.crew) rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul) rows.push(['Roads', (e.onRoad ? 'on a road, ' : 'off road, ') + Math.round((d.roadMul - 1) * 100) + '% faster on roads']);
   if (d.troop && e.order.kind === 'dig') rows.push(['Digging', Math.ceil(e.digT || 0) + ' s to go']);
@@ -32,7 +36,7 @@ function unitRows(e: Unit): [string, string][] {
   if (d.troop) { const cv = e.cover || 'open'; rows.push(['Cover', cv === 'trench' ? 'trench: -45% damage, drones -70%, seen only within 110' : cv === 'forest' ? 'forest: +50% fire, -40% damage, drones -60%, seen only within 140' : cv === 'urban' ? 'town: +20% fire, -25% damage, drones -30%, seen within 220' : 'open ground: +30% damage taken']); }
   if (d.endurance) rows.push(['Flight time', e.landed ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s' : Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s of ' + d.endurance + (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : '')]);
   if (d.operated) rows.push(['Operator', !G.needsOperator(d, e.team) ? 'autonomous' : e.grounded ? 'none: grounded until a squad within 900 has a free slot' : e.operator && !e.operator.dead ? UNITS[e.operator.type].label[0] + ', ' + Math.round(dist(e, e.operator)) + ' of ' + G.linkRange(e) + ' range' : 'none, searching']);
-  if (d.operator) rows.push(['Flying', G.droneCount(e) + ' of ' + G.opCap(e.team) + ' drones']);
+  if (d.operator) { rows.push(['Operators', (e.ops || 1) + ' of 4, ' + G.opCap(e.team) + ' drones each']); rows.push(['Flying', G.droneCount(e) + ' of ' + G.opCapOf(e) + ' drones']); }
   if (d.jam) rows.push(['Jam radius', String(d.jam)]);
   rows.push(['Vision', String(Math.round(d.vision * G.visMul(e.team)))]);
   if (d.minRange) rows.push(['Minimum range', String(d.minRange)]);
@@ -62,6 +66,7 @@ function structRows(e: Struct): [string, string][] {
       <template v-if="one.isStruct"><div class="row" v-for="r in structRows(one as Struct)" :key="r[0]"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div></template>
       <template v-else>
         <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, 7)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
+        <div v-if="(one as Unit).def.operator" class="forms"><button type="button" @click="ctl.setOps(1)" title="One person from the pool joins as a drone operator (O)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)" title="Send one operator back to the pool (Shift+O)">− operator</button></div>
         <button v-if="(one as Unit).def.troop" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E)</button>
         <button v-if="(one as Unit).def.indirect" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B)</button>
         <button v-if="(one as Unit).def.kamikaze" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest target (F)</button>
@@ -69,6 +74,7 @@ function structRows(e: Struct): [string, string][] {
     </template>
     <template v-else>
       <h3>{{ swarmSel ? 'Swarm of ' + unitsSel.length : unitsSel.length + ' units selected' }}</h3>
+      <div v-if="unitsSel.some(u => u.def.operator)" class="forms"><button type="button" @click="ctl.setOps(1)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)">− operator</button></div>
       <button v-if="unitsSel.some(u => u.def.troop)" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E): trench in 20 s</button>
       <button v-if="unitsSel.some(u => u.def.indirect)" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B, or Ctrl+right-click)</button>
       <template v-if="unitsSel.some(u => u.def.air)">
