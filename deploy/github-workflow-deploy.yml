@@ -1,0 +1,40 @@
+name: Build and deploy to Azure App Service
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: greyzone-rts
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '22'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: npm, cache-dependency-path: client/package-lock.json }
+      - name: Build client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: ${{ env.DOTNET_VERSION }} }
+      - name: Publish server with the built client in wwwroot
+        run: |
+          rm -rf server/GreyZone.Server/wwwroot && mkdir -p server/GreyZone.Server/wwwroot
+          cp -r client/dist/. server/GreyZone.Server/wwwroot/
+          dotnet publish server/GreyZone.Server/GreyZone.Server.csproj -c Release -o publish
+
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish

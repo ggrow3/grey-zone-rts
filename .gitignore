@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+server/GreyZone.Server/Data/*.db*
+server/GreyZone.Server/wwwroot/*
+!server/GreyZone.Server/wwwroot/.gitkeep
+publish/
+
+# Node
+node_modules/
+client/dist/
+npm-debug.log*
+
+# local tooling
+.claude/
+*.zip
+.DS_Store
+Thumbs.db

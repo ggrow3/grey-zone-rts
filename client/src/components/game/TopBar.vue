@@ -1,0 +1,54 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { Game } from '../../game/sim';
+import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE } from '../../game/data';
+
+const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; basemap: string; opponent?: string }>();
+const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
+
+function fmtTime(t: number) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+const g = () => props.game;
+const PL = () => props.team;
+const forces = computed(() => { void props.tick; let n = 0; for (const u of g().units) if (u.team === PL() && !u.def.auto) n++; return n; });
+const slots = computed(() => {
+  void props.tick;
+  if (!g().needsOperator(UNITS.fpv, PL())) return { text: 'autonomous', color: '' };
+  const fs = g().freeSlots(PL()), gr = g().units.filter(u => u.team === PL() && !u.dead && u.grounded).length;
+  return { text: fs + ' free (' + g().opCap(PL()) + ' per squad)' + (gr ? ', ' + gr + ' grounded' : ''), color: gr ? 'var(--ru)' : fs < 3 ? 'var(--warn)' : '' };
+});
+const people = computed(() => { void props.tick; const fp = g().freePeople(PL()); return { text: Math.floor(fp) + ' free / ' + Math.floor(g().people[PL()].total), color: fp < 3 ? 'var(--ru)' : fp < 10 ? 'var(--warn)' : '' }; });
+const civTotal = CIV_SITES.filter(c => c[1] === 0).length;
+const supply = computed(() => {
+  void props.tick; const sp = g().supply[PL()];
+  return { text: 'food ' + sp.foodUsed + '/' + sp.foodCap + ', fuel ' + sp.fuelUsed + '/' + sp.fuelCap + ', power ' + sp.powerUsed + '/' + sp.powerCap,
+    color: (sp.food < 1 || sp.fuel < 1 || sp.power < 1) ? 'var(--ru)' : (sp.foodUsed >= sp.foodCap - 1 || sp.fuelUsed >= sp.fuelCap - 1 || sp.powerUsed >= sp.powerCap - 2) ? 'var(--warn)' : '' };
+});
+const supplyTitle = 'Each wheat field held feeds ' + FOOD_PER_FIELD + ' squads (plus ' + FOOD_BASE + ' from stores); each gas site with a working pipeline fuels ' + FUEL_PER_NODE + ' vehicles (plus ' + FUEL_BASE + ' from reserves); each intact substation charges ' + POWER_PER_SUBSTATION + ' battery drones and each generator set ' + POWER_PER_GENERATOR + ' (plus ' + POWER_BASE + ' base)';
+function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()); return r.owner === UA ? (intact || PL() !== UA ? 'ua' : 'cut') : r.owner === RU ? (intact || PL() !== RU ? 'ru' : 'cut') : ''; }
+</script>
+
+<template>
+  <div id="top" :key="tick">
+    <div class="stat"><span class="lbl">Funds</span><span class="val">{{ Math.floor(game.funds[team]) }}</span></div>
+    <div class="stat"><span class="lbl">Income</span><span class="val">+{{ game.expectedIncome(team).toFixed(0) }}/s</span></div>
+    <div class="stat"><span class="lbl">Towns</span><span class="sq"><i v-for="d in game.depots" :key="d.name" :title="d.name" :class="d.owner === UA ? 'ua' : d.owner === RU ? 'ru' : ''" /></span></div>
+    <div class="stat"><span class="lbl">Gas</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'gas')" :key="i" :title="r.name" :class="gasClass(r)" /></span>
+      <span class="val small" :style="{ color: game.pipelineIntact(team) ? '' : 'var(--ru)' }">{{ game.pipelineIntact(team) ? '+' + game.gasIncome(team).toFixed(0) + '/s' : 'pipeline cut' }}</span></div>
+    <div class="stat"><span class="lbl">Wheat</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'wheat')" :key="i" :title="r.name" :class="r.burnT > 0 ? 'fire' : r.owner === UA ? 'ua' : r.owner === RU ? 'ru' : ''" /></span></div>
+    <div class="stat"><span class="lbl">Forces</span><span class="val">{{ forces }}</span></div>
+    <div class="stat"><span class="lbl">Personnel</span><span class="val small" :style="{ color: people.color }">{{ people.text }}</span></div>
+    <div class="stat"><span class="lbl">Operators</span><span class="val small" :style="{ color: slots.color }">{{ slots.text }}</span></div>
+    <div class="stat" v-if="team === UA"><span class="lbl">Support</span><span class="val" :style="{ color: game.support < 50 ? 'var(--ru)' : game.support < 75 ? 'var(--warn)' : '' }">{{ Math.round(game.support) }}%</span></div>
+    <div class="stat" v-if="team === UA"><span class="lbl">Civilian sites</span><span class="val small">{{ civTotal - game.civ.lost[0] }} / {{ civTotal }}</span></div>
+    <div class="stat"><span class="lbl">Trade</span><span class="val small">+{{ game.tradeTotal[team] }}<span v-if="game.captured[team]">, {{ game.captured[team] }} trucks taken</span></span></div>
+    <div class="stat"><span class="lbl">Supply</span><span class="val small" :style="{ color: supply.color }" :title="supplyTitle">{{ supply.text }}</span></div>
+    <div class="spacer" />
+    <div class="stat" v-if="opponent"><span class="lbl">vs</span><span class="val small">{{ opponent }}</span></div>
+    <div class="stat"><span class="val">{{ fmtTime(game.gameTime) }}</span></div>
+    <button type="button" @click="emit('basemap')" title="Cycle the background: drawn terrain, street map tiles, satellite imagery">Map: {{ basemap }}</button>
+    <button type="button" @click="emit('toggle', 'manual')" title="Every unit, building, and the strategy behind them (M)">Manual</button>
+    <button type="button" @click="emit('toggle', 'legend')" title="Unit shapes (L)">Legend</button>
+    <button type="button" v-if="canPause" @click="emit('toggle', 'pause')">{{ paused ? 'Resume' : 'Pause' }}</button>
+    <button type="button" class="danger" @click="emit('leave')">Leave</button>
+  </div>
+</template>

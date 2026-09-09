@@ -1,0 +1,8 @@
+bin/
+obj/
+Data/*.db
+Data/*.db-*
+**/Data/*.db
+**/Data/*.db-*
+*.user
+.vs/
