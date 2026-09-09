@@ -15,6 +15,16 @@ export interface View {
   drag: { x0: number; y0: number; x1: number; y1: number } | null; marker: Marker | null;
 }
 
+/** 0 ground, 1 low aircraft, 2 high-altitude aircraft */
+export function altOf(u: Unit): number { return !u.def.air || u.landed || u.grounded ? 0 : u.def.highAlt ? 2 : 1; }
+/** where an aircraft is drawn: it slides away from the screen centre with altitude, so panning the camera gives depth */
+export function parallaxOf(u: Unit, v: View): { x: number; y: number } {
+  const alt = altOf(u); if (!alt) return { x: u.x, y: u.y };
+  const k = alt === 2 ? 0.09 : 0.045, cx = v.cam.x + v.vw / (2 * v.cam.z), cy = v.cam.y + v.vh / (2 * v.cam.z);
+  return { x: u.x + (u.x - cx) * k, y: u.y + (u.y - cy) * k };
+}
+const SHADOW_OFF = [[2, 3], [10, 14], [24, 34]];
+
 export function shapePath(c: CanvasRenderingContext2D, shape: string, r: number) {
   c.beginPath();
   switch (shape) {
@@ -94,18 +104,33 @@ function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
   c.restore();
 }
 
-function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0) {
-  const d = u.def, r = d.r * UNIT_SCALE;
+function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
+  const d = u.def, alt = altOf(u), r = d.r * UNIT_SCALE * (alt === 2 ? 1.15 : 1);
   if (u.order.kind === 'dig') drawDigging(c, u, now);
   const team = u.team < 0 ? { color: '#efeadf', stroke: '#5d584c' } : TEAMS[u.team];
-  c.save(); c.translate(u.x, u.y);
-  if (d.air) { c.save(); c.translate(7, 9); c.rotate(u.angle); c.globalAlpha = 0.28; c.fillStyle = '#000'; shapePath(c, d.shape, r); c.fill(); c.restore(); }
+  // shadow on the ground at the true position; aircraft cast it farther away the higher they fly
+  const so = SHADOW_OFF[alt];
+  c.save(); c.translate(u.x + so[0], u.y + so[1]);
+  if (alt) { c.rotate(u.angle); c.globalAlpha = alt === 2 ? 0.16 : 0.26; c.fillStyle = '#000'; shapePath(c, d.shape, r * (alt === 2 ? 0.85 : 1)); c.fill(); }
+  else { c.globalAlpha = 0.35; c.fillStyle = '#000'; c.beginPath(); c.ellipse(0, 0, r * 1.15, r * 0.8, 0, 0, Math.PI * 2); c.fill(); }
+  c.restore();
+  const p = v ? parallaxOf(u, v) : { x: u.x, y: u.y };
+  const bob = alt === 1 ? Math.sin(now / 420 + u.id) * 1.2 : alt === 2 ? Math.sin(now / 900 + u.id) * 2 : 0;
+  c.save(); c.translate(p.x, p.y + bob);
   if (u.landed) { c.scale(0.7, 0.7); c.globalAlpha = 0.6; }
   if (u.grounded) { c.scale(0.7, 0.7); c.globalAlpha = 0.5; }
   c.rotate(u.angle);
+  const body = u.jamT > 0 && Math.floor(u.jamT * 40) % 2 === 0 ? '#ffffff' : d.hollow ? 'rgba(90,20,24,0.5)' : team.color;
+  if (!alt) {
+    // extruded side: the same shape a little lower in a darker tone
+    c.save(); c.rotate(-u.angle); c.translate(0, 2.5); c.rotate(u.angle); shapePath(c, d.shape, r); c.fillStyle = 'rgba(0,0,0,0.45)'; c.fill(); c.restore();
+  }
   shapePath(c, d.shape, r);
-  c.fillStyle = u.jamT > 0 && Math.floor(u.jamT * 40) % 2 === 0 ? '#ffffff' : d.hollow ? 'rgba(90,20,24,0.5)' : team.color;
+  c.fillStyle = body;
   c.fill();
+  // top-face highlight for the lit side
+  c.save(); c.clip(); c.fillStyle = 'rgba(255,255,255,0.14)'; c.beginPath(); c.ellipse(-r * 0.25, -r * 0.35, r * 0.9, r * 0.5, 0, 0, Math.PI * 2); c.fill(); c.restore();
+  shapePath(c, d.shape, r);
   c.lineWidth = 1.5; c.strokeStyle = team.stroke; c.stroke();
   shapeDetail(c, d.shape, r, team.stroke, u.cargo);
   if (d.shape === 'band') { c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, r * 0.62, 0, Math.PI * 2); c.stroke(); }
@@ -133,6 +158,7 @@ function hpBar(c: CanvasRenderingContext2D, x: number, y: number, w: number, rat
 
 function drawCiv(c: CanvasRenderingContext2D, s: Struct) {
   const r = s.r;
+  drawFootprintShadow(c, s);
   c.save(); c.translate(s.x, s.y);
   c.lineWidth = 1.5; c.strokeStyle = '#5d584c';
   switch (s.type) {
@@ -153,8 +179,14 @@ function drawCiv(c: CanvasRenderingContext2D, s: Struct) {
   c.restore();
 }
 
+function drawFootprintShadow(c: CanvasRenderingContext2D, s: Struct) {
+  if (s.def.trench || s.def.netR) return;
+  c.save(); c.translate(s.x + 4, s.y + 7); c.globalAlpha = 0.32; c.fillStyle = '#000';
+  c.beginPath(); c.ellipse(0, 0, s.r * 1.15, s.r * 0.85, 0, 0, Math.PI * 2); c.fill(); c.restore();
+}
 function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
   if (s.civ) return drawCiv(c, s);
+  drawFootprintShadow(c, s);
   const team = TEAMS[s.team], r = s.r;
   c.save(); c.translate(s.x, s.y);
   c.fillStyle = team.dark; c.strokeStyle = team.color; c.lineWidth = 2;
@@ -332,9 +364,11 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.rally.x, s.rally.y); ctx.stroke(); ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(s.rally.x, s.rally.y, 5, 0, Math.PI * 2); ctx.stroke();
     }
-    for (const u of g.units) if (!u.def.air && (u.seenBy[PL] || u.team === PL)) drawUnit(ctx, u, now);
+    for (const u of g.units) if (!u.def.air && (u.seenBy[PL] || u.team === PL)) drawUnit(ctx, u, now, v);
     drawProjectiles(ctx, g.projectiles);
-    for (const u of g.units) if (u.def.air && u.seenBy[PL]) drawUnit(ctx, u);
+    // low aircraft first, then the high ones on top: a layered sky
+    for (const u of g.units) if (u.def.air && u.seenBy[PL] && altOf(u) < 2) drawUnit(ctx, u, now, v);
+    for (const u of g.units) if (u.def.air && u.seenBy[PL] && altOf(u) === 2) drawUnit(ctx, u, now, v);
     drawEffects(ctx, g.effects, PL, g); drawEffects(ctx, this.localFx, PL);
     ctx.restore();
 
@@ -344,9 +378,10 @@ export class Renderer {
     for (const e of v.selection) {
       if (e.dead) continue;
       const r = (e.isUnit ? e.def.r * UNIT_SCALE : e.r) + 5;
+      const sp = e.isUnit ? parallaxOf(e, v) : { x: e.x, y: e.y };
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
-      if (e.isUnit) hpBar(ctx, e.x - 12, e.y - r - 8, 24, e.hp / e.def.hp);
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.stroke();
+      if (e.isUnit) hpBar(ctx, sp.x - 12, sp.y - r - 8, 24, e.hp / e.def.hp);
       if (e.isUnit && e.def.ammo) { const max = e.def.ammo, n = e.ammo || 0; for (let i = 0; i < max; i++) { ctx.fillStyle = i < n ? '#f5e9c8' : 'rgba(0,0,0,0.5)'; ctx.fillRect(e.x - max * 1.5 + i * 3, e.y + r + 3, 2, 3); } }
       const rng = e.isUnit ? g.rangeOf(e) : (e.def.range || 0);
       const jam = e.def.jam || 0;
@@ -388,10 +423,10 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(58,134,255,0.55)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(232,228,212,0.85)'; ctx.font = '11px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('swarm ' + ms.length, cx, cy - rr - 4);
     }
-    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1); ctx.fillStyle = '#000'; ctx.fillRect(u.x - 8, u.y + u.def.r * UNIT_SCALE + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(u.x - 8, u.y + u.def.r + 4, 16 * k, 3); }
+    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = '#000'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16 * k, 3); }
     for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - u.def.r * UNIT_SCALE - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
-    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) hpBar(ctx, u.x - 10, u.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp);
-    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) hpBar(ctx, u.x - 10, u.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp);
+    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
+    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
     for (const s of g.structs) if (s.team === PL && s.def.jam && s.build >= 1) { ctx.strokeStyle = 'rgba(196,139,224,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(s.x, s.y, s.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const st of g.structs) if (!st.dead && st.def.heal && st.build >= 1 && (st.civ ? st.nation === PL : st.team === PL)) { ctx.strokeStyle = 'rgba(139,195,74,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(st.x, st.y, st.def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const u of g.units) if (u.team === PL && u.def.jam) { ctx.strokeStyle = 'rgba(196,139,224,0.3)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(u.x, u.y, u.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
