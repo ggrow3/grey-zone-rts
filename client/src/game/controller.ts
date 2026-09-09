@@ -1,5 +1,5 @@
 // Player input: camera, selection, hotkeys, and turning clicks into simulation commands.
-import { UNITS, STRUCTS, HOTKEYS } from './data';
+import { UNITS, STRUCTS, HOTKEYS, UNIT_SCALE } from './data';
 import type { FormationType } from './data';
 import { W, H } from './map';
 import { clamp, dist } from './dmath';
@@ -93,7 +93,7 @@ export class Controller {
     const w = this.toWorld(px, py), { cam, vw, vh } = this.view, g = this.game, PL = this.team;
     const onScreen = (u: Unit) => (u.x - cam.x) * cam.z >= 0 && (u.x - cam.x) * cam.z <= vw && (u.y - cam.y) * cam.z >= 0 && (u.y - cam.y) * cam.z <= vh;
     let hit: Unit | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && u.def.air && !u.def.auto) { const dd = dist(u, w); if (dd <= u.def.r + 8 && dd < bd) { bd = dd; hit = u; } }
+    for (const u of g.units) if (u.team === PL && !u.dead && u.def.air && !u.def.auto) { const dd = dist(u, w); if (dd <= u.def.r * UNIT_SCALE + 8 && dd < bd) { bd = dd; hit = u; } }
     const picked = g.units.filter(u => u.team === PL && !u.dead && u.def.air && !u.def.auto && onScreen(u) && (!hit || u.type === hit.type));
     if (!picked.length) return this.onMessage('No drones on screen');
     this.selection = g.expandSwarms(picked); this.view.drag = null;
@@ -117,7 +117,7 @@ export class Controller {
     const g = this.game, PL = this.team;
     // aircraft hover over squads: prefer the ground unit under the click unless the drone itself was hit dead centre
     let best: Entity | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(u, { x, y }) + (u.def.air ? 3 : 0); if (dd <= u.def.r + 5 && dd < bd) { bd = dd; best = u; } }
+    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(u, { x, y }) + (u.def.air ? 3 : 0); if (dd <= u.def.r * UNIT_SCALE + 5 && dd < bd) { bd = dd; best = u; } }
     if (!best) for (const s of g.structs) if (s.team === PL && !s.dead && dist(s, { x, y }) <= s.r) best = s;
     if (!best) { if (!shift) this.selection = []; else this.onSelectionChange(); return; }
     let sel = this.view.selection;
@@ -138,7 +138,7 @@ export class Controller {
   findEnemyAt(x: number, y: number): Entity | null {
     const g = this.game, PL = this.team, EN = 1 - PL;
     let best: Entity | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL]) { const dd = dist(u, { x, y }); if (dd <= u.def.r + 7 && dd < bd) { bd = dd; best = u; } }
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL]) { const dd = dist(u, { x, y }); if (dd <= u.def.r * UNIT_SCALE + 7 && dd < bd) { bd = dd; best = u; } }
     if (!best) for (const s of g.structs) if (s.team === EN && !s.dead && dist(s, { x, y }) <= s.r + 4) best = s;
     return best;
   }

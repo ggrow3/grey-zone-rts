@@ -1,10 +1,9 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, UNIT_SCALE } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
 import type { Game } from './sim';
-import { rOf } from './sim';
 import type { Unit, Struct, Entity, Site, Effect, Projectile } from './types';
 import { TerrainCanvas, poly, drawPipelines } from './terrainCanvas';
 import type { Marker } from './levels';
@@ -71,7 +70,7 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
 
 /** shovel, flying dirt, and a trench line growing under a squad that is digging in */
 function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
-  const r = u.def.r, k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
+  const r = u.def.r * UNIT_SCALE, k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
   c.save(); c.translate(u.x, u.y);
   // the trench taking shape
   c.globalAlpha = 0.25 + 0.75 * k; c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round';
@@ -96,7 +95,7 @@ function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
 }
 
 function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0) {
-  const d = u.def, r = d.r;
+  const d = u.def, r = d.r * UNIT_SCALE;
   if (u.order.kind === 'dig') drawDigging(c, u, now);
   const team = u.team < 0 ? { color: '#efeadf', stroke: '#5d584c' } : TEAMS[u.team];
   c.save(); c.translate(u.x, u.y);
@@ -344,7 +343,7 @@ export class Renderer {
     ctx.save(); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
     for (const e of v.selection) {
       if (e.dead) continue;
-      const r = rOf(e) + 5;
+      const r = (e.isUnit ? e.def.r * UNIT_SCALE : e.r) + 5;
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
       if (e.isUnit) hpBar(ctx, e.x - 12, e.y - r - 8, 24, e.hp / e.def.hp);
@@ -389,10 +388,10 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(58,134,255,0.55)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(232,228,212,0.85)'; ctx.font = '11px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('swarm ' + ms.length, cx, cy - rr - 4);
     }
-    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1); ctx.fillStyle = '#000'; ctx.fillRect(u.x - 8, u.y + u.def.r + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(u.x - 8, u.y + u.def.r + 4, 16 * k, 3); }
-    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
-    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) hpBar(ctx, u.x - 10, u.y - u.def.r - 9, 20, u.hp / u.def.hp);
-    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) hpBar(ctx, u.x - 10, u.y - u.def.r - 9, 20, u.hp / u.def.hp);
+    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1); ctx.fillStyle = '#000'; ctx.fillRect(u.x - 8, u.y + u.def.r * UNIT_SCALE + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(u.x - 8, u.y + u.def.r + 4, 16 * k, 3); }
+    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - u.def.r * UNIT_SCALE - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
+    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) hpBar(ctx, u.x - 10, u.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp);
+    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) hpBar(ctx, u.x - 10, u.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp);
     for (const s of g.structs) if (s.team === PL && s.def.jam && s.build >= 1) { ctx.strokeStyle = 'rgba(196,139,224,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(s.x, s.y, s.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const st of g.structs) if (!st.dead && st.def.heal && st.build >= 1 && (st.civ ? st.nation === PL : st.team === PL)) { ctx.strokeStyle = 'rgba(139,195,74,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(st.x, st.y, st.def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const u of g.units) if (u.team === PL && u.def.jam) { ctx.strokeStyle = 'rgba(196,139,224,0.3)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(u.x, u.y, u.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }

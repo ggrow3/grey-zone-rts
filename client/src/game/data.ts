@@ -261,6 +261,8 @@ export const COUNTERS: [string, string][] = [
 export const WAVE_COST = 600, WAVE_COOLDOWN = 90;
 /** seconds a squad stands still to dig a trench */
 export const DIG_TIME = 5;
+/** units are drawn this much larger than their simulation radius (visual only) */
+export const UNIT_SCALE = 1.3;
 
 export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine; the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
 
