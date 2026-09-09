@@ -20,6 +20,13 @@ function unitRows(e: Unit): [string, string][] {
   if (d.kamikaze) { rows.push(['Warhead', String(d.dmg)], ['Attack', 'one-way dive, dies on impact']); }
   else if (d.dmg) { rows.push(['Damage', d.dmg + (d.salvo ? ' x' + d.salvo : '')], ['Range', String(G.rangeOf(e))]); }
   rows.push(['Can hit', d.targets ? d.targets.map(k => TARGET_WORDS[k]).join(', ') : 'nothing']);
+  if (d.targets) {
+    const m: [string, number][] = [['troops', d.vsInf || 1], ['vehicles', d.vsVehicle || 1], ['buildings', d.vsStruct || 1], ['small drones', d.vsAirSmall || 1], ['large aircraft', d.vsAirLarge || 1]];
+    const can = (k: string) => k === 'troops' ? d.targets!.includes('inf') : k === 'vehicles' ? d.targets!.includes('veh') : k === 'buildings' ? d.targets!.includes('struct') : d.targets!.includes('air');
+    const strong = m.filter(([k, v]) => can(k) && v >= 1.2).map(([k, v]) => k + ' x' + v), weak = m.filter(([k, v]) => can(k) && v <= 0.8).map(([k, v]) => k + ' x' + v);
+    if (strong.length) rows.push(['Strong against', strong.join(', ')]);
+    if (weak.length) rows.push(['Weak against', weak.join(', ')]);
+  }
   if (d.ammo) rows.push(['Shells', (e.ammo || 0) + ' / ' + d.ammo + (e.ammo === 0 ? ', waiting for a truck' : e.ammoTruckId ? ', truck on the way' : '')]);
   if (e.revealT && e.revealT > 0 && d.indirect) rows.push(['Exposed', 'firing revealed you to radar for ' + Math.ceil(e.revealT) + ' s']);
   if (d.indirect) { const cv = e.cover || 'open'; rows.push(['Position', cv === 'forest' ? 'in a wood: hidden beyond 140, drones -65%, 2 s radar exposure' : cv === 'urban' ? 'in a town: hidden beyond 220, drones -55%' : 'IN THE OPEN: seen from anywhere, drones +45%, 6 s radar exposure. Move into the trees']); }
@@ -66,7 +73,7 @@ function structRows(e: Struct): [string, string][] {
       <div class="row"><span>Health</span><b>{{ Math.ceil(one.hp) }} / {{ one.def.hp }}</b></div>
       <template v-if="one.isStruct"><div class="row" v-for="r in structRows(one as Struct)" :key="r[0]"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div></template>
       <template v-else>
-        <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, 7)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
+        <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, 8)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
         <div v-if="(one as Unit).def.operator" class="forms"><button type="button" @click="ctl.setOps(1)" title="One person from the pool joins as a drone operator (O)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)" title="Send one operator back to the pool (Shift+O)">− operator</button></div>
         <button v-if="(one as Unit).def.troop" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E)</button>
         <button v-if="(one as Unit).def.indirect" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B)</button>

@@ -41,7 +41,7 @@ export interface PumpSite { team: number; x: number; y: number; struct: Struct |
 
 export interface Projectile {
   x: number; y: number; sx: number; sy: number; tx: number; ty: number; t: number; dur: number; dmg: number; splash: number; team: number;
-  arc: number; rocket: boolean; dead: boolean; srcId?: number;
+  arc: number; rocket: boolean; dead: boolean; srcId?: number; srcType?: string;
 }
 
 export interface Effect {

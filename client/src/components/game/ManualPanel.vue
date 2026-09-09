@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS } from '../../game/data';
 import type { UnitDef } from '../../game/data';
-import { BARK_GLOSS } from '../../game/data';
+import { BARK_GLOSS, COUNTERS } from '../../game/data';
 import { FACTION_FACTS } from '../../game/factions';
 
 defineEmits<{ (e: 'close'): void }>();
@@ -67,6 +67,9 @@ const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-cli
         <p>Every two confirmed kills raise a unit one rank (Trained, Veteran, Elite): 6% more damage dealt and 6% less taken per rank, and drones dodge a little better. Chevrons under a unit show its rank. Howitzers carry 12 shells and rocket launchers three salvos; guns beside the artillery depot or headquarters refill slowly, and an ammunition truck leaves the headquarters for any gun below half. Trucks are captured and killed like any other. A gun that fires is shown to enemy radar for three seconds: expect counter-battery fire.</p>
         <h4>Operators</h4>
         <p>Ukrainian drones are flown by infantry squads. A squad starts with one operator and can take up to four (press O with the squad selected; each one is a person from your pool). Every operator flies three drones, six after Drone swarm control, so a squad of four flies a dozen. Drones link to the nearest squad with a free slot within 900 and must stay inside its control range.</p>
+        <h4>Rock, paper, scissors</h4>
+        <p>Every weapon has things it is built to kill and things it only scratches. The selection panel shows a unit's strong and weak matchups; the short version:</p>
+        <div class="uentry" v-for="[u, t] in COUNTERS" :key="u"><div class="un">{{ u }}</div><div>{{ t }}</div></div>
         <h4>Cover against drones</h4>
         <p>A squad in an open field takes 45% extra from every drone strike; in a town 55% less, in a wood 65% less (and it cannot be seen beyond 140), in a trench 75% less, and in a trench dug inside a wood 85% less. Drones are hard for other drones to hit: a Sting or Yolka misses a quarter more of its shots than a gun on the ground, so interceptors need numbers and machine guns and air defense do the real shooting. Move squads from cover to cover and dig in the moment they stop. Artillery follows the same rule: a gun in a wood is hidden beyond 140, shows on radar for only two seconds after a shot, and takes 65% less from drones; in the open it is exposed for six seconds a shot and drones hit it 45% harder. Recon drones (Mavic, Shark, Orlan) dodge 65% to 70% of what is fired at them, so expect them to keep watching.</p>
         <h4>Winning</h4>

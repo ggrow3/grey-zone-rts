@@ -831,7 +831,7 @@ export class Game {
     }
     this.moveToward(u, u.target.x, u.target.y, dt);
     if (dist(u, u.target) <= rOf(u.target) + 4) {
-      if (d.dmg > 0) { this.explosionFx(u.x, u.y, (d.splash || 0) + 14, true); this.damageArea(u.x, u.y, d.splash || 0, d.dmg, u.team, u.target, 1, 1, true, u); }
+      if (d.dmg > 0) { this.explosionFx(u.x, u.y, (d.splash || 0) + 14, true); this.damageArea(u.x, u.y, d.splash || 0, d.dmg, u.team, u.target, d.vsStruct || 1, d.vsVehicle || 1, true, u); }
       else this.effects.push({ kind: 'caught', x: u.x, y: u.y, t: 0, dur: 0.4 });
       this.killUnit(u, true);
     }
@@ -856,7 +856,7 @@ export class Game {
     }
     const vs = src.def.vsStruct || 1, vv = src.def.vsVehicle || 1;
     if (splash > 0) { this.explosionFx(t.x, t.y, splash * 0.7, false); this.damageArea(t.x, t.y, splash, dmg, src.team, t, vs, vv, !!src.def.air, src); }
-    else { this.applyDamage(t, t.isStruct ? dmg * vs : isVehicle(t) ? dmg * vv : dmg, src.team, !!src.def.air, src); this.effects.push({ kind: 'hit', x: t.x + this.rand(-3, 3), y: t.y + this.rand(-3, 3), t: 0, dur: 0.18 }); }
+    else { this.applyDamage(t, dmg * matchup(src.def, t), src.team, !!src.def.air, src); this.effects.push({ kind: 'hit', x: t.x + this.rand(-3, 3), y: t.y + this.rand(-3, 3), t: 0, dur: 0.18 }); }
   }
   launchShell(u: Unit, t: Entity) { this.launchShellAt(u, t.x, t.y, 1); }
   launchShellAt(u: Unit, px: number, py: number, spreadMul: number) {
@@ -867,7 +867,7 @@ export class Game {
     u.revealT = u.cover === 'forest' ? 2 : u.cover === 'open' ? 6 : 3;
     if (d.ammo) { if (u.ammo! <= 0) return; u.ammo!--; if (u.ammo === 0) this.notify(u.team, u.def.label[u.team] + ' fired its last shell'); }
     this.projectiles.push({ x: u.x, y: u.y, sx: u.x, sy: u.y, tx, ty, t: 0, dur: dd / (d.shellSpeed || 260), dmg: d.dmg * (this.upgrades[u.team].ammo ? 1.15 : 1) * (1 + 0.06 * rankOf(u)), splash: d.splash || 0, team: u.team,
-      arc: Math.min(110, dd * 0.22), rocket: !!d.salvo, dead: false, srcId: u.id });
+      arc: Math.min(110, dd * 0.22), rocket: !!d.salvo, dead: false, srcId: u.id, srcType: u.type });
     this.effects.push({ kind: 'flash', x: u.x + dcos(u.angle) * 14, y: u.y + dsin(u.angle) * 14, t: 0, dur: 0.1 });
   }
   updateProjectile(p: Projectile, dt: number) {
@@ -879,16 +879,18 @@ export class Game {
       p.dead = true;
       this.explosionFx(p.tx, p.ty, p.splash, true);
       const src = p.srcId !== undefined ? this.find(p.srcId) : undefined;
-      this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, 1, 1, false, src && src.isUnit ? src : undefined);
+      const sd = src && src.isUnit ? src.def : (p.srcType ? UNITS[p.srcType] : undefined);
+      this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, sd && sd.vsStruct ? sd.vsStruct : 1, sd && sd.vsVehicle ? sd.vsVehicle : 1, false, src && src.isUnit ? src : undefined, sd);
     }
   }
-  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit) {
+  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit, srcDef?: UnitDef) {
     const vs = vsStruct || 1, vv = vsVehicle || 1;
     if (dmg >= 30) for (const rs of this.resources) if (rs.kind === 'wheat' && rs.burnT <= 0 && hyp(rs.x - x, rs.y - y) < rs.r) { rs.burnT = 60; if (rs.owner >= 0) this.notify(rs.owner, 'Wheat field burning'); }
+    const sd = src ? src.def : srcDef, vi = sd && sd.vsInf ? sd.vsInf : 1;
     for (const e of this.units) {
       if (e.dead || e.team === team || e.def.air) continue;
       const dd = hyp(e.x - x, e.y - y) - e.def.r;
-      if (dd <= r) this.applyDamage(e, (e === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * (isVehicle(e) ? vv : 1), team, drone, src);
+      if (dd <= r) this.applyDamage(e, (e === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * (isVehicle(e) ? vv : e.def.troop ? vi : 1), team, drone, src);
     }
     for (const s of this.structs) {
       if (s.dead || s.team === team) continue;
@@ -1361,5 +1363,13 @@ export class Game {
   }
 }
 
-export function isVehicle(t: Entity): boolean { return !!t.isUnit && !t.def.air && t.type !== 'infantry'; }
+export function isVehicle(t: Entity): boolean { return !!t.isUnit && !t.def.air && !t.def.troop; }
+/** rock, paper, scissors: how hard a weapon hits this kind of target */
+export function matchup(src: UnitDef | undefined, t: Entity): number {
+  if (!src) return 1;
+  if (t.isStruct) return src.vsStruct || 1;
+  if (t.def.air) return (t.def.large || t.def.structuresOnly) ? (src.vsAirLarge || 1) : (src.vsAirSmall || 1);
+  if (t.def.troop) return src.vsInf || 1;
+  return src.vsVehicle || 1;
+}
 export function rOf(e: Entity): number { return e.isStruct ? e.r : e.def.r; }

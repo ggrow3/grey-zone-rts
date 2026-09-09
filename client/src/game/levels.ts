@@ -225,22 +225,22 @@ export const LEVELS: Level[] = [
     briefing: [
       'Belgorod group, listen up. You hold Zhuravlyovka south of the city, and Kozacha Lopan across the border is Ukrainian, with two squads dug in.',
       'Your drones fly themselves: no operators, no control range. Pyongyang has sent infantry; they cost nothing from your pool and they fight, but their morale breaks if you start losing towns.',
-      'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road and take it, cargo and all.',
+      'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road, halfway up and out of sight of the city, and take it, cargo and all.',
       'Then the motorcycles go in. Grab the town before the trenches react. Za Rodinu, commander.',
     ],
-    shots: g => [BELGOROD, g.site('Zhuravlyovka'), { x: 1445, y: 1119 }, g.site('Kozacha Lopan')],
+    shots: g => [BELGOROD, g.site('Zhuravlyovka'), { x: 1498, y: 995 }, g.site('Kozacha Lopan')],
     sideNote: 'Russia: drones need no squads, North Koreans cost no personnel, and your troops shout "Ura!" But morale breaks when you hold fewer towns than the enemy.',
     scenario: g => {
       g.capture('Zhuravlyovka', RU); const Z = g.site('Zhuravlyovka'); squads(g, RU, 'infantry', Z.x, Z.y + 40, 3); g.funds[RU] = 900;
-      g.capture('Kozacha Lopan', UA); const K = g.site('Kozacha Lopan'); squads(g, UA, 'infantry', K.x, K.y + 20, 2, true); g.funds[UA] = 0; g.people[UA].total = 160;
+      g.capture('Kozacha Lopan', UA); const K = g.site('Kozacha Lopan'); squads(g, UA, 'infantry', K.x - 75, K.y + 5, 2, true); g.funds[UA] = 0; g.people[UA].total = 160;
     },
     objectives: [
       { title: 'They fly themselves', text: 'Click the drone works and press Z three times. Your drones need no squad: Ukraine pays 4,400 funds of research to get that.',
         done: g => g.stats.drones[RU] >= 3, marker: own('droneWorks', RU) },
       { title: 'Pyongyang\'s men', text: 'Queue two North Korean squads at the barracks (B): 100 funds, no draw on your personnel, ten at most. They are tough, and they have morale.',
         done: has(RU, 'dprk', 2), marker: own('barracks', RU) },
-      { title: 'Highway robbery', text: 'A Ukrainian supply truck drives from Kharkiv to Kozacha Lopan every 40 seconds. Park a squad on the road south of the town: a squad within 45 of an unescorted truck takes it and its 100 funds.',
-        done: g => g.captured[RU] >= 1, marker: () => ({ x: 1500, y: 1120, r: 120 }) },
+      { title: 'Highway robbery', text: 'A Ukrainian supply truck drives from Kharkiv to Kozacha Lopan every 40 seconds. Ambush it halfway up the highway, at the marker. The road south from Hoptivka passes east of Kozacha Lopan, out of range of the trenches on its west side; closer to Kharkiv the IFV and the squads at the headquarters would see you. Park a squad right on the road, press E to dig in, and wait. A squad within 45 of an unescorted truck takes it and its 100 funds.',
+        done: g => g.captured[RU] >= 1, marker: () => ({ x: 1498, y: 995, r: 90 }) },
       { title: 'Motorcycle rush', text: 'Queue two motorcycle groups (C at the barracks): speed 105, 80% faster on roads. Rush Kozacha Lopan before the trench squads react, and bring the drones.',
         done: g => g.typeCount(RU, 'moto') >= 2 && townOwned('Kozacha Lopan', RU)(g), marker: town('Kozacha Lopan') },
       { title: 'Keep them steady', text: 'Morale falls while Russia holds fewer towns than Ukraine, when a friend dies nearby, and with hunger. Hold two towns and keep every Korean squad above 50%.',
