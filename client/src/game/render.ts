@@ -373,6 +373,7 @@ export class Renderer {
     ctx.restore();
 
     this.drawFog(ctx, g, v);
+    this.drawWeather(ctx, g, v, now);
 
     ctx.save(); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
     for (const e of v.selection) {
@@ -396,6 +397,11 @@ export class Renderer {
     for (const e of v.selection) {
       if (!e.isUnit || e.dead) continue;
       if (e.path && e.path.length && e.order.kind === 'move') { ctx.strokeStyle = 'rgba(232,228,212,0.45)'; ctx.setLineDash([6, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(e.x, e.y); for (const w of e.path) ctx.lineTo(w.x, w.y); ctx.lineTo(e.order.x, e.order.y); ctx.stroke(); ctx.setLineDash([]); }
+      if (e.waypoints && e.waypoints.length) {
+        ctx.strokeStyle = 'rgba(255,214,10,0.55)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath();
+        const start = e.order.kind === 'move' ? e.order : e; ctx.moveTo(start.x, start.y); for (const w of e.waypoints) ctx.lineTo(w.x, w.y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(255,214,10,0.8)'; e.waypoints.forEach((w, i) => { ctx.fillRect(w.x - 3, w.y - 3, 6, 6); ctx.font = '600 9px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(i + 1), w.x, w.y - 6); });
+      }
       if (e.def.operated && e.operator && !e.operator.dead) { ctx.strokeStyle = 'rgba(159,214,232,0.5)'; ctx.setLineDash([3, 6]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.operator.x, e.operator.y); ctx.stroke(); ctx.setLineDash([]); }
       if (e.def.operator && g.needsOperator(UNITS.fpv, PL)) {
         ctx.strokeStyle = 'rgba(159,214,232,0.35)'; ctx.setLineDash([4, 8]); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 650 + (g.upgrades[PL].auto1 ? 150 : 0), 0, Math.PI * 2); ctx.stroke();
@@ -466,6 +472,17 @@ export class Renderer {
       ctx.fillRect(x, y, Math.abs(v.drag.x1 - v.drag.x0) * cam.z, Math.abs(v.drag.y1 - v.drag.y0) * cam.z);
       ctx.strokeRect(x, y, Math.abs(v.drag.x1 - v.drag.x0) * cam.z, Math.abs(v.drag.y1 - v.drag.y0) * cam.z);
     }
+  }
+
+  private rainSeed = 0;
+  /** client-only weather and night overlays in screen space */
+  private drawWeather(ctx: CanvasRenderingContext2D, g: Game, v: View, now: number) {
+    const { vw, vh, dpr } = v, k = g.weather.kind;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (g.isNight()) { ctx.fillStyle = 'rgba(8,12,34,0.34)'; ctx.fillRect(0, 0, vw, vh); }
+    if (k === 'fog') { ctx.fillStyle = 'rgba(214,218,205,0.42)'; ctx.fillRect(0, 0, vw, vh); const t = now / 9000; ctx.fillStyle = 'rgba(230,232,224,0.12)'; for (let i = 0; i < 4; i++) { const x = ((t * 80 + i * 300) % (vw + 400)) - 200; ctx.beginPath(); ctx.ellipse(x, vh * (0.2 + i * 0.2), 260, 90, 0, 0, Math.PI * 2); ctx.fill(); } }
+    else if (k === 'rain') { ctx.fillStyle = 'rgba(40,52,64,0.16)'; ctx.fillRect(0, 0, vw, vh); ctx.strokeStyle = 'rgba(200,220,240,0.35)'; ctx.lineWidth = 1; const off = (now / 4) % 40; ctx.beginPath(); for (let i = 0; i < 90; i++) { const x = (i * 97 + this.rainSeed) % (vw + 40) - 20, y = (i * 53 + off * (1 + (i % 3))) % (vh + 40) - 20; ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 14); } ctx.stroke(); }
+    else if (k === 'snow') { ctx.fillStyle = 'rgba(230,236,240,0.22)'; ctx.fillRect(0, 0, vw, vh); ctx.fillStyle = 'rgba(255,255,255,0.8)'; const off = now / 40; for (let i = 0; i < 70; i++) { const x = (i * 131 + Math.sin(now / 900 + i) * 20 + vw) % vw, y = (i * 71 + off * (1 + (i % 4) * 0.4)) % vh; ctx.beginPath(); ctx.arc(x, y, 1 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill(); } }
   }
 
   private drawFog(ctx: CanvasRenderingContext2D, g: Game, v: View) {

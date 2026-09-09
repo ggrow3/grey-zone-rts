@@ -21,6 +21,8 @@ export interface Unit {
   ammo?: number; ammoTruckId?: number; ammoWarned?: boolean;
   /** seconds a firing gun stays exposed to enemy radar */
   revealT?: number;
+  /** queued move destinations (Shift+right-click) taken in order after the current move */
+  waypoints?: Pt[];
 }
 
 export interface Struct {
@@ -51,7 +53,9 @@ export interface Effect {
   sub?: string;
 }
 
-export type LogKind = 'kill' | 'loss' | 'capture' | 'struct' | 'truck' | 'research' | 'wave' | 'defect' | 'info';
+export type LogKind = 'kill' | 'loss' | 'capture' | 'struct' | 'truck' | 'research' | 'wave' | 'defect' | 'info' | 'weather';
+export type WeatherKind = 'clear' | 'rain' | 'fog' | 'snow';
+export interface Weather { kind: WeatherKind; until: number; next: WeatherKind; warned: boolean }
 /** battle log entry; team is the side the event is about (-1 = both) */
 export interface LogEntry { at: number; team: number; kind: LogKind; text: string }
 
@@ -69,7 +73,7 @@ export interface Scorch { x: number; y: number; r: number }
 
 /** everything a player can ask the simulation to do; ids refer to units/structs owned by the issuing team */
 export type Command =
-  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType }
+  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType; queue?: boolean }
   | { kind: 'attack'; ids: number[]; targetId: number }
   | { kind: 'bombard'; ids: number[]; x: number; y: number }
   | { kind: 'dig'; ids: number[] }

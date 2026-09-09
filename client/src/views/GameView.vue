@@ -129,7 +129,7 @@ function attach() {
   on(c, 'mousemove', e => { const p = pos(e); controller.mouseMove(p.x, p.y); });
   on(c, 'mouseleave', () => controller.mouseLeave());
   on(c, 'dblclick', e => { if (result.value) return; const p = pos(e); controller.doubleClick(p.x, p.y); });
-  on(c, 'contextmenu', e => { e.preventDefault(); if (result.value) return; const p = pos(e); controller.contextMenu(p.x, p.y, e.ctrlKey || e.altKey); });
+  on(c, 'contextmenu', e => { e.preventDefault(); if (result.value) return; const p = pos(e); controller.contextMenu(p.x, p.y, e.ctrlKey || e.altKey, e.shiftKey); });
   on(c, 'wheel', e => { e.preventDefault(); const p = pos(e); controller.wheel(e.deltaY, p.x, p.y); }, { passive: false });
   on(window, 'mouseup', e => controller.mouseUp(e.button));
   on(mm, 'mousedown', e => { if (result.value) return; const r = mm.getBoundingClientRect(); controller.minimapDown((e.clientX - r.left) / MM_W, (e.clientY - r.top) / MM_H, e.button); });

@@ -22,7 +22,10 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   if (bot.spendT <= 0) { bot.spendT = 1; botSpend(g, bot); }
   bot.attackT += dt;
   const staging = g.units.filter(u => u.team === T && !u.dead && !u.def.structuresOnly && !u.def.auto && !u.def.indirect && !u.def.recon && u.order.kind === 'idle');
-  const threshold = Math.min(2600, 700 + t * 2);
+  // bad weather and darkness ground the enemy's drones: that is when to move
+  const badLight = g.weather.kind === 'fog' || g.weather.kind === 'rain' || g.weather.kind === 'snow' || g.isNight();
+  const threshold = Math.min(2600, 700 + t * 2) * (badLight ? 0.5 : 1);
+  if (badLight) bot.attackT += dt;
   const homeHq = g.structs.find(s => s.team === T && s.type === 'hq');
   const guard = homeHq ? staging.filter(u => !u.def.air).sort((a, b) => dist(a, homeHq) - dist(b, homeHq)).slice(0, 4) : [];
   const sortie = staging.filter(u => !guard.includes(u));
@@ -96,7 +99,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   }
   if (T === RU) {
     bot.shahedT -= dt;
-    if (bot.shahedT <= 0) { bot.shahedT = g.noGerans ? 20 : Math.max(55, 125 - t / 25); if (!g.noGerans) g.spawnShaheds(); }
+    if (bot.shahedT <= 0) { bot.shahedT = g.noGerans ? 20 : Math.max(55, 125 - t / 25) * (g.isNight() ? 0.6 : 1); if (!g.noGerans && g.weather.kind !== 'fog') g.spawnShaheds(); }
   }
   if (bot.warnT > 0) { bot.warnT -= dt; if (bot.warnT <= 0) g.notify(E, 'Enemy column moving toward ' + bot.warnName); }
   // squads take on extra operators when people are spare, so more drones can fly

@@ -16,6 +16,7 @@ export class AudioDirector {
   played = 0; spoken = 0; dropped = 0;
   /** camera shake amplitude, consumed by the renderer */
   shake = 0;
+  private rain: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
 
   constructor() {
     try { const s = localStorage.getItem(KEY); if (s) { const j = JSON.parse(s); this.sfx = j.sfx !== false; this.voice = j.voice !== false; } } catch { /* ignore */ }
@@ -52,6 +53,7 @@ export class AudioDirector {
       this.lastKind[e.kind] = now; budget--;
       this.play(e, gain);
     }
+    this.weatherLoop(g.weather.kind === 'rain' || g.weather.kind === 'snow' ? (g.weather.kind === 'rain' ? 0.12 : 0.04) : 0);
     if (biggestBoom) this.shake = Math.max(this.shake, Math.min(7, (biggestBoom.r || 0) / 12));
     this.shake *= 0.85; if (this.shake < 0.2) this.shake = 0;
     if (this.queued && this.voice && now - this.lastSpeech > 2600 && !window.speechSynthesis?.speaking) { const q = this.queued; this.queued = null; this.say(q.text, q.team, now); }
@@ -69,6 +71,12 @@ export class AudioDirector {
       case 'text': this.tone(660, 0.06, gain * 0.2, t, 'triangle'); break;
     }
     this.played++;
+  }
+  private weatherLoop(level: number) {
+    if (!this.ctx) return;
+    if (!this.sfx) level = 0;
+    if (level > 0 && !this.rain) { const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.loop = true; const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; const gn = c.createGain(); gn.gain.value = 0; src.connect(f); f.connect(gn); gn.connect(this.master!); src.start(); this.rain = { src, gain: gn }; }
+    if (this.rain) { this.rain.gain.gain.setTargetAtTime(level, this.ctx.currentTime, 0.8); if (level === 0 && this.rain.gain.gain.value < 0.002) { try { this.rain.src.stop(); } catch { /* ignore */ } this.rain = null; } }
   }
   blip() { if (!this.sfx || !this.ctx) return; this.tone(660, 0.06, 0.25, this.ctx.currentTime, 'triangle'); }
 
@@ -129,5 +137,5 @@ export class AudioDirector {
       setTimeout(() => { if (this.narrating && !synth.speaking && !synth.pending) this.narrating = false; }, 2500);
     } catch { this.narrating = false; }
   }
-  dispose() { this.cancelSpeech(); try { this.ctx?.close(); } catch { /* ignore */ } this.ctx = null; }
+  dispose() { this.cancelSpeech(); try { this.rain?.src.stop(); } catch { /* ignore */ } this.rain = null; try { this.ctx?.close(); } catch { /* ignore */ } this.ctx = null; }
 }

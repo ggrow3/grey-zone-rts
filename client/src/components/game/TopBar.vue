@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Game } from '../../game/sim';
-import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE } from '../../game/data';
+import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE, WEATHER_TEXT } from '../../game/data';
 
 const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; basemap: string; audio: string; opponent?: string }>();
 const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
+const sky = computed(() => { void props.tick; const w = g().weather; const left = Math.max(0, Math.ceil(w.until - g().gameTime)); return { label: WEATHER_TEXT[w.kind].label + (g().isNight() ? ', night' : ', day'), sub: (w.warned ? WEATHER_TEXT[w.next].label + ' in ' + left + ' s' : 'for ' + fmtTime(left)) + ' · ' + (g().isNight() ? 'dawn' : 'dusk') + ' in ' + fmtTime(g().phaseLeft()), title: WEATHER_TEXT[w.kind].effect, bad: w.kind !== 'clear' || g().isNight() }; });
 const hold = computed(() => { void props.tick; for (const T of [0, 1]) if (g().holdT[T] > 0) return { team: T, left: Math.max(0, Math.ceil(180 - g().holdT[T])) }; return null; });
 
 function fmtTime(t: number) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
@@ -44,6 +45,7 @@ function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()
     <div class="stat"><span class="lbl">Trade</span><span class="val small">+{{ game.tradeTotal[team] }}<span v-if="game.captured[team]">, {{ game.captured[team] }} trucks taken</span></span></div>
     <div class="stat"><span class="lbl">Supply</span><span class="val small" :style="{ color: supply.color }" :title="supplyTitle">{{ supply.text }}</span></div>
     <div class="spacer" />
+    <div class="stat" :title="sky.title"><span class="lbl">Sky</span><span class="val small" :class="{ warn: sky.bad }">{{ sky.label }}</span><span class="dim" style="font-size:11px">{{ sky.sub }}</span></div>
     <div class="stat" v-if="hold"><span class="lbl">{{ hold.team === team ? 'All towns held' : 'Enemy holds all towns' }}</span><span class="val small" :class="hold.team === team ? 'ok' : 'ru'">victory in {{ hold.left }} s</span></div>
     <div class="stat" v-if="opponent"><span class="lbl">vs</span><span class="val small">{{ opponent }}</span></div>
     <div class="stat"><span class="val">{{ fmtTime(game.gameTime) }}</span></div>

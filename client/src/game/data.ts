@@ -261,6 +261,12 @@ export const COUNTERS: [string, string][] = [
 export const WAVE_COST = 600, WAVE_COOLDOWN = 90;
 /** seconds a squad stands still to dig a trench */
 export const DIG_TIME = 5;
+export const WEATHER_TEXT: Record<'clear' | 'rain' | 'fog' | 'snow', { label: string; now: string; coming: string; effect: string }> = {
+  clear: { label: 'Clear', now: 'Skies clearing: drones fly and see again', coming: 'Clearing in 30 s', effect: 'no penalties' },
+  rain: { label: 'Rain', now: 'Rain: batteries drain faster, drones dodge less, everything off the roads slows in the mud', coming: 'Rain in 30 s: keep the drones near home', effect: 'vision 85%, battery drain x1.5, air evasion -10%, off-road speed 80%' },
+  fog: { label: 'Fog', now: 'Fog: nobody sees far, drones hunt half as far, and the enemy infantry moves', coming: 'Fog in 30 s: drones will not see, watch the treelines', effect: 'vision 45%, drone hunting radius 50%, no Geran waves from the bot' },
+  snow: { label: 'Snow', now: 'Snow: quadcopters are grounded, fixed wings ice up, the fields are mud', coming: 'Snow in 30 s: land the quads', effect: 'quads grounded, vision 70%, battery drain x2, off-road speed 80%' },
+};
 /** units are drawn this much larger than their simulation radius (visual only) */
 export const UNIT_SCALE = 1.3;
 

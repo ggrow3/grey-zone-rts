@@ -24,5 +24,6 @@ export const FACTION_FACTS: FactionFact[] = [
   { topic: 'Trade convoys', ua: 'West to the NATO border, first at 0:30 then every 75 s', ru: 'East into the interior, first at 0:45 then every 75 s', source: 'tradeEdge(), tradeT' },
   { topic: 'Nearest town', ua: 'Lyptsi, 487 px north-east of Kharkiv', ru: 'Zhuravlyovka, 448 px south of Belgorod', source: 'TOWNS' },
   { topic: 'Starting forces', ua: '5 squads, an IFV, air defense, 2 fire groups, 9 buildings', ru: 'The same', source: 'Game.setup()' },
+  { topic: 'Weather and night', ua: 'Drones are the defense, so fog, rain, snow, and darkness are the danger: vision and hunting radius shrink, quads are grounded in snow', ru: 'The computer halves its assault threshold in bad light and times pushes to fog, rain, and night; Geran waves come at night', source: 'updateWeather(), bot.ts' },
   { topic: 'What the troops shout', ua: BARKS.attack[0].join(', ') + '; answered with ' + BARKS.reply[0][0], ru: BARKS.attack[1].join(', ') + '; North Koreans shout Manse!', source: 'BARKS' },
 ];

@@ -100,11 +100,11 @@ export class Controller {
     this.selection = g.expandSwarms(picked); this.view.drag = null;
     this.onMessage(picked.length + ' ' + (hit ? UNITS[hit.type].label[PL] : 'drone') + (picked.length > 1 ? 's' : '') + ' selected');
   }
-  contextMenu(px: number, py: number, ctrl: boolean) {
+  contextMenu(px: number, py: number, ctrl: boolean, shift = false) {
     if (this.view.placing) { this.view.placing = null; this.onSelectionChange(); return; }
     const w = this.toWorld(px, py);
     if (this.view.bombardMode) { this.view.bombardMode = false; return this.bombardAt(w.x, w.y); }
-    this.issueCommand(w.x, w.y, ctrl);
+    this.issueCommand(w.x, w.y, ctrl, shift);
   }
   wheel(deltaY: number, px: number, py: number) { this.zoomAt(Math.exp(-deltaY * 0.0012), px, py); }
   minimapDown(fx: number, fy: number, button: number) {
@@ -147,9 +147,10 @@ export class Controller {
   selFactories(): Struct[] { return this.view.selection.filter(e => e.isStruct && !e.dead && e.def.produces) as Struct[]; }
 
   // ---- commands
-  issueCommand(x: number, y: number, ctrl: boolean) {
+  issueCommand(x: number, y: number, ctrl: boolean, shift = false) {
     const units = this.selUnits();
     if (ctrl && units.some(e => e.def.indirect)) return this.bombardAt(x, y);
+    if (shift && units.length) { this.submit({ kind: 'move', ids: this.ids(units), x, y, formation: this.formationType, queue: true }); return; }
     if (!units.length) {
       const fac = this.selFactories();
       if (fac.length) this.submit({ kind: 'rally', ids: this.ids(fac), x, y });
