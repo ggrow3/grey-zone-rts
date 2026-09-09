@@ -2,7 +2,7 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
@@ -749,7 +749,7 @@ export class Game {
       else { u.salvoT -= dt; if (u.salvoT <= 0) { this.launchShell(u, u.target); u.salvoLeft--; u.salvoT = 0.18; } }
     }
     if (u.order.kind === 'dig') {
-      u.digT = (u.digT === undefined ? 20 : u.digT) - dt;
+      u.digT = (u.digT === undefined ? DIG_TIME : u.digT) - dt;
       u.target = null;
       if (u.digT <= 0) {
         u.digT = undefined;
@@ -1263,8 +1263,8 @@ export class Game {
         const troops = this.ownUnits(team, cmd.ids).filter(e => e.def.troop && !e.shaken);
         if (!troops.length) return this.notify(team, 'Select troops first');
         let n = 0;
-        for (const u of troops) { if (this.trenchAt(u.x, u.y)) continue; u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.target = null; u.path = null; u.digT = 20; n++; }
-        this.notify(team, n ? n + ' squad' + (n > 1 ? 's' : '') + ' digging in: 20 seconds' : 'Already in a trench');
+        for (const u of troops) { if (this.trenchAt(u.x, u.y)) continue; u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.target = null; u.path = null; u.digT = DIG_TIME; n++; }
+        this.notify(team, n ? n + ' squad' + (n > 1 ? 's' : '') + ' digging in: ' + DIG_TIME + ' seconds' : 'Already in a trench');
         return;
       }
       case 'strike': {

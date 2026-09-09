@@ -83,7 +83,7 @@ function structRows(e: Struct): [string, string][] {
     <template v-else>
       <h3>{{ swarmSel ? 'Swarm of ' + unitsSel.length : unitsSel.length + ' units selected' }}</h3>
       <div v-if="unitsSel.some(u => u.def.operator)" class="forms"><button type="button" @click="ctl.setOps(1)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)">− operator</button></div>
-      <button v-if="unitsSel.some(u => u.def.troop)" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E): trench in 20 s</button>
+      <button v-if="unitsSel.some(u => u.def.troop)" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E): trench in 5 s</button>
       <button v-if="unitsSel.some(u => u.def.indirect)" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B, or Ctrl+right-click)</button>
       <template v-if="unitsSel.some(u => u.def.air)">
         <div class="forms"><button v-for="f in FORMATIONS" :key="f" type="button" :class="{ on: (swarmSel ? swarmSel.formation : ctl.formationType) === f }" @click="ctl.setFormation(f)">{{ f }}</button></div>

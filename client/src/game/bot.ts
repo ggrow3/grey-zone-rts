@@ -1,5 +1,5 @@
 // The computer opponent. Team-parametric; uses the game's seeded RNG so it is deterministic.
-import { UA, RU, UNITS, UPGRADES, FUEL_USERS } from './data';
+import { UA, RU, UNITS, UPGRADES, FUEL_USERS, DIG_TIME } from './data';
 import { dist } from './dmath';
 import type { Game } from './sim';
 import { MOVE, ATTACK } from './sim';
@@ -51,9 +51,9 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       let best: Pt | null = null, bd = 380;
       for (const f of g.terrain.forestPx) { const d = dist(f, u); if (d < bd) { bd = d; best = f; } }
       if (best) { u.order = MOVE(best.x + g.rand(-12, 12), best.y + g.rand(-12, 12)); u.target = null; u.idleT = 0; continue; }
-      if (!g.trenchAt(u.x, u.y)) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = 20; u.idleT = 0; continue; }
+      if (!g.trenchAt(u.x, u.y)) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = DIG_TIME; u.idleT = 0; continue; }
     }
-    if (u.idleT > (u.cover === 'forest' ? 6 : 12) && !g.trenchAt(u.x, u.y) && !u.shaken) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = 20; u.idleT = 0; }
+    if (u.idleT > (u.cover === 'forest' ? 6 : 12) && !g.trenchAt(u.x, u.y) && !u.shaken) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = DIG_TIME; u.idleT = 0; }
   }
   bot.artyT -= dt;
   if (bot.artyT <= 0) {

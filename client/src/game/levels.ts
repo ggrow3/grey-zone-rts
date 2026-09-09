@@ -71,7 +71,7 @@ export const LEVELS: Level[] = [
         done: g => g.units.some(u => u.team === UA && u.type === 'infantry' && !u.dead && dist(u, lyptsi(g)) < 140), marker: town('Lyptsi') },
       { title: 'Capture it', text: 'Keep the squads inside the ring for five seconds. A captured town sends supply trucks and pays every time one arrives. You can now build near it.',
         done: g => lyptsi(g).owner === UA, marker: town('Lyptsi') },
-      { title: 'Dig in', text: 'Drones kill squads in the open. Select two or more squads at Lyptsi and press E: after 20 seconds standing still they leave a trench, 45% less damage and 75% less from drones (85% less if you dig inside a wood). Towns and woods protect too. Wait for two trenches.',
+      { title: 'Dig in', text: 'Drones kill squads in the open. Select two or more squads at Lyptsi and press E: after 5 seconds standing still they leave a trench, 45% less damage and 75% less from drones (85% less if you dig inside a wood). Towns and woods protect too. Wait for two trenches.',
         done: g => g.structs.filter(s => s.team === UA && s.def.trench).length >= 2, marker: town('Lyptsi') },
     ],
   },
