@@ -110,11 +110,24 @@ export class AudioDirector {
       synth.speak(u); this.lastSpeech = now; this.spoken++;
     } catch { /* ignore */ }
   }
-  cancelSpeech() { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } this.queued = null; }
-  /** briefing narration in the default (English) voice; returns immediately */
+  cancelSpeech() { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } this.queued = null; this.narrating = false; }
+  /** true while a briefing line is being read aloud */
+  narrating = false;
+  /** true once the current line actually started being spoken (so a silent engine falls back to reading time) */
+  narrateSpoke = false;
+  /** briefing narration in the default (English) voice; `narrating` clears when the line ends (or on error/cancel) */
   narrate(text: string) {
+    this.narrating = false; this.narrateSpoke = false;
     if (!this.voice || !('speechSynthesis' in window)) return;
-    try { const synth = window.speechSynthesis; synth.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.0; u.pitch = 0.95; u.volume = 0.9; synth.speak(u); this.lastSpeech = performance.now(); } catch { /* ignore */ }
+    try {
+      const synth = window.speechSynthesis; synth.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.rate = 1.0; u.pitch = 0.95; u.volume = 0.9;
+      u.onstart = () => { this.narrating = true; this.narrateSpoke = true; };
+      u.onend = () => { this.narrating = false; }; u.onerror = () => { this.narrating = false; };
+      this.narrating = true; synth.speak(u); this.lastSpeech = performance.now();
+      // if the engine never starts (no voices, blocked audio), do not hold the briefing forever
+      setTimeout(() => { if (this.narrating && !synth.speaking && !synth.pending) this.narrating = false; }, 2500);
+    } catch { this.narrating = false; }
   }
   dispose() { this.cancelSpeech(); try { this.ctx?.close(); } catch { /* ignore */ } this.ctx = null; }
 }

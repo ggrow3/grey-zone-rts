@@ -38,7 +38,7 @@ const objIdx = ref(0), chat = ref<ChatMsg[]>([]), opponent = ref(''), netStatus 
 const result = ref<{ won: boolean; title: string; text: string; stats: [string, string][] } | null>(null);
 const level = shallowRef<Level | null>(null);
 const cut = ref<{ title: string; lines: string[]; index: number } | null>(null);
-let cutShots: { x: number; y: number }[] = []; let cutT = 0;
+let cutShots: { x: number; y: number }[] = []; let cutT = 0, cutDone = 0;
 const SKIRMISH_BRIEF: string[][] = [
   ['Kharkiv group. The full war: no scripted enemy, no pauses. Belgorod is building from the first second, and its drones fly themselves.', 'Take Lyptsi first, put a Mavic and a Sting over the substation before the four-minute mark, and keep your strikes off civilians: support is income.', 'Destroy the headquarters in Belgorod, or hold all six towns for three minutes. Slava Ukraini, commander.'],
   ['Belgorod group. The full war: Kharkiv is researching and building from the first second, and every one of its drones has a human on the sticks until it buys autonomy.', 'Your drones need nobody. Take Zhuravlyovka, hunt their trucks, keep the pump on the Kursk line standing, and launch the waves when the crews are ready.', 'Destroy the headquarters in Kharkiv, or hold all six towns for three minutes. Za Rodinu, commander.'],
@@ -161,7 +161,12 @@ function frame(now: number) {
     cutT += elapsed;
     const shot = cutShots[Math.min(cut.value.index, cutShots.length - 1)];
     if (shot) { const v = controller.view, tx = shot.x - v.vw / (2 * v.cam.z), ty = shot.y - v.vh / (2 * v.cam.z); v.cam.x += (tx - v.cam.x) * Math.min(1, elapsed * 1.2); v.cam.y += (ty - v.cam.y) * Math.min(1, elapsed * 1.2); controller.clampCam(); }
-    if (cutT > 7) nextCutLine();
+    // a line stays until it has been read out (plus a beat); with voice off, long enough to read it silently
+    const line = cut.value.lines[cut.value.index] || '';
+    const readTime = 2.5 + line.length * 0.055;
+    if (audio.narrating) cutDone = 0; else cutDone += elapsed;
+    const advance = audio.narrating ? false : audio.narrateSpoke ? cutDone > 1.2 : cutT > readTime;
+    if (advance) nextCutLine();
   }
   if (!result.value) session.advance(elapsed);
   audio.scan(game, controller.view, now);
@@ -180,14 +185,14 @@ function startCutscene() {
   const lines = l ? l.briefing : SKIRMISH_BRIEF[team.value];
   cutShots = l ? l.shots(game) : [hq || { x: 1800, y: 1000 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: 1800, y: 1000 }];
   cut.value = { title: l ? l.title : (team.value === UA ? 'Skirmish: the Kharkiv front' : 'Skirmish: the Belgorod front'), lines, index: 0 };
-  session.paused = true; cutT = 0;
+  session.paused = true; cutT = 0; cutDone = 0;
   if (cutShots[0]) ctl.value!.centerOn(cutShots[0].x, cutShots[0].y);
   audio.narrate(lines[0]);
 }
 function nextCutLine() {
   const c = cut.value; if (!c) return;
   if (c.index >= c.lines.length - 1) return endCutscene();
-  c.index++; cutT = 0; audio.narrate(c.lines[c.index]);
+  c.index++; cutT = 0; cutDone = 0; audio.narrate(c.lines[c.index]);
 }
 function endCutscene() {
   if (!cut.value) return;
