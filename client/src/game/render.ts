@@ -275,7 +275,15 @@ function drawResource(c: CanvasRenderingContext2D, rs: Site, fx: Effect[]) {
 function drawEffects(c: CanvasRenderingContext2D, effects: Effect[], team: number, g?: Game) {
   for (const e of effects) {
     const k = e.t / e.dur;
-    if (e.kind === 'bark') {
+    if (e.kind === 'alert') {
+      const pulse = 0.5 + 0.5 * Math.sin(k * 40);
+      c.globalAlpha = 0.5 + 0.5 * pulse; c.strokeStyle = '#ff5a5a'; c.lineWidth = 3; c.setLineDash([8, 6]);
+      c.beginPath(); c.arc(e.x, e.y, 70 + pulse * 8, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+      c.beginPath(); c.moveTo(e.x - 14, e.y); c.lineTo(e.x + 14, e.y); c.moveTo(e.x, e.y - 14); c.lineTo(e.x, e.y + 14); c.stroke();
+      c.font = '600 13px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = 'rgba(12,14,10,0.9)';
+      const label = (e.text || 'STRIKE') + ' ' + Math.ceil(e.dur - e.t) + 's'; c.strokeText(label, e.x, e.y - 84); c.fillStyle = '#ff8a80'; c.fillText(label, e.x, e.y - 84);
+      c.globalAlpha = 1;
+    } else if (e.kind === 'bark') {
       if (e.delay && e.t < e.delay) continue;
       if (e.team !== team && g && !g.inVision(team, e.x, e.y)) continue;
       const kk = (e.t - (e.delay || 0)) / (e.dur - (e.delay || 0));
@@ -325,6 +333,15 @@ function drawProjectiles(c: CanvasRenderingContext2D, projectiles: Projectile[])
       c.strokeStyle = 'rgba(255,200,120,0.6)'; c.lineWidth = 2;
       const bk = Math.max(0, k - 0.08), bx = p.sx + (p.tx - p.sx) * bk, by = p.sy + (p.ty - p.sy) * bk - Math.sin(bk * Math.PI) * p.arc;
       c.beginPath(); c.moveTo(bx, by); c.lineTo(p.x, p.y - h); c.stroke();
+    }
+    if (p.strike) {
+      const ang = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+      c.save(); c.translate(p.x, p.y - h); c.rotate(ang); c.fillStyle = p.strike === 'kab' ? '#3a3a3a' : '#5a5a66'; c.strokeStyle = '#ff8a80'; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(11, 0); c.lineTo(-7, 4); c.lineTo(-9, 0); c.lineTo(-7, -4); c.closePath(); c.fill(); c.stroke();
+      if (p.strike === 'kab') { c.beginPath(); c.moveTo(-2, -8); c.lineTo(2, 0); c.lineTo(-2, 8); c.stroke(); }
+      c.restore();
+      c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(p.x, p.y, 5, 3, 0, 0, Math.PI * 2); c.fill();
+      continue;
     }
     c.fillStyle = '#f5e9c8'; c.beginPath(); c.arc(p.x, p.y - h, p.rocket ? 2.2 : 3, 0, Math.PI * 2); c.fill();
     c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.arc(p.x, p.y, 2, 0, Math.PI * 2); c.fill();

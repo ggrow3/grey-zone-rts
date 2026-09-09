@@ -6,7 +6,7 @@ import type { Effect } from './types';
 import type { View } from './render';
 
 const KEY = 'gz.audio';
-const COOLDOWN_MS: Record<string, number> = { tracer: 70, hit: 120, flash: 90, boom: 50, caught: 150, mark: 200, bark: 0, text: 300, heal: 9999 };
+const COOLDOWN_MS: Record<string, number> = { tracer: 70, hit: 120, flash: 90, boom: 50, caught: 150, mark: 200, bark: 0, text: 300, heal: 9999, alert: 3000 };
 const PRIORITY: Record<string, number> = { win: 7, capture: 6, lost: 5, attack: 4, strike: 4, bombard: 4, kill: 3, reply: 3, ack: 2, ops: 2, dig: 1 };
 
 export class AudioDirector {
@@ -37,7 +37,9 @@ export class AudioDirector {
   }
 
   /** look at every effect the simulation produced since the last frame */
+  private viewTeam = 0;
   scan(g: Game, v: View, now: number) {
+    this.viewTeam = v.team;
     const cx = v.cam.x + v.vw / (2 * v.cam.z), cy = v.cam.y + v.vh / (2 * v.cam.z), viewR = Math.max(v.vw, v.vh) / v.cam.z;
     let budget = 10, biggestBoom: Effect | null = null;
     for (const e of g.effects) {
@@ -69,6 +71,7 @@ export class AudioDirector {
       case 'caught': this.sweep(1200, 300, 0.2, gain * 0.3, t); break;
       case 'mark': if (e.green) { this.tone(880, 0.09, gain * 0.25, t, 'square'); this.tone(1320, 0.09, gain * 0.25, t + 0.09, 'square'); } else if (e.red) this.tone(330, 0.07, gain * 0.2, t, 'square'); break;
       case 'text': this.tone(660, 0.06, gain * 0.2, t, 'triangle'); break;
+      case 'alert': if (e.team === undefined || e.team === this.viewTeam) { for (let i = 0; i < 3; i++) { this.sweep(500, 900, 0.6, 0.35, t + i * 0.7); this.sweep(900, 500, 0.6, 0.35, t + i * 0.7 + 0.3); } } break;
     }
     this.played++;
   }

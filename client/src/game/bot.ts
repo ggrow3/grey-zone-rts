@@ -111,10 +111,26 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       if (sq) g.apply(T, { kind: 'ops', ids: [sq.id], delta: 1 });
     }
   }
+  // aviation and missiles: glide bombs on the enemy's trench lines, missiles on the grid and the factories, deep strikes on refineries
+  bot.strikeT = (bot.strikeT === undefined ? 90 : bot.strikeT) - dt;
+  if (bot.strikeT <= 0 && !g.botPassive) {
+    bot.strikeT = T === RU ? g.rand(60, 90) : g.rand(110, 150);
+    const enemyStructs = g.structs.filter(s => !s.dead && s.team === E);
+    if (g.funds[T] >= 800 && g.kabT[T] <= 0) {
+      const trenches = enemyStructs.filter(s => s.def.trench), pool = trenches.length ? trenches : enemyStructs.filter(s => !s.def.trench);
+      if (pool.length) { pool.sort((a, b) => dist(a, bot.staging) - dist(b, bot.staging)); const t = pool[0]; g.apply(T, { kind: 'kab', x: t.x, y: t.y }); }
+    }
+    if (T === RU && g.funds[RU] >= 1600 && g.missileT <= 0) {
+      const prio = ['power', 'droneWorks', 'artyDepot', 'launchSite', 'armorPlant'];
+      const targets = g.structs.filter(s => !s.dead && (s.team === E || (s.civ && s.nation === E && s.type === 'power')) && prio.includes(s.type)).sort((a, b) => prio.indexOf(a.type) - prio.indexOf(b.type));
+      if (targets.length) g.apply(RU, { kind: 'iskander', targetId: targets[0].id });
+    }
+    if (T === UA && g.funds[UA] >= 1200 && g.deepT <= 0 && g.units.some(u => !u.dead && u.team === UA && u.type === 'liutyi' && u.order.kind !== 'attack')) g.apply(UA, { kind: 'deep' });
+  }
   bot.resT = (bot.resT === undefined ? 200 : bot.resT) - dt;
   if (bot.resT <= 0) {
     bot.resT = 90;
-    const prio = ['auto1', 'training', 'armorDrone', 'cages', 'auto2', 'aaRange', 'repeaters', 'logistics', 'medevac', 'evasion', 'ammo', 'gunnery', 'relay', 'thermal', 'auto3', 'nightOps', 'ewPlus', 'shells', 'mobilization', 'freqHop', 'aid'];
+    const prio = ['auto1', 'training', 'armorDrone', 'cages', 'auto2', 'aaRange', 'repeaters', 'logistics', 'medevac', 'evasion', 'ammo', 'gunnery', 'relay', 'thermal', 'auto3', 'nightOps', 'ewPlus', 'shells', 'mobilization', 'freqHop', 'aid', 'samNet'];
     const pick = prio.find(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6);
     if (pick) { g.funds[T] = Math.max(0, g.funds[T] - UPGRADES[pick].cost * 0.6); g.upgrades[T][pick] = true; if (pick === 'mobilization') g.people[T].total = Math.min(240, g.people[T].total + 40); }
   }

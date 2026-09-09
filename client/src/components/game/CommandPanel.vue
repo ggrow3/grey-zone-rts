@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
-import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, WAVE_COST, upgLabel, RU } from '../../game/data';
+import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, WAVE_COST, STRIKES, upgLabel, RU, UA } from '../../game/data';
 import { clamp } from '../../game/dmath';
 
 const props = defineProps<{ ctl: Controller; tick: number }>();
@@ -52,6 +52,18 @@ function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSele
         <button v-if="ctl.team === RU" type="button" class="cmd wave" :disabled="g().waveT > 0" title="Three Geran-2 drones and four Gerbera decoys from the north, east, and south, aimed at Ukrainian buildings, the substation first" @click="ctl.geranWave()">
           <div class="name">Geran wave</div>
           <div class="meta"><span>{{ WAVE_COST }} funds</span><span>{{ g().waveT > 0 ? 'reload ' + Math.ceil(g().waveT) + 's' : 'ready' }}</span></div>
+        </button>
+        <button type="button" class="cmd strike" :class="{ owned: ctl.strikeMode === 'kab' }" :disabled="g().kabT[ctl.team] > 0" :title="'A ' + STRIKES.kab.dmg + '-damage glide bomb on a map point after a ' + STRIKES.kab.warn + ' second warning: flattens trenches and buildings, trench cover does not help. Enemy mobile air defense within 260 of the point can shoot it down.'" @click="ctl.startStrike('kab')">
+          <div class="name">{{ STRIKES.kab.label[ctl.team] }}</div>
+          <div class="meta"><span>{{ STRIKES.kab.cost[ctl.team] }} funds</span><span>{{ g().kabT[ctl.team] > 0 ? 'reload ' + Math.ceil(g().kabT[ctl.team]) + 's' : 'click a point' }}</span></div>
+        </button>
+        <button v-if="ctl.team === RU" type="button" class="cmd strike" :class="{ owned: ctl.strikeMode === 'iskander' }" :disabled="g().missileT > 0" :title="'An Iskander ballistic missile on an enemy building: ' + STRIKES.missile.dmg + ' damage after an ' + STRIKES.missile.warn + ' second warning. Air defense near the target intercepts some.'" @click="ctl.startStrike('iskander')">
+          <div class="name">Iskander strike</div>
+          <div class="meta"><span>{{ STRIKES.missile.cost }} funds</span><span>{{ g().missileT > 0 ? 'reload ' + Math.ceil(g().missileT) + 's' : 'click a building' }}</span></div>
+        </button>
+        <button v-if="ctl.team === UA" type="button" class="cmd strike" :disabled="g().deepT > 0 || !!g().deepPending" :title="'Send an idle Liutyi at a refinery inside Russia: ' + Math.round(STRIKES.deep.chance * 100) + '% get through, and each burning refinery cuts Russian income 15% for four minutes and slows their glide bombs.'" @click="ctl.deepStrike()">
+          <div class="name">Deep strike (Liutyi)</div>
+          <div class="meta"><span>{{ STRIKES.deep.cost }} funds + 1 Liutyi</span><span>{{ g().deepPending ? 'in the air' : g().deepT > 0 ? 'ready in ' + Math.ceil(g().deepT) + 's' : g().refineriesBurning() ? g().refineriesBurning() + ' burning' : 'ready' }}</span></div>
         </button>
       </div>
       <div id="cmdbody" v-else>

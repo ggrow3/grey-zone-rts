@@ -165,6 +165,7 @@ export const UPGRADES: Record<string, UpgradeDef> = {
   logistics: { label: 'Logistics reform', desc: 'Every truck and convoy delivers 50% more', cost: 900, branch: 'Economy', tier: 1 },
   thermal: { label: 'Satellite feeds', desc: 'Every unit and building sees 25% farther', cost: 800, requires: 'logistics', branch: 'Economy', tier: 2 },
   aid: { label: 'Aid package', labelRU: 'War economy', desc: 'Permanent +8 funds per second', cost: 1500, requires: 'thermal', branch: 'Economy', tier: 3 },
+  samNet: { label: 'Patriot coverage', labelRU: 'S-400 coverage', desc: 'Your mobile air defense intercepts glide bombs at 65% and ballistic missiles at 60% instead of 35% and 30%', cost: 1500, requires: 'ewPlus', branch: 'Air defense', tier: 4 },
 };
 export const TECH_BRANCHES = ['Drones', 'Airframes', 'Links', 'Air defense', 'Ground', 'People', 'Economy'];
 export function upgLabel(team: number, k: string): string { const u = UPGRADES[k]; return team === RU && u.labelRU ? u.labelRU : u.label; }
@@ -261,6 +262,12 @@ export const COUNTERS: [string, string][] = [
 export const WAVE_COST = 600, WAVE_COOLDOWN = 90;
 /** seconds a squad stands still to dig a trench */
 export const DIG_TIME = 5;
+/** strikes from beyond the map: glide bombs for both sides, ballistic missiles for Russia, deep strikes for Ukraine */
+export const STRIKES = {
+  kab: { cost: [500, 350], cooldown: [90, 40], warn: 6, dmg: 700, splash: 80, intercept: 0.35, interceptUp: 0.65, label: ['Glide bomb strike (F-16)', 'Glide bomb strike (KAB-500)'] },
+  missile: { cost: 800, cooldown: 120, warn: 8, dmg: 900, splash: 60, intercept: 0.3, interceptUp: 0.6 },
+  deep: { cost: 600, cooldown: 60, delay: 20, chance: 0.6, burn: 240, incomeMul: 0.85 },
+};
 export const WEATHER_TEXT: Record<'clear' | 'rain' | 'fog' | 'snow', { label: string; now: string; coming: string; effect: string }> = {
   clear: { label: 'Clear', now: 'Skies clearing: drones fly and see again', coming: 'Clearing in 30 s', effect: 'no penalties' },
   rain: { label: 'Rain', now: 'Rain: batteries drain faster, drones dodge less, everything off the roads slows in the mud', coming: 'Rain in 30 s: keep the drones near home', effect: 'vision 85%, battery drain x1.5, air evasion -10%, off-road speed 80%' },

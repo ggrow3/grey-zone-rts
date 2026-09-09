@@ -2,13 +2,13 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from './dmath';
 import { getTerrain, Terrain } from './terrain';
-import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind } from './types';
+import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike } from './types';
 import { updateBot, makeBot } from './bot';
 
 export const DT = 1 / 60;
@@ -42,7 +42,10 @@ export class Game {
   funds = [1200, 300];
   upgrades: [Record<string, boolean>, Record<string, boolean>] = [{}, {}];
   stats = { built: [0, 0], lost: [0, 0], drones: [0, 0], deliveries: [0, 0], peopleLost: [0, 0], shotDown: [0, 0], kills: [0, 0],
-    jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>] };
+    jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>],
+    kabs: [0, 0], intercepted: [0, 0], refineries: 0, missiles: 0 };
+  /** strikes from beyond the map: cooldowns, pending impacts, burning refineries (expiry times) */
+  kabT = [0, 0]; missileT = 0; deepT = 0; strikes: PendingStrike[] = []; refineryHits: number[] = []; deepPending: { at: number; hit: boolean } | null = null;
   /** ids registered by a level scenario so objectives can find what it placed */
   tags: Record<string, number> = {};
   /** seconds each team has held every town (victory at HOLD_TO_WIN) */
@@ -126,7 +129,7 @@ export class Game {
   gasIncome(team: number): number { return this.pipelineIntact(team) ? this.resources.filter(r => r.kind === 'gas' && r.owner === team).reduce((a, r) => a + (r.yieldRate || 0), 0) : 0; }
   wheatHeld(team: number): number { return this.resources.filter(r => r.kind === 'wheat' && r.owner === team && r.burnT <= 0).length; }
   income(team: number): number {
-    if (team === RU) return (12 + this.gasIncome(RU)) * this.teamMul(RU);
+    if (team === RU) return (12 + this.gasIncome(RU)) * this.teamMul(RU) * Math.pow(STRIKES.deep.incomeMul, this.refineriesBurning());
     return Math.max(4, 12 * (0.4 + 0.6 * this.support / 100) - Math.min(6, this.civ.lost[0] * 0.5) + (this.upgrades[UA].aid ? 8 : 0)) + this.gasIncome(UA);
   }
   expectedIncome(team: number): number { return this.income(team) + this.depots.filter(d => d.owner === team).length * TRUCK_LOAD / TRUCK_PERIOD * this.teamMul(team); }
@@ -287,6 +290,9 @@ export class Game {
     this.updateAmmo(dt);
     this.updateHold(dt);
     if (this.waveT > 0) this.waveT -= dt;
+    for (const T of [UA, RU]) if (this.kabT[T] > 0) this.kabT[T] -= dt;
+    if (this.missileT > 0) this.missileT -= dt; if (this.deepT > 0) this.deepT -= dt;
+    this.updateStrikes();
     this.cleanup();
     for (const b of this.bots) if (b) updateBot(this, b, dt);
   }
@@ -327,6 +333,45 @@ export class Game {
     this.planRoute(u, u.order.x, u.order.y);
     this.units.push(u); gun.ammoTruckId = u.id;
     this.notify(team, 'Ammunition truck leaving for the ' + gun.def.label[team].toLowerCase());
+  }
+
+  // ---------------------------------------------------------------- strikes from beyond the map
+  refineriesBurning(): number { return this.refineryHits.filter(t => t > this.gameTime).length; }
+  kabCooldown(team: number): number { return STRIKES.kab.cooldown[team] * (team === RU && this.refineriesBurning() ? 1.5 : 1); }
+  /** announce a strike; it lands after the warning unless air defense near the point catches it */
+  scheduleStrike(team: number, kind: 'kab' | 'missile', x: number, y: number, targetId?: number) {
+    const spec = kind === 'kab' ? STRIKES.kab : STRIKES.missile;
+    this.strikes.push({ team, kind, x, y, at: this.gameTime + spec.warn, targetId });
+    this.effects.push({ kind: 'alert', x, y, t: 0, dur: spec.warn, team: 1 - team, text: kind === 'kab' ? 'GLIDE BOMB' : 'MISSILE' });
+    this.notify(1 - team, (kind === 'kab' ? 'Air raid: glide bomb inbound at ' : 'Ballistic missile inbound at ') + nearestPlace(x, y) + ', ' + spec.warn + ' seconds');
+    this.addLog(team, 'info', TEAMS[team].name + (kind === 'kab' ? ' launched a glide bomb at ' : ' fired a ballistic missile at ') + nearestPlace(x, y));
+  }
+  updateStrikes() {
+    for (const s of this.strikes) {
+      if (this.gameTime < s.at) continue;
+      const E = 1 - s.team, spec = s.kind === 'kab' ? STRIKES.kab : STRIKES.missile;
+      const p = s.kind === 'missile' && s.targetId !== undefined ? (this.find(s.targetId) || s) : s;
+      const chance = this.upgrades[E].samNet ? spec.interceptUp : spec.intercept;
+      let shot = false;
+      for (const a of this.units) { if (a.dead || a.team !== E || a.type !== 'aa') continue; if (dist(a, p) < 260 && this.rng.next() < chance) { shot = true; this.credit(a, a); a.kills = (a.kills || 0); break; } }
+      if (shot) {
+        this.stats.intercepted[E]++;
+        this.effects.push({ kind: 'boom', x: p.x + this.rand(-60, 60), y: p.y - 90, r: 40, t: 0, dur: 0.9 });
+        this.notify(E, (s.kind === 'kab' ? 'Glide bomb' : 'Missile') + ' shot down over ' + nearestPlace(p.x, p.y)); this.notify(s.team, 'Strike intercepted');
+        this.addLog(E, 'info', TEAMS[E].name + ' shot down a ' + (s.kind === 'kab' ? 'glide bomb' : 'ballistic missile') + ' over ' + nearestPlace(p.x, p.y));
+      } else {
+        const fromN = s.team === RU;
+        const sx = p.x + (fromN ? 120 : -120), sy = fromN ? Math.max(10, p.y - 900) : Math.min(H - 10, p.y + 900);
+        const dd = hyp(p.x - sx, p.y - sy);
+        this.projectiles.push({ x: sx, y: sy, sx, sy, tx: p.x, ty: p.y, t: 0, dur: dd / (s.kind === 'kab' ? 420 : 900), dmg: spec.dmg, splash: spec.splash, team: s.team, arc: s.kind === 'kab' ? 60 : 140, rocket: s.kind === 'missile', dead: false, strike: s.kind });
+      }
+    }
+    this.strikes = this.strikes.filter(s => this.gameTime < s.at);
+    if (this.deepPending && this.gameTime >= this.deepPending.at) {
+      const d = this.deepPending; this.deepPending = null;
+      if (d.hit) { this.refineryHits.push(this.gameTime + STRIKES.deep.burn); this.stats.refineries++; this.notify(-1, 'A Russian refinery is burning: Russian income down ' + Math.round((1 - Math.pow(STRIKES.deep.incomeMul, this.refineriesBurning())) * 100) + '% for four minutes, glide bombs slower to come'); this.addLog(UA, 'info', 'Deep strike: a refinery inside Russia is burning'); }
+      else { this.notify(-1, 'The deep strike was shot down over Russia'); this.addLog(RU, 'info', 'Russian air defense downed a Liutyi over the interior'); }
+    }
   }
 
   // ---------------------------------------------------------------- weather and night
@@ -922,19 +967,26 @@ export class Game {
     if (p.t >= p.dur) {
       p.dead = true;
       this.explosionFx(p.tx, p.ty, p.splash, true);
+      if (p.strike) {
+        // a glide bomb or missile: trench cover does not help, trenches are erased, buildings crumble
+        this.effects.push({ kind: 'boom', x: p.tx, y: p.ty, r: p.splash * 1.4, t: 0, dur: 1.4 }); this.scorches.push({ x: p.tx, y: p.ty, r: p.splash });
+        for (const s of this.structs) if (!s.dead && s.def.trench && hyp(s.x - p.tx, s.y - p.ty) < p.splash) this.destroyStruct(s, p.team);
+        this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, 1.5, 1.2, false, undefined, undefined, true);
+        return;
+      }
       const src = p.srcId !== undefined ? this.find(p.srcId) : undefined;
       const sd = src && src.isUnit ? src.def : (p.srcType ? UNITS[p.srcType] : undefined);
       this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, sd && sd.vsStruct ? sd.vsStruct : 1, sd && sd.vsVehicle ? sd.vsVehicle : 1, false, src && src.isUnit ? src : undefined, sd);
     }
   }
-  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit, srcDef?: UnitDef) {
+  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit, srcDef?: UnitDef, heavy = false) {
     const vs = vsStruct || 1, vv = vsVehicle || 1;
     if (dmg >= 30) for (const rs of this.resources) if (rs.kind === 'wheat' && rs.burnT <= 0 && hyp(rs.x - x, rs.y - y) < rs.r) { rs.burnT = 60; if (rs.owner >= 0) this.notify(rs.owner, 'Wheat field burning'); }
-    const sd = src ? src.def : srcDef, vi = sd && sd.vsInf ? sd.vsInf : 1;
+    const sd = src ? src.def : srcDef, vi = heavy ? 1.6 : sd && sd.vsInf ? sd.vsInf : 1;
     for (const e of this.units) {
       if (e.dead || e.team === team || e.def.air) continue;
       const dd = hyp(e.x - x, e.y - y) - e.def.r;
-      if (dd <= r) this.applyDamage(e, (e === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * (isVehicle(e) ? vv : e.def.troop ? vi : 1), team, drone, src);
+      if (dd <= r) this.applyDamage(e, (e === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * (isVehicle(e) ? vv : e.def.troop ? vi : 1), team, drone, src, heavy);
     }
     for (const s of this.structs) {
       if (s.dead || s.team === team) continue;
@@ -942,11 +994,11 @@ export class Game {
       if (dd <= r) this.applyDamage(s, (s === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * vs, team, false, src);
     }
   }
-  applyDamage(t: Entity, amt: number, team: number, drone?: boolean, src?: Unit) {
+  applyDamage(t: Entity, amt: number, team: number, drone?: boolean, src?: Unit, heavy = false) {
     if (t.dead) return;
     if (drone && t.isUnit && isVehicle(t) && t.team >= 0 && this.upgrades[t.team].cages) amt *= 0.65;
     if (t.isUnit) amt *= 1 - 0.06 * rankOf(t);
-    if (t.isUnit && t.def.troop) { const cv = COVER[t.cover || 'open']; amt *= cv.take; if (drone) { amt *= cv.drone; if (t.cover === 'trench' && this.terrain.coverOf(t.x, t.y) === 'forest') amt *= TRENCH_IN_FOREST; } }
+    if (t.isUnit && t.def.troop && !heavy) { const cv = COVER[t.cover || 'open']; amt *= cv.take; if (drone) { amt *= cv.drone; if (t.cover === 'trench' && this.terrain.coverOf(t.x, t.y) === 'forest') amt *= TRENCH_IN_FOREST; } }
     else if (t.isUnit && t.def.indirect && drone) amt *= COVER[t.cover || 'open'].drone;
     if (t.isUnit && t.def.morale) t.morale = clamp((t.morale === undefined ? 90 : t.morale) - amt * 0.25, 0, 100);
     t.hp -= amt; t.lastHitBy = team;
@@ -1379,6 +1431,37 @@ export class Game {
         }
         if (n) { this.notify(team, cmd.delta > 0 ? n + ' operator' + (n > 1 ? 's' : '') + ' joined: each flies ' + this.opCap(team) + ' drones' : n + ' operator' + (n > 1 ? 's' : '') + ' returned to the pool'); if (cmd.delta > 0) this.bark('ops', squads[0]); }
         else if (cmd.delta > 0) this.notify(team, 'A squad holds at most ' + OPS_MAX + ' operators');
+        return;
+      }
+      case 'kab': {
+        const cost = STRIKES.kab.cost[team];
+        if (this.kabT[team] > 0) return this.notify(team, 'Aviation reloading: ' + Math.ceil(this.kabT[team]) + ' s');
+        if (this.funds[team] < cost) return this.notify(team, 'A glide bomb strike costs ' + cost + ' funds');
+        this.funds[team] -= cost; this.kabT[team] = this.kabCooldown(team); this.stats.kabs[team]++;
+        this.scheduleStrike(team, 'kab', clamp(cmd.x, 20, W - 20), clamp(cmd.y, 20, H_LAND - 20));
+        this.notify(team, 'Glide bomb on the way: ' + STRIKES.kab.warn + ' seconds to impact');
+        return;
+      }
+      case 'deep': {
+        if (team !== UA) return this.notify(team, 'Only Ukraine flies deep strikes');
+        if (this.deepT > 0) return this.notify(team, 'Deep strike crews preparing: ' + Math.ceil(this.deepT) + ' s');
+        if (this.deepPending) return this.notify(team, 'A deep strike is already in the air');
+        const li = this.units.find(u => !u.dead && u.team === UA && u.type === 'liutyi' && u.order.kind !== 'attack');
+        if (!li) return this.notify(team, 'Needs an idle Liutyi: build one at the launch site');
+        if (this.funds[UA] < STRIKES.deep.cost) return this.notify(team, 'A deep strike costs ' + STRIKES.deep.cost + ' funds');
+        this.funds[UA] -= STRIKES.deep.cost; this.deepT = STRIKES.deep.cooldown; this.killUnit(li, true);
+        this.deepPending = { at: this.gameTime + STRIKES.deep.delay, hit: this.rng.next() < STRIKES.deep.chance };
+        this.notify(UA, 'Liutyi away toward a refinery inside Russia: ' + STRIKES.deep.delay + ' seconds of flight'); this.addLog(UA, 'info', 'A Liutyi left for the Russian interior');
+        return;
+      }
+      case 'iskander': {
+        if (team !== RU) return this.notify(team, 'Only Russia has Iskanders here');
+        if (this.missileT > 0) return this.notify(team, 'Missile brigade reloading: ' + Math.ceil(this.missileT) + ' s');
+        if (this.funds[RU] < STRIKES.missile.cost) return this.notify(team, 'A missile strike costs ' + STRIKES.missile.cost + ' funds');
+        const t = this.find(cmd.targetId); if (!t || !t.isStruct || t.team === RU) return this.notify(team, 'Pick an enemy building');
+        this.funds[RU] -= STRIKES.missile.cost; this.missileT = STRIKES.missile.cooldown; this.stats.missiles++;
+        this.scheduleStrike(RU, 'missile', t.x, t.y, t.id);
+        this.notify(RU, 'Iskander launched: ' + STRIKES.missile.warn + ' seconds to impact');
         return;
       }
       case 'wave': {

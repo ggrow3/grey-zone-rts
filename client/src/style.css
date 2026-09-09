@@ -177,7 +177,7 @@ table.log th { color: var(--ink-dim); font-weight: 500; }
 #killfeed .m { background: rgba(26,29,21,0.7); padding: 1px 6px; margin-top: 2px; }
 .m .t { color: var(--ink-dim); margin-right: 6px; font-family: 'Barlow Condensed', sans-serif; }
 .m.good { color: #c6e48b; } .m.bad { color: #ff9a80; } .m.both { color: var(--ink); }
-.cmd.wave { border-left-color: var(--ru); }
+.cmd.wave { border-left-color: var(--ru); } .cmd.strike { border-left-color: #ff8a80; }
 table.armies { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
 table.armies th, table.armies td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--hud-edge); font-size: 13px; }
 table.armies th.ua { color: var(--ua); } table.armies th.ru { color: #ff8a80; } table.armies td:first-child { color: var(--ink-dim); white-space: nowrap; }

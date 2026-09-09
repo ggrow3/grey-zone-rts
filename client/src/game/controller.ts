@@ -14,7 +14,9 @@ export class Controller {
   formationType: FormationType = 'wedge';
   groups: Record<string, Unit[]> = {};
   keys: Record<string, boolean> = {};
-  cmdTab: 'build' | 'procure' = 'build';
+  cmdTab: 'build' | 'procure' | 'market' = 'build';
+  /** next left click on the map picks the strike point (glide bomb) or the enemy building (missile) */
+  strikeMode: 'kab' | 'iskander' | null = null;
   private pan: { mx: number; my: number; cx: number; cy: number } | null = null;
   onMessage: (text: string) => void = () => {};
   onSelectionChange: () => void = () => {};
@@ -70,6 +72,7 @@ export class Controller {
   mouseDown(px: number, py: number, button: number, shift: boolean) {
     const w = this.toWorld(px, py);
     if (button === 0) {
+      if (this.strikeMode) { const m = this.strikeMode; this.strikeMode = null; if (m === 'kab') this.submit({ kind: 'kab', x: w.x, y: w.y }); else { const t = this.findEnemyAt(w.x, w.y); if (t && t.isStruct) this.submit({ kind: 'iskander', targetId: t.id }); else this.onMessage('Missiles need an enemy building: click one'); } this.onSelectionChange(); return; }
       if (this.view.bombardMode) { this.view.bombardMode = false; this.bombardAt(w.x, w.y); return; }
       if (this.view.placing) { this.tryPlace(w.x, w.y, shift); return; }
       this.view.drag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
@@ -101,6 +104,7 @@ export class Controller {
     this.onMessage(picked.length + ' ' + (hit ? UNITS[hit.type].label[PL] : 'drone') + (picked.length > 1 ? 's' : '') + ' selected');
   }
   contextMenu(px: number, py: number, ctrl: boolean, shift = false) {
+    if (this.strikeMode) { this.strikeMode = null; this.onSelectionChange(); return; }
     if (this.view.placing) { this.view.placing = null; this.onSelectionChange(); return; }
     const w = this.toWorld(px, py);
     if (this.view.bombardMode) { this.view.bombardMode = false; return this.bombardAt(w.x, w.y); }
@@ -205,6 +209,8 @@ export class Controller {
   cancelQueued(fac: Struct, index: number) { this.submit({ kind: 'cancel', facId: fac.id, index }); }
   buyUpgrade(key: string) { this.submit({ kind: 'upgrade', key }); }
   geranWave() { this.submit({ kind: 'wave' }); }
+  startStrike(kind: 'kab' | 'iskander') { this.strikeMode = this.strikeMode === kind ? null : kind; this.onMessage(kind === 'kab' ? 'Click where the glide bomb should land. Right-click to cancel.' : 'Click the enemy building the missile should hit. Right-click to cancel.'); this.onSelectionChange(); }
+  deepStrike() { this.submit({ kind: 'deep' }); }
   setOps(delta: 1 | -1) {
     const squads = this.selUnits().filter(u => u.def.operator);
     if (!squads.length) return this.onMessage('Select an infantry squad first');
@@ -217,7 +223,7 @@ export class Controller {
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return false;
     const v = this.view;
-    if (e.code === 'Escape') { if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
+    if (e.code === 'Escape') { if (this.strikeMode) this.strikeMode = null; else if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
     else if (e.code === 'KeyP') this.onToggle('pause');
     else if (e.code === 'Space') { this.goHome(); return true; }
     else if (e.code === 'Equal' || e.code === 'NumpadAdd') this.zoomAt(1.25, v.vw / 2, v.vh / 2);

@@ -44,10 +44,14 @@ export interface PumpSite { team: number; x: number; y: number; struct: Struct |
 export interface Projectile {
   x: number; y: number; sx: number; sy: number; tx: number; ty: number; t: number; dur: number; dmg: number; splash: number; team: number;
   arc: number; rocket: boolean; dead: boolean; srcId?: number; srcType?: string;
+  /** a glide bomb or ballistic missile: heavier, ignores trench cover, drawn differently */
+  strike?: 'kab' | 'missile';
 }
+/** a strike announced ahead of impact; interception is rolled when it arrives */
+export interface PendingStrike { team: number; kind: 'kab' | 'missile'; x: number; y: number; at: number; targetId?: number }
 
 export interface Effect {
-  kind: 'boom' | 'tracer' | 'hit' | 'flash' | 'mark' | 'heal' | 'caught' | 'text' | 'bark';
+  kind: 'boom' | 'tracer' | 'hit' | 'flash' | 'mark' | 'heal' | 'caught' | 'text' | 'bark' | 'alert';
   x: number; y: number; t: number; dur: number; r?: number; tx?: number; ty?: number; team?: number; red?: boolean; green?: boolean; text?: string; delay?: number;
   /** bark kind, for the voice queue's priorities */
   sub?: string;
@@ -65,7 +69,7 @@ export interface Supply { food: number; fuel: number; power: number; foodUsed: n
 
 export interface Bot {
   team: number; staging: Pt; spendT: number; attackT: number; shahedT: number; warnT: number; warnName: string; defendT: number; artyT: number;
-  pending: string | null; raidT?: number; resT?: number; opsT?: number; coverT?: number;
+  pending: string | null; raidT?: number; resT?: number; opsT?: number; coverT?: number; strikeT?: number;
 }
 
 export interface Notice { team: number; text: string; at: number }
@@ -86,4 +90,7 @@ export type Command =
   | { kind: 'cancel'; facId: number; index: number }
   | { kind: 'upgrade'; key: string }
   | { kind: 'wave' }
-  | { kind: 'ops'; ids: number[]; delta: 1 | -1 };
+  | { kind: 'ops'; ids: number[]; delta: 1 | -1 }
+  | { kind: 'kab'; x: number; y: number }
+  | { kind: 'deep' }
+  | { kind: 'iskander'; targetId: number };
