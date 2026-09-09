@@ -22,6 +22,7 @@ function unitRows(e: Unit): [string, string][] {
   rows.push(['Can hit', d.targets ? d.targets.map(k => TARGET_WORDS[k]).join(', ') : 'nothing']);
   if (d.ammo) rows.push(['Shells', (e.ammo || 0) + ' / ' + d.ammo + (e.ammo === 0 ? ', waiting for a truck' : e.ammoTruckId ? ', truck on the way' : '')]);
   if (e.revealT && e.revealT > 0 && d.indirect) rows.push(['Exposed', 'firing revealed you to radar for ' + Math.ceil(e.revealT) + ' s']);
+  if (d.indirect) { const cv = e.cover || 'open'; rows.push(['Position', cv === 'forest' ? 'in a wood: hidden beyond 140, drones -65%, 2 s radar exposure' : cv === 'urban' ? 'in a town: hidden beyond 220, drones -55%' : 'IN THE OPEN: seen from anywhere, drones +45%, 6 s radar exposure. Move into the trees']); }
   if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)] + ' (' + (e.kills || 0) + ' kills)']);
   if (d.crew) rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul) rows.push(['Roads', (e.onRoad ? 'on a road, ' : 'off road, ') + Math.round((d.roadMul - 1) * 100) + '% faster on roads']);
@@ -33,7 +34,7 @@ function unitRows(e: Unit): [string, string][] {
   if (d.troop && G.supply[e.team].food < 1) rows.push(['Supply', 'hungry: fire at ' + Math.round(G.foodMul(e.team) * 100) + '%']);
   if (FUEL_USERS.has(e.type) && G.supply[e.team].fuel < 1) rows.push(['Supply', 'short of fuel: speed ' + Math.round(G.fuelMul(e) * 100) + '%']);
   if (d.morale) rows.push(['Morale', Math.round(e.morale === undefined ? 90 : e.morale) + '%' + (e.shaken ? ', shaken: falling back' : '') + (d.upkeep ? ', wages ' + d.upkeep + '/s' : '')]);
-  if (d.troop) { const cv = e.cover || 'open'; rows.push(['Cover', cv === 'trench' ? 'trench: -45% damage, drones -70%, seen only within 110' : cv === 'forest' ? 'forest: +50% fire, -40% damage, drones -60%, seen only within 140' : cv === 'urban' ? 'town: +20% fire, -25% damage, drones -30%, seen within 220' : 'open ground: +30% damage taken']); }
+  if (d.troop) { const cv = e.cover || 'open', wood = cv === 'trench' && G.terrain.coverOf(e.x, e.y) === 'forest'; rows.push(['Cover', cv === 'trench' ? (wood ? 'trench in a wood: -45% damage, drones -85%, seen only within 110' : 'trench: -45% damage, drones -75%, seen only within 110') : cv === 'forest' ? 'forest: +50% fire, -40% damage, drones -65%, seen only within 140' : cv === 'urban' ? 'town: +20% fire, -25% damage, drones -55%, seen within 220' : 'OPEN GROUND: +30% damage, drones +45%. Get into a town, a wood, or a trench']); }
   if (d.endurance) rows.push(['Flight time', e.landed ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s' : Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s of ' + d.endurance + (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : '')]);
   if (d.operated) rows.push(['Operator', !G.needsOperator(d, e.team) ? 'autonomous' : e.grounded ? 'none: grounded until a squad within 900 has a free slot' : e.operator && !e.operator.dead ? UNITS[e.operator.type].label[0] + ', ' + Math.round(dist(e, e.operator)) + ' of ' + G.linkRange(e) + ' range' : 'none, searching']);
   if (d.operator) { rows.push(['Operators', (e.ops || 1) + ' of 4, ' + G.opCap(e.team) + ' drones each']); rows.push(['Flying', G.droneCount(e) + ' of ' + G.opCapOf(e) + ' drones']); }

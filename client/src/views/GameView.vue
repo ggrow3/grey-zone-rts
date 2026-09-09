@@ -26,6 +26,7 @@ import ObjectivesPanel from '../components/game/ObjectivesPanel.vue';
 import ChatPanel from '../components/game/ChatPanel.vue';
 import LegendPanel from '../components/game/LegendPanel.vue';
 import BattleLog from '../components/game/BattleLog.vue';
+import Cutscene from '../components/game/Cutscene.vue';
 
 const props = defineProps<{ mode: 'level' | 'skirmish' | 'multiplayer'; levelId?: string; side?: number; difficulty?: number; matchId?: string }>();
 const router = useRouter(); const auth = useAuth();
@@ -36,6 +37,12 @@ const audio = new AudioDirector(); const audioMode = ref(audio.mode);
 const objIdx = ref(0), chat = ref<ChatMsg[]>([]), opponent = ref(''), netStatus = ref(''), basemap = ref<BasemapMode>('drawn');
 const result = ref<{ won: boolean; title: string; text: string; stats: [string, string][] } | null>(null);
 const level = shallowRef<Level | null>(null);
+const cut = ref<{ title: string; lines: string[]; index: number } | null>(null);
+let cutShots: { x: number; y: number }[] = []; let cutT = 0;
+const SKIRMISH_BRIEF: string[][] = [
+  ['Kharkiv group. The full war: no scripted enemy, no pauses. Belgorod is building from the first second, and its drones fly themselves.', 'Take Lyptsi first, put a Mavic and a Sting over the substation before the four-minute mark, and keep your strikes off civilians: support is income.', 'Destroy the headquarters in Belgorod, or hold all six towns for three minutes. Slava Ukraini, commander.'],
+  ['Belgorod group. The full war: Kharkiv is researching and building from the first second, and every one of its drones has a human on the sticks until it buys autonomy.', 'Your drones need nobody. Take Zhuravlyovka, hunt their trucks, keep the pump on the Kursk line standing, and launch the waves when the crews are ready.', 'Destroy the headquarters in Kharkiv, or hold all six towns for three minutes. Za Rodinu, commander.'],
+];
 const canvas = ref<HTMLCanvasElement | null>(null), minimap = ref<HTMLCanvasElement | null>(null), stage = ref<HTMLElement | null>(null), chatPanel = ref<InstanceType<typeof ChatPanel> | null>(null);
 const ctl = shallowRef<Controller | null>(null);
 const team = ref(0);
@@ -115,6 +122,7 @@ function attach() {
   resize(); const ro = new ResizeObserver(resize); ro.observe(st); cleanups.push(() => ro.disconnect());
   const hq = game.hq(team.value); if (hq) controller.centerOn(hq.x, hq.y + (team.value === UA ? -60 : 60));
   camStart = { x: controller.view.cam.x, y: controller.view.cam.y };
+  if (!isNet.value) startCutscene();
   const pos = (e: MouseEvent) => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, ev: K, fn: (e: HTMLElementEventMap[K]) => void, opts?: AddEventListenerOptions) => { el.addEventListener(ev, fn as EventListener, opts); cleanups.push(() => el.removeEventListener(ev, fn as EventListener, opts)); };
   on(c, 'mousedown', e => { audio.unlock(); if (result.value) return; const p = pos(e); controller.mouseDown(p.x, p.y, e.button, e.shiftKey); if (e.button === 1) e.preventDefault(); });
@@ -128,6 +136,7 @@ function attach() {
   on(mm, 'contextmenu', e => e.preventDefault());
   on(window, 'keydown', e => {
     audio.unlock();
+    if (cut.value) { if (e.code === 'Escape' || e.code === 'Enter') endCutscene(); else if (e.code === 'Space') nextCutLine(); e.preventDefault(); return; }
     const t = e.target as HTMLElement | null, typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
     if (e.code === 'Enter' && !typing && isNet.value) { chatPanel.value?.focus(); e.preventDefault(); return; }
     if (typing) { if (e.code === 'Escape') (t as HTMLElement).blur(); return; }
@@ -147,6 +156,13 @@ function frame(now: number) {
   raf = requestAnimationFrame(frame);
   const elapsed = Math.min(0.25, (now - last) / 1000); last = now;
   const controller = ctl.value!;
+  if (cut.value) {
+    // slow pan toward this line's map point; lines advance on their own after a while
+    cutT += elapsed;
+    const shot = cutShots[Math.min(cut.value.index, cutShots.length - 1)];
+    if (shot) { const v = controller.view, tx = shot.x - v.vw / (2 * v.cam.z), ty = shot.y - v.vh / (2 * v.cam.z); v.cam.x += (tx - v.cam.x) * Math.min(1, elapsed * 1.2); v.cam.y += (ty - v.cam.y) * Math.min(1, elapsed * 1.2); controller.clampCam(); }
+    if (cutT > 7) nextCutLine();
+  }
   if (!result.value) session.advance(elapsed);
   audio.scan(game, controller.view, now);
   controller.handleCamera(elapsed); controller.prune();
@@ -159,8 +175,29 @@ function frame(now: number) {
   hudT -= elapsed; if (hudT <= 0) { hudT = 0.25; hudTick.value++; }
 }
 
+function startCutscene() {
+  const l = level.value, hq = game.hq(team.value);
+  const lines = l ? l.briefing : SKIRMISH_BRIEF[team.value];
+  cutShots = l ? l.shots(game) : [hq || { x: 1800, y: 1000 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: 1800, y: 1000 }];
+  cut.value = { title: l ? l.title : (team.value === UA ? 'Skirmish: the Kharkiv front' : 'Skirmish: the Belgorod front'), lines, index: 0 };
+  session.paused = true; cutT = 0;
+  if (cutShots[0]) ctl.value!.centerOn(cutShots[0].x, cutShots[0].y);
+  audio.narrate(lines[0]);
+}
+function nextCutLine() {
+  const c = cut.value; if (!c) return;
+  if (c.index >= c.lines.length - 1) return endCutscene();
+  c.index++; cutT = 0; audio.narrate(c.lines[c.index]);
+}
+function endCutscene() {
+  if (!cut.value) return;
+  cut.value = null; audio.cancelSpeech(); session.paused = paused.value;
+  const controller = ctl.value!; controller.view.cam.z = 1; controller.goHome(); if (team.value === UA) controller.view.cam.y -= 60; else controller.view.cam.y += 60; controller.clampCam();
+  camStart = { x: controller.view.cam.x, y: controller.view.cam.y };
+  msg(level.value ? 'Mission started' : 'Skirmish started');
+}
 function checkLevel() {
-  const l = level.value, controller = ctl.value; if (!l || !controller || result.value) return;
+  const l = level.value, controller = ctl.value; if (!l || !controller || result.value || cut.value) return;
   game.botPassive = objIdx.value < l.passiveUntil; game.noGerans = objIdx.value < l.noGeransUntil;
   if (objIdx.value >= l.objectives.length) return;
   const o = l.objectives[objIdx.value];
@@ -204,7 +241,7 @@ function finishSolo(res: 'won' | 'lost' | 'abandoned') {
   const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime) }).catch(() => {});
   if (gameLogId) send(); else setTimeout(() => { if (gameLogId) send(); }, 1500);
 }
-function togglePause() { if (!session.canPause || result.value) return; session.paused = !session.paused; paused.value = session.paused; }
+function togglePause() { if (!session.canPause || result.value || cut.value) return; session.paused = !session.paused; paused.value = session.paused; }
 function cycleBasemap() { const modes: BasemapMode[] = ['drawn', 'street', 'satellite']; basemap.value = modes[(modes.indexOf(basemap.value) + 1) % modes.length]; tc.loadBasemap(basemap.value); }
 function sendChat(text: string) { hub.send('SendMatchChat', props.matchId, text); }
 async function leave() {
@@ -228,7 +265,8 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>
         <div id="paused" v-if="paused">Paused</div>
         <div id="netstatus" v-if="netStatus || (isNet && (session as any)?.waiting)">{{ netStatus || 'Waiting for the server…' }}</div>
-        <ObjectivesPanel v-if="level && objIdx < level.objectives.length" :level="level" :index="objIdx" @skip="advanceObjective" />
+        <ObjectivesPanel v-if="level && objIdx < level.objectives.length && !cut" :level="level" :index="objIdx" @skip="advanceObjective" />
+        <Cutscene v-if="cut" :title="cut.title" :side="team" :lines="cut.lines" :index="cut.index" @next="nextCutLine" @skip="endCutscene" />
         <LegendPanel v-if="showLegend" />
         <BattleLog v-if="showLog" :game="game" :team="team" :tick="hudTick" @close="showLog = false" />
         <BattleLog v-else :game="game" :team="team" :tick="hudTick" feed />

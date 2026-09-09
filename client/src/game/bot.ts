@@ -40,10 +40,20 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       }
     }
   }
+  // troops standing still dig in; troops in the open with enemy drones about run for the nearest wood first
+  bot.coverT = (bot.coverT === undefined ? 3 : bot.coverT) - dt;
+  const droneAlert = bot.coverT <= 0;
+  if (droneAlert) bot.coverT = 4;
   for (const u of g.units) {
     if (u.dead || u.team !== T || !u.def.troop || u.order.kind !== 'idle') { if (u.team === T) u.idleT = 0; continue; }
     u.idleT = (u.idleT || 0) + dt;
-    if (u.idleT > 15 && !g.trenchAt(u.x, u.y) && !u.shaken) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = 20; u.idleT = 0; }
+    if (droneAlert && u.cover === 'open' && !u.shaken && g.units.some(e => !e.dead && e.team === E && e.def.air && e.def.dmg > 0 && e.seenBy[T] && dist(e, u) < 320)) {
+      let best: Pt | null = null, bd = 380;
+      for (const f of g.terrain.forestPx) { const d = dist(f, u); if (d < bd) { bd = d; best = f; } }
+      if (best) { u.order = MOVE(best.x + g.rand(-12, 12), best.y + g.rand(-12, 12)); u.target = null; u.idleT = 0; continue; }
+      if (!g.trenchAt(u.x, u.y)) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = 20; u.idleT = 0; continue; }
+    }
+    if (u.idleT > (u.cover === 'forest' ? 6 : 12) && !g.trenchAt(u.x, u.y) && !u.shaken) { u.order = { kind: 'dig', x: u.x, y: u.y, target: null }; u.digT = 20; u.idleT = 0; }
   }
   bot.artyT -= dt;
   if (bot.artyT <= 0) {
@@ -56,6 +66,8 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       const toward = T === RU ? 1 : -1;
       let fb: Pt = { x: bot.staging.x, y: bot.staging.y };
       if (held.length && enemyHq) { held.sort((a, b) => dist(a, enemyHq) - dist(b, enemyHq)); fb = { x: held[0].x, y: held[0].y - toward * 90 }; }
+      // guns belong in the trees: the firebase snaps to the nearest wood within 320
+      { let best: Pt | null = null, bd = 320; for (const f of g.terrain.forestPx) { const d = dist(f, fb); if (d < bd) { bd = d; best = f; } } if (best) fb = { x: best.x, y: best.y }; }
       for (const u of arty) if (u.order.kind === 'idle' && dist(u, fb) > 90) { u.order = MOVE(fb.x + g.rand(-50, 50), fb.y + g.rand(-30, 30)); g.planRoute(u, u.order.x, u.order.y); }
       for (const u of arty) {
         if (u.order.kind !== 'idle' || u.target) continue;

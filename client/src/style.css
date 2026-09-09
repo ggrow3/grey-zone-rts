@@ -183,3 +183,24 @@ table.armies th, table.armies td { text-align: left; vertical-align: top; paddin
 table.armies th.ua { color: var(--ua); } table.armies th.ru { color: #ff8a80; } table.armies td:first-child { color: var(--ink-dim); white-space: nowrap; }
 .levelgroup h3 { font-size: 18px; margin: 12px 0 4px; } .levelgroup h3.ua { color: var(--ua); } .levelgroup h3.ru { color: #ff8a80; }
 .tag.side1 { color: #ff8a80; border-color: #7a3030; } .tag.side0 { color: var(--ua); border-color: var(--ua); }
+
+/* ---- mission briefing cutscene ---- */
+#cutscene { position: absolute; inset: 0; z-index: 30; cursor: pointer; }
+#cutscene .bars { position: absolute; left: 0; right: 0; height: 9%; background: #0a0c08; }
+#cutscene .bars.top { top: 0; } #cutscene .bars.bottom { bottom: 0; }
+#cutscene .card { position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%); width: min(820px, 92%); background: rgba(14,17,11,0.86); border: 1px solid var(--hud-edge); border-left: 4px solid var(--ua-accent); padding: 16px 22px 12px; cursor: default; }
+#cutscene.ru .card { border-left-color: var(--ru); }
+#cutscene .kicker { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; color: var(--ink-dim); }
+#cutscene h1 { font-size: 30px; line-height: 1.1; margin: 2px 0 10px; }
+#cutscene .lines p { margin: 0 0 6px; line-height: 1.45; font-size: 17px; max-width: 78ch; }
+#cutscene .lines p.past { color: var(--ink-dim); font-size: 14px; }
+#cutscene .lines p.now { color: #fff; animation: cutline 0.6s ease-out; }
+@keyframes cutline { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+#cutscene .foot { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+#cutscene .foot button { margin-left: auto; }
+#cutscene .dots { display: inline-flex; gap: 5px; } #cutscene .dots i { width: 8px; height: 8px; border: 1px solid var(--ink-dim); display: inline-block; } #cutscene .dots i.on { background: var(--ua-accent); border-color: var(--ua-accent); }
+#cutscene.ru .dots i.on { background: var(--ru); border-color: var(--ru); }
+@media (prefers-reduced-motion: reduce) { #cutscene .lines p.now { animation: none; } }
+
+#nav .brand small { font-family: 'Barlow Condensed', sans-serif; font-weight: 500; font-size: 13px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-left: 6px; }
+.subtitle { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 2px 0 10px; }

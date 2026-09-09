@@ -15,7 +15,7 @@ async function logout() { await hub.disconnect(); auth.logout(); router.push({ n
 <template>
   <div id="shell">
     <nav id="nav" v-if="!inGame">
-      <router-link to="/" class="brand">Grey <span>Zone</span></router-link>
+      <router-link to="/" class="brand">Slava <span>Ukraine</span> <small>Drone Wars</small></router-link>
       <template v-if="auth.loggedIn">
         <router-link to="/">Play</router-link>
         <router-link to="/lobby">Lobby</router-link>

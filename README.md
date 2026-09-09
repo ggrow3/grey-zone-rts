@@ -1,4 +1,4 @@
-# Grey Zone
+# Slava Ukraine: Drone Wars
 
 A browser real-time strategy game on the Kharkiv to Belgorod border: drones, jammers, trucks, trenches, and two headquarters.
 Play ten short teaching levels on both sides of the border, fight the computer, or match against another commander over the network and talk to them while you play.
@@ -8,7 +8,7 @@ What makes it feel like the real front: the two armies are not mirrors (Ukrainia
 - **Client**: Vue 3 + TypeScript (Vite). The whole game simulation runs in the browser as a deterministic lockstep engine.
 - **Server**: C# ASP.NET Core (.NET 10) minimal API + SignalR. Accounts (JWT), lobby, matchmaking, chat, the authoritative match turn clock, level progress, and a log of every game played. SQLite via EF Core.
 
-The original single-file prototype is kept as `grey-zone-rts.html`.
+The game was called Grey Zone in its first version; the original single-file prototype is kept as `grey-zone-rts.html`, and internal names (`GreyZone.Server`, the Azure app `greyzone-rts`) still use it.
 
 ## Run it locally
 

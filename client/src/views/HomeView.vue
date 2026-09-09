@@ -15,7 +15,8 @@ onMounted(() => auth.refresh());
   <div class="page">
     <div class="grid cols2" style="max-width:1200px;margin:0 auto">
       <div class="card" style="grid-column:1/-1">
-        <h1>Grey <span>Zone</span></h1>
+        <h1>Slava <span>Ukraine</span></h1>
+        <div class="subtitle">Drone Wars</div>
         <p class="dim">Drones, jammers, trucks, and trenches on the Kharkiv to Belgorod border. Build factories, take the towns, keep the pipeline pumping, and destroy the enemy headquarters, or hold every town for three minutes. Start with the levels if this is your first game.</p>
       </div>
 

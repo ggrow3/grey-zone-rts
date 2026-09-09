@@ -47,6 +47,8 @@ export interface Projectile {
 export interface Effect {
   kind: 'boom' | 'tracer' | 'hit' | 'flash' | 'mark' | 'heal' | 'caught' | 'text' | 'bark';
   x: number; y: number; t: number; dur: number; r?: number; tx?: number; ty?: number; team?: number; red?: boolean; green?: boolean; text?: string; delay?: number;
+  /** bark kind, for the voice queue's priorities */
+  sub?: string;
 }
 
 export type LogKind = 'kill' | 'loss' | 'capture' | 'struct' | 'truck' | 'research' | 'wave' | 'defect' | 'info';
@@ -59,7 +61,7 @@ export interface Supply { food: number; fuel: number; power: number; foodUsed: n
 
 export interface Bot {
   team: number; staging: Pt; spendT: number; attackT: number; shahedT: number; warnT: number; warnName: string; defendT: number; artyT: number;
-  pending: string | null; raidT?: number; resT?: number; opsT?: number;
+  pending: string | null; raidT?: number; resT?: number; opsT?: number; coverT?: number;
 }
 
 export interface Notice { team: number; text: string; at: number }

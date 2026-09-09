@@ -2,7 +2,7 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
@@ -98,12 +98,12 @@ export class Game {
   /** a shout from a unit; throttled per team and kind on game time, phrase chosen by a plain counter so cosmetics never touch the RNG */
   bark(kind: BarkKind, u: Entity, delay?: number) {
     const team = u.team; if (team < 0) return;
-    const key = team + ':' + kind, gap = kind === 'ack' ? 1.5 : kind === 'attack' ? 2 : kind === 'kill' ? 3 : 0;
+    const key = team + ':' + kind, gap = kind === 'ack' ? 2 : kind === 'attack' ? 2.5 : kind === 'kill' ? 3 : kind === 'lost' ? 4 : kind === 'strike' || kind === 'bombard' ? 3 : 0;
     if (gap && this.lastBark[key] !== undefined && this.gameTime - this.lastBark[key] < gap) return;
     this.lastBark[key] = this.gameTime;
     const table = (u.isUnit && u.type === 'dprk') ? ['Manse!'] : BARKS[kind][team as 0 | 1];
     const text = table[this.barkN++ % table.length];
-    this.effects.push({ kind: 'bark', x: u.x, y: u.y, t: 0, dur: 1.8 + (delay || 0), team, text, delay });
+    this.effects.push({ kind: 'bark', x: u.x, y: u.y, t: 0, dur: 2.6 + (delay || 0), team, text, delay, sub: kind });
   }
   addLog(team: number, kind: LogKind, text: string) { this.log.push({ at: this.gameTime, team, kind, text }); if (this.log.length > 200) this.log.shift(); }
   private nearestTroop(team: number, x: number, y: number, maxD: number): Unit | null {
@@ -345,7 +345,7 @@ export class Game {
       if (u.dead) continue;
       u.cover = u.def.air ? 'open' : (u.def.troop && this.trenchAt(u.x, u.y)) ? 'trench' : this.terrain.coverOf(u.x, u.y);
       if (!u.def.air) u.onRoad = this.terrain.onRoadAt(u.x, u.y);
-      const hid = u.def.troop && u.cover !== 'open' ? COVER[u.cover].spot : 0;
+      const hid = (u.def.troop || u.def.indirect) && u.cover !== 'open' ? COVER[u.cover].spot : 0;
       u.seenBy[UA] = u.team === UA || (hid ? this.inVisionClose(UA, u.x, u.y, hid) : this.inVision(UA, u.x, u.y));
       u.seenBy[RU] = u.team === RU || (hid ? this.inVisionClose(RU, u.x, u.y, hid) : this.inVision(RU, u.x, u.y));
       // counter-battery: a gun that just fired is caught by any enemy radar post within 900
@@ -851,7 +851,7 @@ export class Game {
   directHit(src: Unit, t: Entity, dmg: number, splash: number) {
     this.effects.push({ kind: 'tracer', x: src.x, y: src.y, tx: t.x, ty: t.y, t: 0, dur: 0.12, team: src.team });
     if (t.isUnit && t.def.air) {
-      const ev = clamp((t.def.evade || 0) + 0.04 * rankOf(t) + (t.team >= 0 && this.upgrades[t.team].evasion ? 0.15 : 0) - (src.team >= 0 && this.upgrades[src.team].gunnery ? 0.15 : 0), 0, 0.85);
+      const ev = clamp((t.def.evade || 0) + 0.04 * rankOf(t) + (src.def.air ? AIR_VS_AIR_EVADE : 0) + (t.team >= 0 && this.upgrades[t.team].evasion ? 0.15 : 0) - (src.team >= 0 && this.upgrades[src.team].gunnery ? 0.15 : 0), 0, 0.9);
       if (this.rng.next() < ev) { this.effects.push({ kind: 'hit', x: t.x + this.rand(-14, 14), y: t.y + this.rand(-14, 14), t: 0, dur: 0.15 }); return; }
     }
     const vs = src.def.vsStruct || 1, vv = src.def.vsVehicle || 1;
@@ -864,7 +864,7 @@ export class Game {
     const spread = (d.salvo ? 34 : 14) * (spreadMul || 1);
     const tx = px + this.rand(-spread, spread), ty = py + this.rand(-spread, spread);
     const dd = hyp(tx - u.x, ty - u.y);
-    u.revealT = 3;
+    u.revealT = u.cover === 'forest' ? 2 : u.cover === 'open' ? 6 : 3;
     if (d.ammo) { if (u.ammo! <= 0) return; u.ammo!--; if (u.ammo === 0) this.notify(u.team, u.def.label[u.team] + ' fired its last shell'); }
     this.projectiles.push({ x: u.x, y: u.y, sx: u.x, sy: u.y, tx, ty, t: 0, dur: dd / (d.shellSpeed || 260), dmg: d.dmg * (this.upgrades[u.team].ammo ? 1.15 : 1) * (1 + 0.06 * rankOf(u)), splash: d.splash || 0, team: u.team,
       arc: Math.min(110, dd * 0.22), rocket: !!d.salvo, dead: false, srcId: u.id });
@@ -900,7 +900,8 @@ export class Game {
     if (t.dead) return;
     if (drone && t.isUnit && isVehicle(t) && t.team >= 0 && this.upgrades[t.team].cages) amt *= 0.65;
     if (t.isUnit) amt *= 1 - 0.06 * rankOf(t);
-    if (t.isUnit && t.def.troop) { const cv = COVER[t.cover || 'open']; amt *= cv.take; if (drone) amt *= cv.drone; }
+    if (t.isUnit && t.def.troop) { const cv = COVER[t.cover || 'open']; amt *= cv.take; if (drone) { amt *= cv.drone; if (t.cover === 'trench' && this.terrain.coverOf(t.x, t.y) === 'forest') amt *= TRENCH_IN_FOREST; } }
+    else if (t.isUnit && t.def.indirect && drone) amt *= COVER[t.cover || 'open'].drone;
     if (t.isUnit && t.def.morale) t.morale = clamp((t.morale === undefined ? 90 : t.morale) - amt * 0.25, 0, 100);
     t.hp -= amt; t.lastHitBy = team;
     if (t.hp <= 0) { if (t.isUnit) this.killUnit(t, false, team, src); else this.destroyStruct(t, team, src); }
@@ -928,6 +929,7 @@ export class Game {
       this.addLog(byTeam, 'kill', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed a ' + ADJ[u.team] + ' ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
       this.credit(by, u);
       if (!u.def.auto) { const shouter = this.nearestTroop(byTeam, u.x, u.y, 260); if (shouter) this.bark('kill', shouter); }
+      if (u.def.troop) { const friend = this.nearestTroop(u.team, u.x, u.y, 260); if (friend) this.bark('lost', friend); }
     } else if (!u.def.auto && !silent) this.addLog(u.team, 'loss', TEAMS[u.team].name + ' lost a ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
     if (u.def.troop) for (const o of this.units) if (!o.dead && o !== u && o.team === u.team && o.def.morale && dist(o, u) < 300) o.morale = clamp((o.morale === undefined ? 90 : o.morale) - 12, 0, 100);
     if (u.operator && u.operator.drones) u.operator.drones = u.operator.drones.filter(x => x !== u);
@@ -1250,6 +1252,7 @@ export class Game {
         const arty = this.ownUnits(team, cmd.ids).filter(e => e.def.indirect);
         if (!arty.length) return this.notify(team, 'Select artillery first');
         for (const u of arty) { u.order = { kind: 'bombard', x: cmd.x, y: cmd.y, target: null }; u.target = null; u.path = null; }
+        this.bark('bombard', arty[0]);
         this.effects.push({ kind: 'mark', x: cmd.x, y: cmd.y, t: 0, dur: 0.8, red: true, team });
         this.notify(team, arty.length + ' gun' + (arty.length > 1 ? 's' : '') + ' firing on the area' + (this.inVision(team, cmd.x, cmd.y) ? '' : ', unobserved: wider scatter'));
         return;
@@ -1274,6 +1277,7 @@ export class Game {
           if (t && this.inLink(u, t)) { u.order = ATTACK(t); u.target = t; n++; }
         }
         this.notify(team, n ? n + ' drone' + (n > 1 ? 's' : '') + ' diving' + (done.size ? ' as a swarm' : '') : 'No target in sight for them');
+        if (n) { const op = sel[0].operator && !sel[0].operator.dead ? sel[0].operator : this.nearestTroop(team, sel[0].x, sel[0].y, 900); if (op) this.bark('strike', op); }
         return;
       }
       case 'swarm': return this.formSwarm(team, this.ownUnits(team, cmd.ids), cmd.formation);
@@ -1313,7 +1317,7 @@ export class Game {
           if (cmd.delta > 0) { if ((u.ops || 1) >= OPS_MAX) continue; if (this.freePeople(team) < 1) { this.notify(team, 'No free personnel to add'); break; } u.ops = (u.ops || 1) + 1; n++; }
           else if ((u.ops || 1) > 1) { u.ops = (u.ops || 1) - 1; n++; }
         }
-        if (n) this.notify(team, cmd.delta > 0 ? n + ' operator' + (n > 1 ? 's' : '') + ' joined: each flies ' + this.opCap(team) + ' drones' : n + ' operator' + (n > 1 ? 's' : '') + ' returned to the pool');
+        if (n) { this.notify(team, cmd.delta > 0 ? n + ' operator' + (n > 1 ? 's' : '') + ' joined: each flies ' + this.opCap(team) + ' drones' : n + ' operator' + (n > 1 ? 's' : '') + ' returned to the pool'); if (cmd.delta > 0) this.bark('ops', squads[0]); }
         else if (cmd.delta > 0) this.notify(team, 'A squad holds at most ' + OPS_MAX + ' operators');
         return;
       }

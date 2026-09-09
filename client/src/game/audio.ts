@@ -7,7 +7,7 @@ import type { View } from './render';
 
 const KEY = 'gz.audio';
 const COOLDOWN_MS: Record<string, number> = { tracer: 70, hit: 120, flash: 90, boom: 50, caught: 150, mark: 200, bark: 0, text: 300, heal: 9999 };
-const PRIORITY: Record<string, number> = { capture: 5, win: 6, attack: 4, kill: 3, reply: 3, ack: 2, dig: 1 };
+const PRIORITY: Record<string, number> = { win: 7, capture: 6, lost: 5, attack: 4, strike: 4, bombard: 4, kill: 3, reply: 3, ack: 2, ops: 2, dig: 1 };
 
 export class AudioDirector {
   sfx = true; voice = true;
@@ -54,7 +54,7 @@ export class AudioDirector {
     }
     if (biggestBoom) this.shake = Math.max(this.shake, Math.min(7, (biggestBoom.r || 0) / 12));
     this.shake *= 0.85; if (this.shake < 0.2) this.shake = 0;
-    if (this.queued && this.voice && now - this.lastSpeech > 2200 && !window.speechSynthesis?.speaking) { const q = this.queued; this.queued = null; this.say(q.text, q.team, now); }
+    if (this.queued && this.voice && now - this.lastSpeech > 2600 && !window.speechSynthesis?.speaking) { const q = this.queued; this.queued = null; this.say(q.text, q.team, now); }
   }
 
   private play(e: Effect, gain: number) {
@@ -94,16 +94,9 @@ export class AudioDirector {
     if (!this.voice || !('speechSynthesis' in window)) return;
     const own = e.team === v.team;
     if (!own && !g.inVision(v.team, e.x, e.y)) return;
-    const kind = Object.keys(PRIORITY).find(k => k === this.kindOf(e.text || '')) || 'ack';
+    const kind = e.sub || 'ack';
     const pri = (PRIORITY[kind] || 1) - (own ? 0 : 1);
     if (!this.queued || pri >= this.queued.pri) this.queued = { text: e.text || '', team: e.team ?? 0, pri };
-  }
-  private kindOf(text: string): string {
-    if (/Heroiam|Ura! Ura/.test(text)) return 'reply';
-    if (/Slava|Ura!|Vohon|Ogon|Vperyod|Za Ukrainu|Manse/.test(text)) return 'attack';
-    if (/Mynus|Minus|kontakt|popadaniye/.test(text)) return 'kill';
-    if (/Okop|Okap/.test(text)) return 'dig';
-    return 'ack';
   }
   private say(text: string, team: number, now: number) {
     try {
@@ -113,10 +106,15 @@ export class AudioDirector {
       const voice = voices.find(vc => vc.lang.toLowerCase().startsWith(want)) || null;
       const u = new SpeechSynthesisUtterance(voice ? (BARKS_TTS[text] || text) : text);
       if (voice) u.voice = voice;
-      u.lang = voice ? voice.lang : 'en-US'; u.rate = 1.1; u.pitch = team === 0 ? 1.0 : 0.85; u.volume = 0.9;
+      u.lang = voice ? voice.lang : 'en-US'; u.rate = 1.05; u.pitch = team === 0 ? 1.0 : 0.85; u.volume = 0.9;
       synth.speak(u); this.lastSpeech = now; this.spoken++;
     } catch { /* ignore */ }
   }
   cancelSpeech() { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } this.queued = null; }
+  /** briefing narration in the default (English) voice; returns immediately */
+  narrate(text: string) {
+    if (!this.voice || !('speechSynthesis' in window)) return;
+    try { const synth = window.speechSynthesis; synth.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.0; u.pitch = 0.95; u.volume = 0.9; synth.speak(u); this.lastSpeech = performance.now(); } catch { /* ignore */ }
+  }
   dispose() { this.cancelSpeech(); try { this.ctx?.close(); } catch { /* ignore */ } this.ctx = null; }
 }

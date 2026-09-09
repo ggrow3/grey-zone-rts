@@ -23,7 +23,8 @@ async function submit() {
 <template>
   <div class="page" style="display:flex;align-items:center;justify-content:center">
     <div class="card" style="width:min(460px,92vw)">
-      <h1>Grey <span>Zone</span></h1>
+      <h1>Slava <span>Ukraine</span></h1>
+      <div class="subtitle">Drone Wars</div>
       <p class="dim">A real-time strategy game on the Kharkiv to Belgorod axis. Play the teaching levels, fight the computer, or match against another commander and talk to them while you do.</p>
       <div class="row seg" style="margin:14px 0">
         <button type="button" :class="{ on: mode === 'login' }" @click="mode = 'login'">Sign in</button>

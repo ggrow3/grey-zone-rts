@@ -39,31 +39,31 @@ export const UNITS: Record<string, UnitDef> = {
   moto: { label: ['Motorcycle assault group', 'Motorcycle assault group'], shape: 'moto', r: 7, hp: 40, speed: 105, roadMul: 1.8, range: 70, dmg: 6, rof: 0.4,
     cost: 130, crew: 3, time: 8, factory: 'barracks', vision: 160, canCapture: true, troop: true, targets: ['inf', 'struct'], vsStruct: 0.2,
     blurb: 'Fast and fragile. Rushes through the kill zone to grab a town before the drones react.' },
-  fpv: { label: ['FPV quadcopter', 'FPV quadcopter'], shape: 'tri', r: 6, hp: 30, evade: 0.35, speed: 190, kamikaze: true, dmg: 130, splash: 22,
-    cost: 25, crew: 0, operated: true, endurance: 70, recharge: 25, electric: true, link: 650, time: 0.2, factory: 'droneWorks', vision: 150, air: true, jammable: true, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
+  fpv: { label: ['FPV quadcopter', 'FPV quadcopter'], shape: 'tri', r: 6, hp: 30, evade: 0.35, speed: 190, kamikaze: true, dmg: 165, splash: 28,
+    cost: 25, crew: 0, operated: true, endurance: 70, recharge: 25, electric: true, link: 650, time: 0.2, factory: 'droneWorks', vision: 170, air: true, jammable: true, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 340,
     blurb: 'Seven to ten inch racing-style quads built by the hundred thousand a month. One to two kilo warhead, radio link, ten or so kilometers of reach. Jammers drop it and nets catch it.' },
-  fiberFpv: { label: ['Fiber-optic FPV', 'Knyaz Vandal fiber FPV'], shape: 'tritail', r: 6, hp: 30, evade: 0.35, speed: 140, kamikaze: true, dmg: 130, splash: 22,
-    cost: 45, crew: 0, operated: true, tether: true, endurance: 60, recharge: 25, electric: true, link: 500, time: 0.25, factory: 'droneWorks', vision: 150, air: true, jammable: false, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 260,
+  fiberFpv: { label: ['Fiber-optic FPV', 'Knyaz Vandal fiber FPV'], shape: 'tritail', r: 6, hp: 30, evade: 0.35, speed: 140, kamikaze: true, dmg: 165, splash: 28,
+    cost: 45, crew: 0, operated: true, tether: true, endurance: 60, recharge: 25, electric: true, link: 500, time: 0.25, factory: 'droneWorks', vision: 170, air: true, jammable: false, netted: true, targets: ['inf', 'veh', 'struct'], acquire: 340,
     blurb: 'A spool of fiber instead of a radio link. Nothing to jam; the spool limits speed. Nets still catch it.' },
-  mavic: { label: ['Mavic recon quad', 'Mavic recon quad'], shape: 'diamond', r: 6, hp: 40, evade: 0.3, speed: 135, dmg: 0, cost: 40, crew: 0, operated: true, endurance: 110, recharge: 30, electric: true, link: 650, time: 0.25, recon: true,
+  mavic: { label: ['Mavic recon quad', 'Mavic recon quad'], shape: 'diamond', r: 6, hp: 45, evade: 0.7, speed: 145, dmg: 0, cost: 40, crew: 0, operated: true, endurance: 110, recharge: 30, electric: true, link: 650, time: 0.25, recon: true,
     factory: 'droneWorks', vision: 360, air: true, jammable: true,
-    blurb: 'DJI Mavic 3 with a thermal camera: the standard tactical eye on both sides. Cheap, everywhere, easily jammed. Artillery can only fire at what your side can see.' },
-  fwRecon: { label: ['Shark recon plane', 'Orlan-10 recon plane'], shape: 'plane', r: 8, hp: 80, evade: 0.25, speed: 160, dmg: 0, cost: 150, fuelDrone: true, crew: 0, operated: true, endurance: 600, recharge: 60, link: 1400, large: true, time: 1, recon: true,
+    blurb: 'DJI Mavic 3 with a thermal camera: the standard tactical eye on both sides. Cheap, everywhere, easily jammed, and small enough to dodge 70% of what is fired at it. Artillery can only fire at what your side can see.' },
+  fwRecon: { label: ['Shark recon plane', 'Orlan-10 recon plane'], shape: 'plane', r: 8, hp: 90, evade: 0.65, speed: 165, dmg: 0, cost: 150, fuelDrone: true, crew: 0, operated: true, endurance: 600, recharge: 60, link: 1400, large: true, time: 1, recon: true,
     factory: 'launchSite', vision: 520, air: true, jammable: true, highAlt: true,
-    blurb: 'Fixed-wing spotter. Flies too high for machine guns; air defense and interceptors can reach it. Its vision is what makes the artillery accurate.' },
+    blurb: 'Fixed-wing spotter. Flies too high for machine guns, and high and small enough to dodge two thirds of what air defense and interceptors send up. Its vision is what makes the artillery accurate.' },
   interceptor: { label: ['Sting interceptor', 'Yolka interceptor'], shape: 'star', r: 7, hp: 35, evade: 0.4, speed: 215, range: 70, dmg: 22, rof: 0.5,
     cost: 35, crew: 0, operated: true, endurance: 80, recharge: 25, electric: true, link: 650, time: 0.2, factory: 'droneWorks', vision: 260, air: true, jammable: true, targets: ['air'], acquire: 330,
-    blurb: 'Purpose-built high-speed quad that rams or shoots drones. Patrols on its own. Easy prey for air defense.' },
-  bomber: { label: ['Vampire heavy bomber (Baba Yaga)', 'Heavy bomber hexacopter'], shape: 'hex', r: 9, hp: 140, evade: 0.15, speed: 130, range: 70, dmg: 50, splash: 34, rof: 2.2,
+    blurb: 'Purpose-built high-speed quad that rams or shoots drones. Patrols on its own. Drones are hard for other drones to hit, so Stings need numbers; easy prey for air defense.' },
+  bomber: { label: ['Vampire heavy bomber (Baba Yaga)', 'Heavy bomber hexacopter'], shape: 'hex', r: 9, hp: 140, evade: 0.15, speed: 130, range: 80, dmg: 65, splash: 40, rof: 2.0,
     cost: 120, crew: 0, operated: true, endurance: 160, recharge: 45, electric: true, link: 650, large: true, time: 0.6, factory: 'droneWorks', vision: 190, air: true, jammable: true, targets: ['inf', 'veh', 'struct'],
     blurb: 'Carries mortar bombs, drops them, flies home for more. Slow, reusable, brutal against infantry clusters and nets.' },
   liutyi: { label: ['Liutyi strike drone (An-196)', 'Liutyi strike drone'], shape: 'plane', r: 9, hp: 120, evade: 0.2, speed: 150, kamikaze: true, dmg: 350, splash: 45,
     cost: 300, fuelDrone: true, crew: 2, large: true, time: 2, factory: 'launchSite', vision: 120, air: true, jammable: true, targets: ['struct'], structuresOnly: true, acquire: 700, side: 0,
     blurb: 'Ukraine\'s workhorse deep-strike drone with a 50 kg warhead. Here it flies at enemy buildings. Only air defense and interceptors stop it.' },
-  lancet: { label: ['Lancet loitering munition', 'Lancet loitering munition'], shape: 'plane', r: 7, hp: 60, evade: 0.3, speed: 165, kamikaze: true, dmg: 200, splash: 30,
+  lancet: { label: ['Lancet loitering munition', 'Lancet loitering munition'], shape: 'plane', r: 7, hp: 60, evade: 0.3, speed: 165, kamikaze: true, dmg: 240, splash: 34,
     cost: 120, crew: 0, operated: true, endurance: 240, recharge: 60, electric: true, link: 1400, time: 0.6, factory: 'launchSite', vision: 200, air: true, jammable: true, targets: ['veh', 'struct', 'inf'], acquire: 420, side: 1, prefer: ['howitzer', 'mlrs', 'aa', 'jammer', 'tank'],
     blurb: 'Russia\'s counter-battery and air-defense killer: it loiters until a howitzer, jammer, or launcher shows itself, then dives. Nets do not catch it.' },
-  molniya: { label: ['Molniya fixed-wing FPV', 'Molniya fixed-wing FPV'], shape: 'plane', r: 7, hp: 55, evade: 0.3, speed: 150, kamikaze: true, dmg: 160, splash: 30,
+  molniya: { label: ['Molniya fixed-wing FPV', 'Molniya fixed-wing FPV'], shape: 'plane', r: 7, hp: 55, evade: 0.3, speed: 150, kamikaze: true, dmg: 190, splash: 34,
     cost: 60, crew: 0, operated: true, endurance: 200, recharge: 60, electric: true, link: 1400, time: 0.4, factory: 'launchSite', vision: 160, air: true, jammable: true, targets: ['inf', 'veh', 'struct'], acquire: 500, side: 1,
     blurb: 'Plywood-and-foam fixed-wing drone with a few kilos of explosive and 40 km of reach. Cheap, jammable, not caught by nets.' },
   tank: { label: ['Main battle tank', 'Main battle tank'], shape: 'rect', r: 13, hp: 420, speed: 52, roadMul: 1.25, range: 160, dmg: 60, splash: 44, rof: 2.4,
@@ -80,10 +80,10 @@ export const UNITS: Record<string, UnitDef> = {
     blurb: 'Disrupts radio-controlled drones inside its radius until they fall. Cannot stop fiber-optic FPVs.' },
   howitzer: { label: ['Howitzer', 'Howitzer'], shape: 'pent', r: 11, hp: 160, speed: 34, roadMul: 1.4, range: 430, minRange: 110, dmg: 95, splash: 42, rof: 5.5,
     cost: 700, crew: 4, time: 28, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 260, ammo: 12,
-    blurb: 'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it.' },
+    blurb: 'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it. Park it in a wood: in the open a gun is seen from far off, every shot shows it to radar for six seconds, and drones hit it 45% harder.' },
   mlrs: { label: ['Rocket artillery', 'Rocket artillery'], shape: 'wedge', r: 12, hp: 170, speed: 50, roadMul: 1.4, range: 620, minRange: 220, dmg: 55, splash: 38, rof: 14, salvo: 6,
     cost: 1200, crew: 3, time: 36, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 340, ammo: 18,
-    blurb: 'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more.' },
+    blurb: 'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more. Fire from a wood and move after every mission.' },
   truck: { label: ['Supply truck', 'Supply truck'], shape: 'truck', r: 9, hp: 80, speed: 70, roadMul: 1.8, dmg: 0, cost: 0, crew: 1, time: 0, factory: null, vision: 120, auto: true,
     blurb: 'Carries funds from headquarters to each town you hold. Drones love them.' },
   defector: { label: ['Russian volunteer squad', 'Russian volunteer squad'], shape: 'band', r: 7, hp: 80, speed: 42, roadMul: 1.3, range: 95, dmg: 8, rof: 0.55,
@@ -179,39 +179,70 @@ export const GAS_YIELD = 5;
 export const FOOD_BASE = 4, FOOD_PER_FIELD = 6, FUEL_BASE = 3, FUEL_PER_NODE = 6;
 export const FUEL_USERS = new Set(['tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs', 'moto', 'liutyi', 'fwRecon']);
 export const POWER_BASE = 24, POWER_PER_SUBSTATION = 30, POWER_PER_GENERATOR = 15;
+// drones are the killer of troops in the open: cover is the counter, and a trench dug under trees is the best of all
 export const COVER: Record<string, { give: number; take: number; drone: number; spot: number }> = {
-  trench: { give: 1.1, take: 0.55, drone: 0.3, spot: 110 }, forest: { give: 1.5, take: 0.6, drone: 0.4, spot: 140 },
-  urban: { give: 1.2, take: 0.75, drone: 0.7, spot: 220 }, open: { give: 1, take: 1.3, drone: 1, spot: 0 },
+  trench: { give: 1.1, take: 0.55, drone: 0.25, spot: 110 }, forest: { give: 1.5, take: 0.6, drone: 0.35, spot: 140 },
+  urban: { give: 1.2, take: 0.75, drone: 0.45, spot: 220 }, open: { give: 1, take: 1.3, drone: 1.45, spot: 0 },
 };
+/** extra protection from drones for a trench dug inside a wood (multiplies the trench figure) */
+export const TRENCH_IN_FOREST = 0.6;
+/** drones are small and agile: extra evasion against fire from other drones */
+export const AIR_VS_AIR_EVADE = 0.25;
 export const TARGET_WORDS: Record<TargetClass, string> = { inf: 'troops', veh: 'vehicles', struct: 'buildings', air: 'drones' };
 
 // what the troops shout: transliterated for the screen, Cyrillic for the speech voice, indexed [team][kind]
-export type BarkKind = 'ack' | 'attack' | 'capture' | 'reply' | 'kill' | 'dig' | 'win';
+export type BarkKind = 'ack' | 'attack' | 'capture' | 'reply' | 'kill' | 'dig' | 'win' | 'strike' | 'bombard' | 'lost' | 'ops';
 export const BARKS: Record<BarkKind, [string[], string[]]> = {
-  ack: [['Zrozumilo!', 'Pishly!', 'Vykonuiu!'], ['Ponyal!', 'Poshli!', 'Yest!']],
-  attack: [['Slava Ukraini!', 'Vohon!', 'Za Ukrainu!'], ['Ura!', 'Vperyod!', 'Ogon!']],
-  capture: [['Slava Ukraini!'], ['Ura!']],
-  reply: [['Heroiam slava!'], ['Ura! Ura!']],
-  kill: [['Mynus odyn!', 'Ye kontakt!'], ['Minus odin!', 'Yest popadaniye!']],
-  dig: [['Okopuiemos!'], ['Okapyvayemsya!']],
-  win: [['Slava Ukraini!'], ['Ura!']],
+  ack: [['Zrozumilo, vykonuiemo!', 'Pryiniav, rukhaiemosia!', 'Idemo, khloptsi, za mnoiu!', 'Ye, komandyre, vystupaiemo!'], ['Ponyal, vypolnyayu!', 'Prinyal, vydvigayemsya!', 'Poshli, muzhiki, za mnoy!', 'Yest, komandir, vystupayem!']],
+  attack: [['Slava Ukraini! Vohon po vorohu!', 'Za voliu Ukrainy, vpered!', 'Volia abo smert!', 'Za Ukrainu, vpered!', 'Trymaiemo stryi, b\'iemo!', 'Kontakt! Vohon!'], ['Ura! Ogon po protivniku!', 'Vperyod, za Rodinu!', 'Derzhim stroy, b\'yom!', 'Kontakt! Ogon!']],
+  capture: [['Misto nashe! Slava Ukraini!', 'Prapor pidniato! Ukraina bude vilnoiu!', 'Za voliu Ukrainy! Misto nashe!'], ['Gorod nash! Ura!', 'Flag podnyat! Ura!']],
+  reply: [['Heroiam slava!', 'Heroiam slava, brate!'], ['Ura! Ura! Ura!', 'Ura, bratishka!']],
+  kill: [['Mynus odyn, prodovzhuiemo!', 'Tsil urazhena!', 'Ye kontakt, vorog znyshchenyi!'], ['Minus odin, rabotayem dalshe!', 'Tsel porazhena!', 'Yest popadaniye, protivnik unichtozhen!']],
+  dig: [['Okopuiemos, khloptsi, bo dron ne spyt!', 'Riemo okopy, tut i stoimo!'], ['Okapyvayemsya, muzhiki, dron ne spit!', 'Royem okopy, zdes i stoim!']],
+  win: [['Peremoha! Slava Ukraini! Ukraina bude vilnoiu!'], ['Pobeda! Ura!']],
+  strike: [['Ptashka pishla na tsil!', 'FPV v roboti, trymaite!'], ['Ptichka poshla na tsel!', 'FPV v rabote, derzhites!']],
+  bombard: [['Artyleriia, vohon po koordynatakh!', 'Harmaty pratsiuiut, khovaites!'], ['Artilleriya, ogon po koordinatam!', 'Pushki rabotayut, ukroytes!']],
+  lost: [['Vtratyly hrupu, potribna dopomoha!', 'Try-sotyi! Evakuatsiia!'], ['Poteryali gruppu, nuzhna pomoshch!', 'Trekhsotyy! Evakuatsiya!']],
+  ops: [['Novi operatory v stroiu!', 'Shche odyn pilot u hrupi!'], ['Novyye operatory v stroyu!', 'Yeshchyo odin pilot v gruppe!']],
 };
 export const BARKS_TTS: Record<string, string> = {
-  'Zrozumilo!': 'Зрозуміло!', 'Pishly!': 'Пішли!', 'Vykonuiu!': 'Виконую!', 'Slava Ukraini!': 'Слава Україні!', 'Vohon!': 'Вогонь!', 'Za Ukrainu!': 'За Україну!',
-  'Heroiam slava!': 'Героям слава!', 'Mynus odyn!': 'Мінус один!', 'Ye kontakt!': 'Є контакт!', 'Okopuiemos!': 'Окопуємось!',
-  'Ponyal!': 'Понял!', 'Poshli!': 'Пошли!', 'Yest!': 'Есть!', 'Ura!': 'Ура!', 'Vperyod!': 'Вперёд!', 'Ogon!': 'Огонь!', 'Ura! Ura!': 'Ура! Ура!',
-  'Minus odin!': 'Минус один!', 'Yest popadaniye!': 'Есть попадание!', 'Okapyvayemsya!': 'Окапываемся!', 'Manse!': 'Мансе!',
+  'Zrozumilo, vykonuiemo!': 'Зрозуміло, виконуємо!', 'Pryiniav, rukhaiemosia!': 'Прийняв, рухаємося!', 'Idemo, khloptsi, za mnoiu!': 'Ідемо, хлопці, за мною!', 'Ye, komandyre, vystupaiemo!': 'Є, командире, виступаємо!',
+  'Slava Ukraini! Vohon po vorohu!': 'Слава Україні! Вогонь по ворогу!', 'Za voliu Ukrainy, vpered!': 'За волю України, вперед!', 'Volia abo smert!': 'Воля або смерть!', 'Ukraina bude vilnoiu!': 'Україна буде вільною!', 'Prapor pidniato! Ukraina bude vilnoiu!': 'Прапор піднято! Україна буде вільною!', 'Za voliu Ukrainy! Misto nashe!': 'За волю України! Місто наше!', 'Peremoha! Slava Ukraini! Ukraina bude vilnoiu!': 'Перемога! Слава Україні! Україна буде вільною!', 'Za Ukrainu, vpered!': 'За Україну, вперед!', 'Trymaiemo stryi, b\'iemo!': 'Тримаємо стрій, б\'ємо!', 'Kontakt! Vohon!': 'Контакт! Вогонь!',
+  'Misto nashe! Slava Ukraini!': 'Місто наше! Слава Україні!', 'Prapor pidniato! Slava Ukraini!': 'Прапор піднято! Слава Україні!', 'Heroiam slava!': 'Героям слава!', 'Heroiam slava, brate!': 'Героям слава, брате!',
+  'Mynus odyn, prodovzhuiemo!': 'Мінус один, продовжуємо!', 'Tsil urazhena!': 'Ціль уражена!', 'Ye kontakt, vorog znyshchenyi!': 'Є контакт, ворог знищений!',
+  'Okopuiemos, khloptsi, bo dron ne spyt!': 'Окопуємось, хлопці, бо дрон не спить!', 'Riemo okopy, tut i stoimo!': 'Риємо окопи, тут і стоїмо!', 'Peremoha! Slava Ukraini!': 'Перемога! Слава Україні!',
+  'Ptashka pishla na tsil!': 'Пташка пішла на ціль!', 'FPV v roboti, trymaite!': 'FPV в роботі, тримайте!', 'Artyleriia, vohon po koordynatakh!': 'Артилерія, вогонь по координатах!', 'Harmaty pratsiuiut, khovaites!': 'Гармати працюють, ховайтесь!',
+  'Vtratyly hrupu, potribna dopomoha!': 'Втратили групу, потрібна допомога!', 'Try-sotyi! Evakuatsiia!': 'Трьохсотий! Евакуація!', 'Novi operatory v stroiu!': 'Нові оператори в строю!', 'Shche odyn pilot u hrupi!': 'Ще один пілот у групі!',
+  'Ponyal, vypolnyayu!': 'Понял, выполняю!', 'Prinyal, vydvigayemsya!': 'Принял, выдвигаемся!', 'Poshli, muzhiki, za mnoy!': 'Пошли, мужики, за мной!', 'Yest, komandir, vystupayem!': 'Есть, командир, выступаем!',
+  'Ura! Ogon po protivniku!': 'Ура! Огонь по противнику!', 'Vperyod, za Rodinu!': 'Вперёд, за Родину!', 'Derzhim stroy, b\'yom!': 'Держим строй, бьём!', 'Kontakt! Ogon!': 'Контакт! Огонь!',
+  'Gorod nash! Ura!': 'Город наш! Ура!', 'Flag podnyat! Ura!': 'Флаг поднят! Ура!', 'Ura! Ura! Ura!': 'Ура! Ура! Ура!', 'Ura, bratishka!': 'Ура, братишка!',
+  'Minus odin, rabotayem dalshe!': 'Минус один, работаем дальше!', 'Tsel porazhena!': 'Цель поражена!', 'Yest popadaniye, protivnik unichtozhen!': 'Есть попадание, противник уничтожен!',
+  'Okapyvayemsya, muzhiki, dron ne spit!': 'Окапываемся, мужики, дрон не спит!', 'Royem okopy, zdes i stoim!': 'Роем окопы, здесь и стоим!', 'Pobeda! Ura!': 'Победа! Ура!',
+  'Ptichka poshla na tsel!': 'Птичка пошла на цель!', 'FPV v rabote, derzhites!': 'FPV в работе, держитесь!', 'Artilleriya, ogon po koordinatam!': 'Артиллерия, огонь по координатам!', 'Pushki rabotayut, ukroytes!': 'Пушки работают, укройтесь!',
+  'Poteryali gruppu, nuzhna pomoshch!': 'Потеряли группу, нужна помощь!', 'Trekhsotyy! Evakuatsiya!': 'Трёхсотый! Эвакуация!', 'Novyye operatory v stroyu!': 'Новые операторы в строю!', 'Yeshchyo odin pilot v gruppe!': 'Ещё один пилот в группе!',
+  'Manse!': 'Мансе!',
 };
 export const BARK_GLOSS: Record<string, string> = {
-  'Zrozumilo!': 'Understood!', 'Pishly!': "Let's go!", 'Vykonuiu!': 'On it!', 'Slava Ukraini!': 'Glory to Ukraine!', 'Vohon!': 'Fire!', 'Za Ukrainu!': 'For Ukraine!',
-  'Heroiam slava!': 'Glory to the heroes!', 'Mynus odyn!': 'One down!', 'Ye kontakt!': 'Contact!', 'Okopuiemos!': 'Digging in!',
-  'Ponyal!': 'Got it!', 'Poshli!': "Let's go!", 'Yest!': 'Yes sir!', 'Ura!': 'Hurrah!', 'Vperyod!': 'Forward!', 'Ogon!': 'Fire!', 'Ura! Ura!': 'Hurrah!',
-  'Minus odin!': 'One down!', 'Yest popadaniye!': 'Hit confirmed!', 'Okapyvayemsya!': 'Digging in!', 'Manse!': 'Long live! (Korean)',
+  'Zrozumilo, vykonuiemo!': 'Understood, on it!', 'Pryiniav, rukhaiemosia!': 'Copy, moving out!', 'Idemo, khloptsi, za mnoiu!': "Let's go, boys, follow me!", 'Ye, komandyre, vystupaiemo!': 'Yes, commander, we move!',
+  'Slava Ukraini! Vohon po vorohu!': 'Glory to Ukraine! Fire on the enemy!', 'Za voliu Ukrainy, vpered!': 'For the freedom of Ukraine, forward!', 'Volia abo smert!': 'Freedom or death!', 'Ukraina bude vilnoiu!': 'Ukraine will be free!', 'Prapor pidniato! Ukraina bude vilnoiu!': 'Flag raised! Ukraine will be free!', 'Za voliu Ukrainy! Misto nashe!': 'For the freedom of Ukraine! The town is ours!', 'Peremoha! Slava Ukraini! Ukraina bude vilnoiu!': 'Victory! Glory to Ukraine! Ukraine will be free!', 'Za Ukrainu, vpered!': 'For Ukraine, forward!', "Trymaiemo stryi, b'iemo!": 'Hold the line, hit them!', 'Kontakt! Vohon!': 'Contact! Fire!',
+  'Misto nashe! Slava Ukraini!': 'The town is ours! Glory to Ukraine!', 'Prapor pidniato! Slava Ukraini!': 'Flag raised! Glory to Ukraine!', 'Heroiam slava!': 'Glory to the heroes!', 'Heroiam slava, brate!': 'Glory to the heroes, brother!',
+  'Mynus odyn, prodovzhuiemo!': 'One down, we go on!', 'Tsil urazhena!': 'Target hit!', 'Ye kontakt, vorog znyshchenyi!': 'Contact, enemy destroyed!',
+  'Okopuiemos, khloptsi, bo dron ne spyt!': "Dig in, boys, the drone doesn't sleep!", 'Riemo okopy, tut i stoimo!': 'Digging trenches, here we stand!', 'Peremoha! Slava Ukraini!': 'Victory! Glory to Ukraine!',
+  'Ptashka pishla na tsil!': 'The bird is on its way to the target!', 'FPV v roboti, trymaite!': 'FPV at work, hold on!', 'Artyleriia, vohon po koordynatakh!': 'Artillery, fire on the coordinates!', 'Harmaty pratsiuiut, khovaites!': 'Guns working, take cover!',
+  'Vtratyly hrupu, potribna dopomoha!': 'We lost a group, we need help!', 'Try-sotyi! Evakuatsiia!': 'Wounded! Medevac!', 'Novi operatory v stroiu!': 'New operators in the ranks!', 'Shche odyn pilot u hrupi!': 'One more pilot in the group!',
+  'Ponyal, vypolnyayu!': 'Got it, doing it!', 'Prinyal, vydvigayemsya!': 'Copy, moving out!', 'Poshli, muzhiki, za mnoy!': "Let's go, men, follow me!", 'Yest, komandir, vystupayem!': 'Yes, commander, we move!',
+  'Ura! Ogon po protivniku!': 'Hurrah! Fire on the enemy!', 'Vperyod, za Rodinu!': 'Forward, for the Motherland!', "Derzhim stroy, b'yom!": 'Hold the line, hit them!', 'Kontakt! Ogon!': 'Contact! Fire!',
+  'Gorod nash! Ura!': 'The town is ours! Hurrah!', 'Flag podnyat! Ura!': 'Flag raised! Hurrah!', 'Ura! Ura! Ura!': 'Hurrah!', 'Ura, bratishka!': 'Hurrah, little brother!',
+  'Minus odin, rabotayem dalshe!': 'One down, we work on!', 'Tsel porazhena!': 'Target hit!', 'Yest popadaniye, protivnik unichtozhen!': 'Hit, enemy destroyed!',
+  'Okapyvayemsya, muzhiki, dron ne spit!': "Dig in, men, the drone doesn't sleep!", 'Royem okopy, zdes i stoim!': 'Digging trenches, here we stand!', 'Pobeda! Ura!': 'Victory! Hurrah!',
+  'Ptichka poshla na tsel!': 'The bird is on its way to the target!', 'FPV v rabote, derzhites!': 'FPV at work, hold on!', 'Artilleriya, ogon po koordinatam!': 'Artillery, fire on the coordinates!', 'Pushki rabotayut, ukroytes!': 'Guns working, take cover!',
+  'Poteryali gruppu, nuzhna pomoshch!': 'We lost a group, we need help!', 'Trekhsotyy! Evakuatsiya!': 'Wounded! Medevac!', 'Novyye operatory v stroyu!': 'New operators in the ranks!', 'Yeshchyo odin pilot v gruppe!': 'One more pilot in the group!',
+  'Manse!': 'Long live! (Korean)',
 };
 export const RANK_NAMES = ['Recruit', 'Trained', 'Veteran', 'Elite'];
 export const WAVE_COST = 600, WAVE_COOLDOWN = 90;
 
-export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine; the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 70% less from drones, and are seen only within 110. Anyone can use it.' };
+export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine; the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
 
 export const STRATEGY: [string, string][] = [
   ['The shape of the war', 'Everything on this map is either a drone, something that feeds and flies drones, or something drones are hunting. Nothing on the ground survives in the open for long, so the game is about who sees whom first, who has squads to fly, who has power to charge, and who keeps the roads and pipelines running. Wins come from grinding the enemy economy down and then walking artillery and fiber FPVs onto the headquarters, not from a single charge.'],
@@ -219,8 +250,8 @@ export const STRATEGY: [string, string][] = [
   ['Squads and drones', 'Until Drone swarm control, one squad flies one drone, so your airborne drone force is capped by your infantry count. Build more drones anyway: extras sit grounded and take off the moment a squad is free. Keep squads in woods, trenches, or towns a few hundred pixels behind the point you want to strike; drones cannot go beyond the squad\'s control range.'],
   ['Power, fuel, food', 'Battery drones need charging capacity: base generators plus your substation plus generator sets. The enemy targets the substation first. Gasoline aircraft and vehicles draw on gas flowing through an intact pipeline. Squads eat: past the wheat line your infantry fight at 60%.'],
   ['Air defense', 'Drones dodge bullets, so guns need volume and research. Jammers and EW stations do not miss: radio drones inside the bubble fall unless they are fiber-optic. Nets catch FPVs over a spot. Stings hunt on their own. Layer them.'],
-  ['Ground and cover', 'Infantry in forest hit 50% harder, take 40% less, take 60% less from drones, and are invisible beyond 140. A trench (press E, 20 seconds) is better still against drones. Open fields are death. Tanks only shoot vehicles and buildings, IFVs are what shoot at troops.'],
-  ['Artillery', 'Howitzers reach 430, rockets 620; both need a spotter to be accurate but will fire on a map point blind (Ctrl+right-click or B) with wide scatter. Lancets exist to kill your guns: keep a Sting and a fire group with the battery.'],
+  ['Ground and cover', 'Drones kill troops in the open: a squad in a field takes 45% extra from every drone strike. Get them into a town (55% less from drones), a wood (65% less, and hidden beyond 140), or a trench (75% less), and dig the trench inside a wood for the best of all (85% less). Infantry in forest also hit 50% harder. Tanks only shoot vehicles and buildings, IFVs are what shoot at troops.'],
+  ['Artillery', 'Howitzers reach 430, rockets 620; both need a spotter to be accurate but will fire on a map point blind (Ctrl+right-click or B) with wide scatter. Guns belong in the trees: a battery in a wood is unseen beyond 140, shows on enemy radar for only two seconds after a shot, and takes 65% less from drones. In the open it is seen from anywhere, exposed for six seconds a shot, and drones hit it 45% harder. Lancets exist to kill your guns: keep a Sting and a fire group with the battery.'],
   ['Logistics and trade', 'Supply trucks pay when they reach a town, grain and oil trucks carry from the fields and wells, and every 75 seconds a trade convoy goes to the border and comes back with aid. A squad standing over an unescorted truck takes it and its cargo.'],
   ['Civilians, morale, defectors', 'As Ukraine, every Russian civilian site or vehicle you hit costs support, and support scales your income. Keep support above 70 and hold Shebekino or Zhuravlyovka and Russian volunteers join you. Mercenaries fight well while paid and winning; North Koreans break when Russia is losing.'],
   ['Playing Russia', 'Your drones are autonomous from the start, your Lancets hunt artillery, Molniyas are cheap long reach, and Geran waves cost you nothing. Your weakness is people: defections bleed you, North Koreans break when you lose towns. Take the wheat and gas early, keep the pipeline from Kursk intact.'],

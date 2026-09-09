@@ -1,6 +1,6 @@
 // Teaching levels: each is a short scripted game with a checklist of objectives. Completing the list wins the level.
 import { UA, RU } from './data';
-import { geo, KHARKIV } from './map';
+import { geo, KHARKIV, BELGOROD } from './map';
 import { dist } from './dmath';
 import type { Game } from './sim';
 import { MOVE, ATTACK } from './sim';
@@ -23,8 +23,12 @@ export interface Level {
   sideNote: string;
   /** level script run after the standard setup: pre-captured towns, extra units, funds */
   scenario?: (g: Game) => void;
+  /** opening cutscene: narrated lines, and the map points the camera pans between (one per line, cycled) */
+  briefing: string[];
+  shots: (g: Game) => Pt[];
   objectives: Objective[];
 }
+export interface Pt { x: number; y: number }
 
 const at = (g: Game, name: string) => g.site(name);
 const townOwned = (name: string, team: number) => (g: Game) => at(g, name).owner === team;
@@ -50,6 +54,13 @@ export const LEVELS: Level[] = [
     id: 'boots', title: '1. Boots on the ground', side: UA, difficulty: 0.5, passiveUntil: Infinity, noGeransUntil: Infinity,
     blurb: 'Learn to move the camera, select squads, march on a town along the road, capture it, and dig in. The enemy stays quiet.',
     concepts: ['Camera and selection', 'Road movement', 'Capturing towns', 'Trenches and cover'],
+    briefing: [
+      'Kharkiv, early morning. The city is quiet for once, and the line to the north is thin: five squads, an IFV, and whatever we can build.',
+      'Command wants Lyptsi, the village on the highway north-east of the city. Take it and the trucks start moving, and the enemy loses a staging point on our doorstep.',
+      'The Russians are not moving yet. Use the time: walk the squads up the road, hold the ring for five seconds, and dig in the moment they stop, because the drones never sleep.',
+      'Slava Ukraini, commander. Your squads are waiting north of the headquarters.',
+    ],
+    shots: g => [KHARKIV, { x: KHARKIV.x, y: KHARKIV.y - 200 }, g.site('Lyptsi'), KHARKIV],
     sideNote: 'Ukraine: your squads capture towns and fly your drones. Listen for them: they answer orders with "Slava Ukraini!"',
     objectives: [
       { title: 'Look around', text: 'Pan with W A S D or the arrow keys, zoom with the mouse wheel, and press Space to jump back to your headquarters in Kharkiv. Move the camera a good distance to continue.',
@@ -60,7 +71,7 @@ export const LEVELS: Level[] = [
         done: g => g.units.some(u => u.team === UA && u.type === 'infantry' && !u.dead && dist(u, lyptsi(g)) < 140), marker: town('Lyptsi') },
       { title: 'Capture it', text: 'Keep the squads inside the ring for five seconds. A captured town sends supply trucks and pays every time one arrives. You can now build near it.',
         done: g => lyptsi(g).owner === UA, marker: town('Lyptsi') },
-      { title: 'Dig in', text: 'Select two or more squads at Lyptsi and press E. After 20 seconds standing still they leave a trench: 45% less damage, 70% less from drones, and hard to spot. Wait for two trenches.',
+      { title: 'Dig in', text: 'Drones kill squads in the open. Select two or more squads at Lyptsi and press E: after 20 seconds standing still they leave a trench, 45% less damage and 75% less from drones (85% less if you dig inside a wood). Towns and woods protect too. Wait for two trenches.',
         done: g => g.structs.filter(s => s.team === UA && s.def.trench).length >= 2, marker: town('Lyptsi') },
     ],
   },
@@ -68,6 +79,13 @@ export const LEVELS: Level[] = [
     id: 'eyes', title: '2. Eyes in the sky', side: UA, difficulty: 0.5, passiveUntil: 3, noGeransUntil: 3,
     blurb: 'Drones are most of your army. Build FPVs, put a Mavic up to see, strike what it sees, bind a swarm, and stand up air defense before the first Geran wave.',
     concepts: ['Drone works and heat', 'Operators and control range', 'Recon before strike', 'Swarms', 'Air defense layers'],
+    briefing: [
+      'The drone works is running and the operators are ready. Everything that happens on this front happens because somebody saw it first.',
+      'Put a Mavic up before you send a single FPV: kamikaze drones and guns can only hit what your side can see.',
+      'Intelligence says the first Geran wave is coming for the substation east of the city. Fire groups reach the low ones, a Sting hunts the rest. Have both up before it arrives.',
+      'Fly carefully, commander. Every drone is a squad on the sticks.',
+    ],
+    shots: g => [g.structs.find(s => s.team === 0 && s.type === 'droneWorks') || KHARKIV, g.site('Lyptsi'), { x: KHARKIV.x + 150, y: KHARKIV.y + 126 }, KHARKIV],
     sideNote: 'Ukraine: every drone is flown by a squad until you research Full autonomy; each operator in a squad flies three. Russian drones fly themselves from the start.',
     objectives: [
       { title: 'Fly FPVs', text: 'Click the drone works at your base and press Z three times. Drones are cheap and take a fraction of a second each. Each squad has one drone operator who flies up to three drones; the next level shows how to put more people in a squad. See Operators in the top bar.',
@@ -88,6 +106,13 @@ export const LEVELS: Level[] = [
     id: 'operators', title: '3. Operators: people in the squad', side: UA, difficulty: 0.5, passiveUntil: Infinity, noGeransUntil: Infinity,
     blurb: 'Every drone needs a human on the sticks. Put more people into a squad, fly a dozen drones from it, research swarm control, and bind them into a swarm.',
     concepts: ['Operators per squad', 'Personnel pool', 'Twelve drones from one squad', 'Swarm control', 'Swarms'],
+    briefing: [
+      'A drone is only as good as the human flying it. One operator, three drones: that is the arithmetic of this war.',
+      'Reinforcements have arrived from the mobilization pool. Put them into a squad and that squad flies a dozen drones at once.',
+      'Procurement has cleared Terminal guidance and Drone swarm control. Buy them, bind the drones into a swarm, and the squad becomes a squadron.',
+      'Build the pilots first, commander. The airframes are cheap.',
+    ],
+    shots: g => [{ x: KHARKIV.x, y: KHARKIV.y - 200 }, g.structs.find(s => s.team === 0 && s.type === 'droneWorks') || KHARKIV, KHARKIV, { x: KHARKIV.x, y: KHARKIV.y - 200 }],
     sideNote: 'Ukraine: a squad holds up to four drone operators, each flying three drones (six after Drone swarm control). Every extra operator is one person from your pool.',
     scenario: g => { g.funds[UA] = 2600; },
     objectives: [
@@ -107,6 +132,13 @@ export const LEVELS: Level[] = [
     id: 'guns', title: '4. Guns and logistics', side: UA, difficulty: 0.5, passiveUntil: 0, noGeransUntil: 0,
     blurb: 'A live enemy. Fortify, keep the trucks alive, research, bring up artillery with a spotter, and hold three towns along the border.',
     concepts: ['Nets and hospitals', 'Trucks, trade, and capture', 'Research tree', 'Artillery, shells, and spotting', 'Holding ground'],
+    briefing: [
+      'The enemy is awake now, and the border is a kill zone. Anything that drives the highway gets hunted.',
+      'Nets over the towns and a field hospital in the woods behind them keep the trucks and the squads alive. Trade convoys pay for everything else.',
+      'The artillery depot has a howitzer ready. It carries twelve shells; ammunition trucks and the depot refill it. Put a Mavic ahead of it and it shells whatever the drone sees.',
+      'Three towns by the end of the day, commander. Hold all six for three minutes and the war is over.',
+    ],
+    shots: g => [g.site('Lyptsi'), g.structs.find(s => s.team === 0 && s.type === 'artyDepot') || KHARKIV, g.site('Kozacha Lopan'), g.site('Zolochiv')],
     sideNote: 'Ukraine: your income rises and falls with international support, so keep your strikes off civilians.',
     objectives: [
       { title: 'Fortify', text: 'Open the Build tab. Place an anti-drone net over a town you hold (it catches FPVs) and a Field hospital in a wood behind it (it heals troops). You can build near the headquarters or any town you hold.',
@@ -125,6 +157,13 @@ export const LEVELS: Level[] = [
     id: 'jam', title: '5. Under the jammer', side: UA, difficulty: 0.5, passiveUntil: 4, noGeransUntil: Infinity,
     blurb: 'A Russian jammer sits over Zhuravlyovka. Learn why radio FPVs fall out of the sky there, spool up fiber-optic drones, kill the jammer, and take the town.',
     concepts: ['EW bubbles', 'Fiber-optic FPVs', 'Tether range', 'Killing the jammer'],
+    briefing: [
+      'Zhuravlyovka, just over the border. A Russian jammer truck has parked there with three dug-in squads around it, and every radio drone we send falls out of the sky.',
+      'The answer is a spool of fiber. Fiber-optic FPVs cannot be jammed, but they are tethered to the squad that flies them, five hundred pixels and not one more.',
+      'Bring the squads up to Lyptsi first, then queue the fibers. Kill the jammer, and the radio drones work again.',
+      'Then take the town, commander. The enemy will not stay quiet after that.',
+    ],
+    shots: g => [g.site('Zhuravlyovka'), g.site('Lyptsi'), g.structs.find(s => s.team === 0 && s.type === 'droneWorks') || KHARKIV, g.site('Zhuravlyovka')],
     sideNote: 'Ukraine: fiber FPVs are tethered to a squad within 500, so the squads have to walk up before the drones can reach.',
     scenario: g => {
       g.capture('Lyptsi', UA); const L = g.site('Lyptsi'); squads(g, UA, 'infantry', L.x, L.y - 30, 3); g.funds[UA] = 1500;
@@ -148,6 +187,13 @@ export const LEVELS: Level[] = [
     id: 'counterbattery', title: '6. Blind fire and counter-battery', side: UA, difficulty: 0.6, passiveUntil: 4, noGeransUntil: Infinity,
     blurb: 'Two Russian howitzers are shelling Lyptsi. Your radar catches their muzzle flashes; theirs are down, so only their drones can find your gun. Answer blind, then observed, then guard your gun against the Lancets that come for it.',
     concepts: ['Unobserved fire', 'Radar flash spotting', 'Observed fire', 'Ammunition', 'Lancets hunt guns'],
+    briefing: [
+      'Shells are falling on Lyptsi. Two Russian howitzers north of Zhuravlyovka are working the town blind, and our squads are in their trenches.',
+      'Our radar post catches a muzzle flash for three seconds after every shot. Their radars are down, so they cannot do the same to you.',
+      'Answer with the howitzer, blind at first, then fly the Mavic forward and watch the scatter tighten. Twelve shells, then wait for the truck.',
+      'When the guns fall silent, the Lancets come for yours. Have a Sting and a fire group with the battery before they do.',
+    ],
+    shots: g => [g.site('Lyptsi'), g.site('Zhuravlyovka'), g.find(g.tags.gun) || g.site('Lyptsi'), g.site('Lyptsi')],
     sideNote: 'Ukraine: Russian Lancets loiter until a howitzer or air defense shows itself. Keep a Sting and a fire group with every battery.',
     scenario: g => {
       g.capture('Lyptsi', UA); const L = g.site('Lyptsi'); squads(g, UA, 'infantry', L.x, L.y - 30, 3, true);
@@ -176,6 +222,13 @@ export const LEVELS: Level[] = [
     id: 'rodina', title: '7. Za Rodinu: the road to Kozacha Lopan', side: RU, difficulty: 0.5, passiveUntil: Infinity, noGeransUntil: Infinity,
     blurb: 'Command the Russian side. Your drones fly themselves, Pyongyang sends infantry, and the Kharkiv highway is full of Ukrainian trucks to take.',
     concepts: ['Autonomous drones', 'North Korean infantry', 'Truck capture', 'Motorcycle rush', 'Morale'],
+    briefing: [
+      'Belgorod group, listen up. You hold Zhuravlyovka south of the city, and Kozacha Lopan across the border is Ukrainian, with two squads dug in.',
+      'Your drones fly themselves: no operators, no control range. Pyongyang has sent infantry; they cost nothing from your pool and they fight, but their morale breaks if you start losing towns.',
+      'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road and take it, cargo and all.',
+      'Then the motorcycles go in. Grab the town before the trenches react. Za Rodinu, commander.',
+    ],
+    shots: g => [BELGOROD, g.site('Zhuravlyovka'), { x: 1445, y: 1119 }, g.site('Kozacha Lopan')],
     sideNote: 'Russia: drones need no squads, North Koreans cost no personnel, and your troops shout "Ura!" But morale breaks when you hold fewer towns than the enemy.',
     scenario: g => {
       g.capture('Zhuravlyovka', RU); const Z = g.site('Zhuravlyovka'); squads(g, RU, 'infantry', Z.x, Z.y + 40, 3); g.funds[RU] = 900;
@@ -198,6 +251,13 @@ export const LEVELS: Level[] = [
     id: 'shahed', title: '8. Shahed night', side: RU, difficulty: 0.5, passiveUntil: 4, noGeransUntil: Infinity,
     blurb: 'Put an Orlan over Kharkiv, launch a Geran wave with decoys at the substation, and follow up with Molniya fixed-wing drones. Then hold on when Ukraine answers.',
     concepts: ['Orlan-10 spotting', 'Geran waves and decoys', 'The substation', 'Molniya', 'Layered defense'],
+    briefing: [
+      'Night over Kharkiv. Their air-defense battery has moved east; what stands between you and the city grid tonight is a handful of fire groups and one Sting.',
+      'Put an Orlan over the city first. It flies above the machine guns, and it sees everything.',
+      'The Geran wave costs six hundred and the crews need ninety seconds to reload: three drones and four decoys, the first two aimed at the substation. Kill the grid and their drones stop charging.',
+      'Then send the Molniyas south to hunt over the gas wells, and be ready. Kharkiv answers at dawn.',
+    ],
+    shots: g => [BELGOROD, KHARKIV, { x: KHARKIV.x + 150, y: KHARKIV.y + 126 }, g.site('Gas wells')],
     sideNote: 'Russia: Geran waves are a 600-fund command with a 90 s reload. The bot gets them free; a human pays but chooses the moment.',
     // Ukraine's air-defense battery is away tonight: fire groups and a Sting are what stand between the wave and the grid
     scenario: g => { g.funds[RU] = 1500; const kh = KHARKIV; g.spawn('interceptor', UA, kh.x + 60, kh.y - 220); for (const a of g.units.filter(u => u.team === UA && u.type === 'aa')) g.removeUnit(a); },
@@ -218,6 +278,13 @@ export const LEVELS: Level[] = [
     id: 'pipeline', title: '9. The Kursk line', side: UA, difficulty: 0.6, passiveUntil: 3, noGeransUntil: 3,
     blurb: 'Enemy FPVs are diving at your pumping stations. Defend the line, build a Liutyi, cut the Russian pump north of Belgorod, and turn gas into armor.',
     concepts: ['Pumps and fuel', 'Raids on the line', 'Liutyi deep strike', 'Fuel for vehicles'],
+    briefing: [
+      'Gas is fuel, and fuel is armor. Two wells south of the city feed two pipelines, and three pumping stations keep them flowing. Enemy FPVs are already diving at the nearest one.',
+      'Hold the pumps with fire groups and air defense. While any pump is down, the gas income stops and the vehicles run dry.',
+      'Then take the war to their line: the pump north-east of Belgorod is the only one they have. Two Liutyis will do it, if they fly around the city and its guns.',
+      'Cut their line, keep yours, and the armor plant can turn out tanks. Slava Ukraini, commander.',
+    ],
+    shots: g => [g.pumpSites[1], g.site('Gas wells'), g.pumpSites.find(p => p.team === 1) || BELGOROD, g.structs.find(s => s.team === 0 && s.type === 'armorPlant') || KHARKIV],
     sideNote: 'Ukraine: two gas wells on two pipelines with three pumps to guard. Russia has one pump on the line from Kursk.',
     scenario: g => { g.funds[UA] = 1800; g.capture('Lyptsi', UA); const p = g.pumpSites[1]; g.spawn('fireGroup', UA, p.x - 40, p.y - 40); g.spawn('fireGroup', UA, p.x + 40, p.y - 40); g.spawn('aa', UA, p.x, p.y - 70); },
     objectives: [
@@ -238,6 +305,13 @@ export const LEVELS: Level[] = [
     id: 'donets', title: '10. Across the Vovcha', side: RU, difficulty: 0.6, passiveUntil: 4, noGeransUntil: Infinity,
     blurb: 'From Shebekino, cross the river at the bridge, bomb the netted trenches of Vovchansk from above, hire mercenaries, and hold the crossing.',
     concepts: ['Rivers and bridges', 'Heavy bombers over nets', 'Mercenaries', 'Holding a crossing'],
+    briefing: [
+      'Shebekino, on the Nezhegol. Across the river, Vovchansk is Ukrainian, three squads in trenches under an anti-drone net.',
+      'Rivers stop everything on the ground. The only way across is the bridge on the Vovchansk road; the squads will find it on their own.',
+      'The net eats FPVs, so this is a job for the heavy bomber: it drops on the trenches from above and flies home for more. Hire a mercenary squad to lead the crossing; they are good, as long as they are paid.',
+      'Take the town and hold the crossing when they come back for it. Ura, commander.',
+    ],
+    shots: g => [g.site('Shebekino'), { x: (g.site('Shebekino').x + g.site('Vovchansk').x) / 2, y: (g.site('Shebekino').y + g.site('Vovchansk').y) / 2 }, g.site('Vovchansk'), g.site('Vovchansk')],
     sideNote: 'Russia: mercenary assault squads fight well while paid and winning. Miss their wages and they walk.',
     scenario: g => {
       g.capture('Shebekino', RU); const S = g.site('Shebekino'); squads(g, RU, 'infantry', S.x, S.y + 40, 4); g.funds[RU] = 1400;
