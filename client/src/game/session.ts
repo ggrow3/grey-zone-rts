@@ -22,9 +22,14 @@ export interface Session {
   destroy(): void;
 }
 
+/** a command and the simulation tick it was applied on: the whole game can be replayed from the seed and this list */
+export interface Recorded { tick: number; cmd: Command }
+
 export class LocalSession implements Session {
   online = false; paused = false; canPause = true; waiting = false; speed = 1;
   private pending: Command[] = []; private acc = 0;
+  /** ticks simulated so far and every player command with its tick */
+  tickN = 0; record: Recorded[] = [];
   constructor(public game: Game, public myTeam: number) {}
   submit(cmd: Command) { this.pending.push(cmd); }
   advance(elapsed: number) {
@@ -33,8 +38,28 @@ export class LocalSession implements Session {
     this.acc += Math.min(elapsed, 0.25) * this.speed; let steps = 0;
     const maxSteps = 15 * this.speed;
     while (this.acc >= DT && steps < maxSteps) {
-      if (this.pending.length) { for (const c of this.pending) this.game.apply(this.myTeam, c); this.pending = []; }
-      this.game.tick(DT); this.acc -= DT; steps++;
+      if (this.pending.length) { for (const c of this.pending) { this.game.apply(this.myTeam, c); this.record.push({ tick: this.tickN, cmd: c }); } this.pending = []; }
+      this.game.tick(DT); this.acc -= DT; steps++; this.tickN++;
+    }
+    if (steps === maxSteps) this.acc = 0;
+  }
+  destroy() {}
+}
+
+/** plays a recorded solo game back: the same seed, the same commands on the same ticks; input is ignored */
+export class ReplaySession implements Session {
+  online = false; paused = false; canPause = true; waiting = false; speed = 1;
+  private acc = 0; private tickN = 0; private next = 0;
+  constructor(public game: Game, public myTeam: number, private commands: Recorded[]) {}
+  submit(_cmd: Command) { void _cmd; }
+  get finished(): boolean { return this.next >= this.commands.length; }
+  advance(elapsed: number) {
+    if (this.paused || this.game.gameOver) return;
+    this.acc += Math.min(elapsed, 0.25) * this.speed; let steps = 0;
+    const maxSteps = 15 * this.speed;
+    while (this.acc >= DT && steps < maxSteps) {
+      while (this.next < this.commands.length && this.commands[this.next].tick === this.tickN) { this.game.apply(this.myTeam, this.commands[this.next].cmd); this.next++; }
+      this.game.tick(DT); this.acc -= DT; steps++; this.tickN++;
     }
     if (steps === maxSteps) this.acc = 0;
   }

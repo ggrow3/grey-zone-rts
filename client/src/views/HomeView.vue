@@ -3,9 +3,11 @@ import { ref, onMounted, computed } from 'vue';
 import { useAuth } from '../stores/auth';
 import { LEVELS } from '../game/levels';
 import { FACTION_FACTS } from '../game/factions';
+import { STARTS } from '../game/data';
 
 const auth = useAuth();
-const side = ref(0), diff = ref(0.7);
+const side = ref(0), diff = ref(0.7), start = ref('standard');
+const hasReplay = ref(false); try { hasReplay.value = !!localStorage.getItem('gz.replay'); } catch { /* ignore */ }
 const groups = computed(() => [{ side: 0, name: 'As Ukraine', levels: LEVELS.filter(l => l.side === 0) }, { side: 1, name: 'As Russia', levels: LEVELS.filter(l => l.side === 1) }]);
 const facts = FACTION_FACTS.slice(0, 8);
 onMounted(() => auth.refresh());
@@ -46,7 +48,14 @@ onMounted(() => auth.refresh());
           <div class="row" style="margin:10px 0"><span class="dim" style="width:110px">Enemy strength</span>
             <span class="seg row"><button type="button" :class="{ on: diff === 0.5 }" @click="diff = 0.5">Easy</button><button type="button" :class="{ on: diff === 0.7 }" @click="diff = 0.7">Normal</button><button type="button" :class="{ on: diff === 0.95 }" @click="diff = 0.95">Hard</button></span>
           </div>
-          <router-link :to="{ name: 'skirmish', query: { side, diff } }"><button type="button" class="primary">Start skirmish</button></router-link>
+          <div class="row" style="margin:10px 0"><span class="dim" style="width:110px">Start</span>
+            <span class="seg row"><button v-for="(s, k) in STARTS" :key="k" type="button" :class="{ on: start === k }" :title="s.desc" @click="start = String(k)">{{ s.label }}</button></span>
+          </div>
+          <div class="dim" style="font-size:13px;margin:-4px 0 10px 110px">{{ STARTS[start].desc }}</div>
+          <div class="row">
+            <router-link :to="{ name: 'skirmish', query: { side, diff, start } }"><button type="button" class="primary">Start skirmish</button></router-link>
+            <router-link v-if="hasReplay" :to="{ name: 'skirmish', query: { replay: 1 } }"><button type="button" title="Watch your last solo game again, every order replayed">Watch last replay</button></router-link>
+          </div>
         </div>
         <div class="card">
           <h2>Play against another commander</h2>

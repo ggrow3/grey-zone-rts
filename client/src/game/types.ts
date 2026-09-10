@@ -37,6 +37,10 @@ export interface Unit {
   post?: Pt | null;
   /** shoot-and-scoot: a fire mission was just completed; the point the gun is moving to before it fires again */
   scootPending?: boolean; scoot?: Pt | null;
+  /** a squad's name, for the log and the panel */
+  callsign?: string;
+  /** seconds of shaken fire (80%) after a veteran squad died nearby */
+  grief?: number;
 }
 
 export interface Struct {
@@ -78,6 +82,10 @@ export interface Weather { kind: WeatherKind; until: number; next: WeatherKind; 
 export interface LogEntry { at: number; team: number; kind: LogKind; text: string }
 /** something that happened to a side somewhere on the map: pinged on the minimap, Backspace jumps to the latest */
 export interface Alert { team: number; x: number; y: number; at: number; text: string }
+/** an enemy column on its way: the warned side sees an arrow from where it set out toward where it is going */
+export interface Incoming { team: number; fx: number; fy: number; x: number; y: number; at: number; name: string }
+/** an optional skirmish goal in progress for one side */
+export interface Mission { key: string; progress: number; base: number; startedAt: number; done: boolean }
 
 export interface Swarm { id: number; team: number; members: Unit[]; leader: Unit; formation: FormationType; dead: boolean; t: number }
 
@@ -86,6 +94,12 @@ export interface Supply { food: number; fuel: number; power: number; foodUsed: n
 export interface Bot {
   team: number; staging: Pt; spendT: number; attackT: number; shahedT: number; warnT: number; warnName: string; defendT: number; artyT: number;
   pending: string | null; raidT?: number; resT?: number; opsT?: number; coverT?: number; strikeT?: number;
+  /** ambush FPVs on the roads, road nets by held towns */
+  ambushT?: number; netT?: number; netted?: string[];
+  /** where the announced column is going */
+  warnAt?: Pt;
+  /** purchases paused while it saves for a road net */
+  saving?: boolean;
 }
 
 export interface Notice { team: number; text: string; at: number }
@@ -110,6 +124,8 @@ export type Command =
   | { kind: 'kab'; x: number; y: number }
   | { kind: 'deep' }
   | { kind: 'iskander'; targetId: number }
+  /** every airborne battery drone flies home for fresh batteries (Home) */
+  | { kind: 'recall' }
   /** switch the posture of units that have that mode */
   | { kind: 'mode'; ids: number[]; mode: string }
   /** a human pilot's stick input for one drone: fly toward (x, y), attack targetId, or (kamikaze) dive into the point */

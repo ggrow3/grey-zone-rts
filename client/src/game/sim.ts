@@ -2,13 +2,13 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE, KILLZONE, NET_LINE } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE, KILLZONE, NET_LINE, CALLSIGNS, MISSIONS, MISSION_SCORE } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from './dmath';
 import { getTerrain, Terrain } from './terrain';
-import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike, Alert } from './types';
+import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike, Alert, Incoming, Mission } from './types';
 import { updateBot, makeBot } from './bot';
 
 export const DT = 1 / 60;
@@ -25,6 +25,8 @@ export interface GameOptions {
   noGerans?: boolean;
   /** level script run once after the standard setup (solo games only) */
   scenario?: (g: Game) => void;
+  /** skirmish starting conditions: night, winter, or a Russian rush */
+  start?: string;
 }
 
 export const HOLD_TO_WIN = 180;
@@ -39,7 +41,7 @@ export class Game {
   rng: Rng; terrain: Terrain;
   units: Unit[] = []; structs: Struct[] = []; projectiles: Projectile[] = []; effects: Effect[] = [];
   depots: Site[] = []; resources: Site[] = []; pumpSites: PumpSite[] = [];
-  funds = [1200, 300];
+  funds = [1200, 600];
   upgrades: [Record<string, boolean>, Record<string, boolean>] = [{}, {}];
   stats = { built: [0, 0], lost: [0, 0], drones: [0, 0], deliveries: [0, 0], peopleLost: [0, 0], shotDown: [0, 0], kills: [0, 0],
     jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>],
@@ -58,6 +60,19 @@ export class Game {
   log: LogEntry[] = [];
   /** recent things that happened to each side, with a place: losses, buildings hit, towns lost */
   alerts: Alert[] = [];
+  /** enemy columns announced to each side */
+  incoming: Incoming[] = [];
+  /** the optional goal each side is working on, the gap before the next, and how many were completed */
+  missions: [Mission | null, Mission | null] = [null, null]; missionGap = [30, 30]; missionsDone = [0, 0]; missionT = 0; private lastMission = ['', ''];
+  /** score sampled every ten seconds, for the end-screen graph */
+  history: { t: number; score: [number, number] }[] = []; historyT = 0;
+  /** towns captured per side (missions) */
+  capturesN = [0, 0];
+  /** seconds added to the clock for the day cycle: a night start begins in the dark */
+  dayOffset = 0;
+  /** a Russian rush: the bot attacks with half the usual strength */
+  rush = false;
+  private callsignN = [0, 0];
   private barkN = 0; private lastBark: Record<string, number> = {};
   support = 100;
   people = [{ total: 70 }, { total: 70 }];
@@ -88,8 +103,13 @@ export class Game {
     this.isBot = opts.bots; this.difficulty = opts.difficulty;
     this.botPassive = !!opts.passive; this.noGerans = !!opts.noGerans;
     this.setup();
+    if (opts.start === 'night') this.dayOffset = Game.NIGHT_FROM;
+    else if (opts.start === 'winter') { this.weather = { kind: 'snow', until: 200, next: 'snow', warned: false }; this.winter = true; for (const u of this.units) if (!u.dead && u.def.air && u.def.electric && !u.def.large) { u.landed = true; u.rechargeT = 5; u.batt = u.def.endurance; } }
+    else if (opts.start === 'rush') { this.rush = true; this.funds[RU] += 400; const b = this.bots[RU]; if (b) b.attackT = 40; }
     if (opts.scenario) { opts.scenario(this); this.computeVision(); this.updateSupply(); }
   }
+  /** winter start: snow comes back more often */
+  winter = false;
 
   // ---------------------------------------------------------------- scenario helpers (levels)
   spawn(type: string, team: number, x: number, y: number, order?: Order): Unit {
@@ -247,6 +267,7 @@ export class Game {
       angle: team === UA ? -Math.PI / 2 : Math.PI / 2, netsSeen: [], dest: null, jamT: 0, salvoLeft: 0, salvoT: 0, kills: 0 };
     if (def.ammo) u.ammo = def.ammo;
     if (def.operator) u.ops = 1;
+    if (def.troop && team >= 0) { const names = CALLSIGNS[team as 0 | 1], n = this.callsignN[team]++; u.callsign = names[n % names.length] + (n >= names.length ? ' ' + (Math.floor(n / names.length) + 1) : ''); }
     this.byId.set(u.id, u);
     return u;
   }
@@ -318,6 +339,8 @@ export class Game {
     this.updateTrade(dt);
     this.updateMorale(dt);
     this.updateKillZone(dt);
+    this.updateMissions(dt);
+    this.historyT -= dt; if (this.historyT <= 0) { this.historyT = 10; this.history.push({ t: this.gameTime, score: [this.stats.score[0], this.stats.score[1]] }); }
     for (const s of this.structs) this.updateStruct(s, dt);
     for (const u of this.units) this.updateUnit(u, dt);
     this.separate();
@@ -413,10 +436,10 @@ export class Game {
   // ---------------------------------------------------------------- weather and night
   static DAY_CYCLE = 480; static NIGHT_FROM = 300;
   /** night lasts three minutes of every eight */
-  isNight(): boolean { return this.gameTime % Game.DAY_CYCLE >= Game.NIGHT_FROM; }
+  isNight(): boolean { return (this.gameTime + this.dayOffset) % Game.DAY_CYCLE >= Game.NIGHT_FROM; }
   /** seconds until the light changes */
-  phaseLeft(): number { const p = this.gameTime % Game.DAY_CYCLE; return this.isNight() ? Game.DAY_CYCLE - p : Game.NIGHT_FROM - p; }
-  private rollWeather(): WeatherKind { const r = this.rng.next(); return r < 0.6 ? 'clear' : r < 0.8 ? 'rain' : r < 0.92 ? 'fog' : 'snow'; }
+  phaseLeft(): number { const p = (this.gameTime + this.dayOffset) % Game.DAY_CYCLE; return this.isNight() ? Game.DAY_CYCLE - p : Game.NIGHT_FROM - p; }
+  private rollWeather(): WeatherKind { const r = this.rng.next(); if (this.winter) return r < 0.4 ? 'clear' : r < 0.55 ? 'fog' : 'snow'; return r < 0.6 ? 'clear' : r < 0.8 ? 'rain' : r < 0.92 ? 'fog' : 'snow'; }
   updateWeather() {
     const w = this.weather;
     if (!w.warned && w.until - this.gameTime <= 30) {
@@ -491,10 +514,47 @@ export class Game {
       if (!under) continue;
       if (this.structs.some(n => !n.dead && n.build >= 1 && n.def.netR && n.team === u.team && dist(n, u) <= n.def.netR!)) continue;
       u.hp -= (truck ? KILLZONE.truck : KILLZONE.troop) * step; u.lastHitBy = E; hit[u.team]++;
-      if (this.rng.next() < 0.35) this.effects.push({ kind: 'hit', x: u.x + this.rand(-6, 6), y: u.y + this.rand(-6, 6), t: 0, dur: 0.2 });
+      if (this.rng.next() < 0.35) this.effects.push({ kind: 'hit', x: u.x + this.rand(-6, 6), y: u.y + this.rand(-6, 6), t: 0, dur: 0.2, sub: 'kz', team: u.team });
       if (u.hp <= 0) this.killUnit(u, false, E);
     }
     for (const T of [UA, RU]) if (hit[T] && this.kzWarnT[T] <= 0) { this.kzWarnT[T] = 25; this.notify(T, 'Kill zone: ' + hit[T] + ' of your ' + (hit[T] > 1 ? 'units are' : 'units is') + ' in the open under enemy drones and bleeding. Get into cover or under a net'); }
+  }
+  /** optional goals: one at a time per side, a new one a while after the last is done */
+  updateMissions(dt: number) {
+    this.missionT -= dt; if (this.missionT > 0) return; this.missionT = 1;
+    const keys = Object.keys(MISSIONS);
+    for (const T of [UA, RU]) {
+      let m = this.missions[T];
+      if (!m || m.done) {
+        this.missionGap[T] -= 1; if (this.missionGap[T] > 0) continue;
+        const pool = keys.filter(k => k !== this.lastMission[T] && (k !== 'holdWheat' || this.resources.some(r => r.kind === 'wheat')) && (k !== 'pipeline' || this.pumpSites.some(p => p.team === T)));
+        const key = this.rng.pick(pool); this.lastMission[T] = key;
+        m = { key, progress: 0, base: this.missionStat(T, key), startedAt: this.gameTime, done: false }; this.missions[T] = m;
+        if (!this.isBot[T]) this.notify(T, 'New goal: ' + MISSIONS[key].text + ' (+' + MISSIONS[key].reward + ' funds)');
+        continue;
+      }
+      const def = MISSIONS[m.key];
+      if (def.timed) m.progress = this.missionStat(T, m.key) ? m.progress + 1 : 0;
+      else m.progress = this.missionStat(T, m.key) - m.base;
+      if (m.progress >= def.goal) {
+        m.done = true; m.progress = def.goal; this.missionsDone[T]++; this.missionGap[T] = 40;
+        this.funds[T] += def.reward; this.stats.score[T] += MISSION_SCORE;
+        this.notify(T, 'Goal met: ' + def.text + '. +' + def.reward + ' funds, +' + MISSION_SCORE + ' score'); this.addLog(T, 'info', TEAMS[T].name + ' met a goal: ' + def.text.toLowerCase());
+        this.effects.push({ kind: 'text', x: 0, y: 0, t: 0, dur: 0.1, team: T, text: '', sub: 'goal' });
+      }
+    }
+  }
+  /** the number a mission watches: 1/0 for timed conditions, a running count otherwise */
+  missionStat(T: number, key: string): number {
+    switch (key) {
+      case 'holdWheat': return this.resources.some(r => r.kind === 'wheat' && r.owner === T && r.burnT <= 0) ? 1 : 0;
+      case 'pipeline': return this.pipelineIntact(T) ? 1 : 0;
+      case 'shootDown': return this.stats.shotDown[T];
+      case 'killGun': { const ko = this.stats.killsOf[T]; return (ko.howitzer || 0) + (ko.mlrs || 0) + (ko.aa || 0); }
+      case 'capture': return this.capturesN[T];
+      case 'trucks': return this.stats.deliveries[T];
+    }
+    return 0;
   }
   updateSupply() {
     for (const T of [UA, RU]) {
@@ -531,7 +591,7 @@ export class Game {
           const was = d.owner; d.owner = team; d.cap = 0; d.capTeam = -1; d.supplyT = 6;
           this.notify(team, d.name + ' captured');
           if (was >= 0) { this.notify(was, d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : '')); this.alert(was, d.x, d.y, d.name + ' lost'); }
-          this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name); this.stats.score[team] += SCORE.capture;
+          this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name); this.stats.score[team] += SCORE.capture; this.capturesN[team]++;
           const cap = first[team]; if (cap) { this.bark('capture', cap); const friend = this.units.find(o => o !== cap && !o.dead && o.team === team && o.def.troop && dist(o, cap) < 220); if (friend) this.bark('reply', friend, 0.9); }
         }
       } else { d.cap = Math.max(0, d.cap - dt); if (d.cap === 0) d.capTeam = -1; }
@@ -854,7 +914,7 @@ export class Game {
   updateUnit(u: Unit, dt: number) {
     if (u.dead) return;
     const d = u.def;
-    u.cool -= dt; if (u.jamT > 0) u.jamT -= dt; if (u.revealT && u.revealT > 0) u.revealT -= dt;
+    u.cool -= dt; if (u.jamT > 0) u.jamT -= dt; if (u.revealT && u.revealT > 0) u.revealT -= dt; if (u.grief && u.grief > 0) u.grief -= dt;
     if (u.pilotT && u.pilotT > 0) { u.pilotT -= dt; if (u.pilotT <= 0) { u.pilotT = 0; u.diveAt = null; } }
     if (u.target && u.target.dead) u.target = null;
     if (u.order.kind === 'attack' && (!u.order.target || u.order.target.dead)) u.order = IDLE();
@@ -1048,7 +1108,7 @@ export class Game {
     if (d.dmg > 0) {
       this.explosionFx(u.x, u.y, (d.splash || 0) + 14, true);
       this.damageArea(u.x, u.y, d.splash || 0, d.dmg * (piloted ? PILOT.dmg : 1), u.team, primary, d.vsStruct || 1, d.vsVehicle || 1, true, u);
-      if (piloted) this.effects.push({ kind: 'text', x: u.x, y: u.y - 16, t: 0, dur: 1.4, team: u.team, text: primary ? 'DIRECT HIT +20%' : 'IMPACT' });
+      if (piloted) this.effects.push({ kind: 'text', x: u.x, y: u.y - 16, t: 0, dur: 1.4, team: u.team, text: primary ? 'DIRECT HIT +20%' : 'IMPACT', sub: 'pilotHit' });
     } else this.effects.push({ kind: 'caught', x: u.x, y: u.y, t: 0, dur: 0.4 });
     this.killUnit(u, true);
   }
@@ -1061,7 +1121,7 @@ export class Game {
       this.launchShell(u, t);
       if (d.salvo) { u.salvoLeft = d.salvo - 1; u.salvoT = 0.18; }
     } else {
-      this.directHit(u, t, d.dmg * (d.troop ? COVER[u.cover || 'open'].give * this.foodMul(u.team) : 1) * this.moraleMul(u) * (!d.air && this.upgrades[u.team].ammo ? 1.15 : 1) * (1 + 0.06 * rankOf(u)), d.splash || 0);
+      this.directHit(u, t, d.dmg * (d.troop ? COVER[u.cover || 'open'].give * this.foodMul(u.team) : 1) * this.moraleMul(u) * (!d.air && this.upgrades[u.team].ammo ? 1.15 : 1) * (1 + 0.06 * rankOf(u)) * (u.grief && u.grief > 0 ? 0.8 : 1), d.splash || 0);
     }
   }
   directHit(src: Unit, t: Entity, dmg: number, splash: number) {
@@ -1158,11 +1218,13 @@ export class Game {
     if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) {
       this.stats.kills[byTeam]++; if (u.def.air) this.stats.shotDown[byTeam]++; this.stats.score[byTeam] += unitPoints(u.def);
       const ko = this.stats.killsOf[byTeam]; ko[u.type] = (ko[u.type] || 0) + 1;
-      this.addLog(byTeam, 'kill', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed a ' + ADJ[u.team] + ' ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
+      this.addLog(byTeam, 'kill', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed a ' + ADJ[u.team] + ' ' + u.def.label[u.team].toLowerCase() + (u.callsign ? ' (' + u.callsign + (rankOf(u) ? ', ' + ['recruit', 'trained', 'veteran', 'elite'][rankOf(u)] : '') + ')' : '') + ' near ' + nearestPlace(u.x, u.y));
+      // a veteran squad lost shakes the squads around it
+      if (u.def.troop && rankOf(u) >= 2) { let n = 0; for (const o of this.units) if (!o.dead && o !== u && o.team === u.team && o.def.troop && dist(o, u) < 400) { o.grief = 10; if (o.def.morale) o.morale = clamp((o.morale === undefined ? 90 : o.morale) - 20, 0, 100); n++; } if (n) this.notify(u.team, (u.callsign || u.def.label[u.team]) + ', a ' + ['', '', 'veteran', 'elite'][rankOf(u)] + ' squad, is gone: ' + n + ' squad' + (n > 1 ? 's' : '') + ' nearby shaken for ten seconds'); }
       this.credit(by, u);
       if (!u.def.auto) { const shouter = this.nearestTroop(byTeam, u.x, u.y, 260); if (shouter) this.bark('kill', shouter); }
       if (u.def.troop) { const friend = this.nearestTroop(u.team, u.x, u.y, 260); if (friend) this.bark('lost', friend); }
-    } else if (byTeam === u.team && by && by.def.indirect && !u.def.auto) { this.stats.friendlyFire[u.team]++; this.addLog(u.team, 'loss', 'Friendly fire: ' + TEAMS[u.team].name + ' lost ' + (/^[aeiou]/i.test(u.def.label[u.team]) ? 'an ' : 'a ') + u.def.label[u.team].toLowerCase() + ' to its own ' + by.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y)); this.notify(u.team, 'Friendly fire! Your ' + by.def.label[u.team].toLowerCase() + ' destroyed your own ' + u.def.label[u.team].toLowerCase()); }
+    } else if (byTeam === u.team && by && by.def.indirect && !u.def.auto) { this.stats.friendlyFire[u.team]++; this.addLog(u.team, 'loss', 'Friendly fire: ' + TEAMS[u.team].name + ' lost ' + (/^[aeiou]/i.test(u.def.label[u.team]) ? 'an ' : 'a ') + u.def.label[u.team].toLowerCase() + ' to its own ' + by.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y)); this.notify(u.team, 'Friendly fire! Your ' + by.def.label[u.team].toLowerCase() + ' destroyed your own ' + u.def.label[u.team].toLowerCase()); this.effects.push({ kind: 'text', x: u.x, y: u.y - 16, t: 0, dur: 1.4, team: u.team, text: 'FRIENDLY FIRE', sub: 'ff' }); }
     else if (!u.def.auto && !silent) this.addLog(u.team, 'loss', TEAMS[u.team].name + ' lost a ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
     if (u.def.troop) for (const o of this.units) if (!o.dead && o !== u && o.team === u.team && o.def.morale && dist(o, u) < 300) o.morale = clamp((o.morale === undefined ? 90 : o.morale) - 12, 0, 100);
     if (u.operator && u.operator.drones) u.operator.drones = u.operator.drones.filter(x => x !== u);
@@ -1224,6 +1286,7 @@ export class Game {
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.effects = this.effects.filter(e => e.t < e.dur);
     if (this.alerts.length && this.gameTime - this.alerts[0].at > 40) this.alerts = this.alerts.filter(a => this.gameTime - a.at <= 40);
+    if (this.incoming.length && this.gameTime - this.incoming[0].at > 30) this.incoming = this.incoming.filter(a => this.gameTime - a.at <= 30);
   }
   endGame(winner: number) {
     if (this.gameOver) return; this.gameOver = true; this.winner = winner;
@@ -1502,10 +1565,15 @@ export class Game {
           // a guarding interceptor's post moves with it
           for (const u of airSel) if (this.modeOf(u) === 'guard' && u.order.kind === 'move') u.post = { x: u.order.x, y: u.order.y };
         }
+        // ground formations: wedge, line, or column face the way they are going; ring is the old square block
         const n = groundSel.length, cols = Math.ceil(Math.sqrt(Math.max(1, n))), sp = 28, rows = Math.ceil(n / cols);
+        const gcx = n ? groundSel.reduce((a, u) => a + u.x, 0) / n : cmd.x, gcy = n ? groundSel.reduce((a, u) => a + u.y, 0) / n : cmd.y;
+        const gh = hyp(cmd.x - gcx, cmd.y - gcy) > 10 ? datan2(cmd.y - gcy, cmd.x - gcx) : (n ? groundSel[0].angle : 0);
+        const goffs = cmd.formation !== 'ring' && n > 1 ? this.formationOffsets(n, cmd.formation, 30).map(o => this.rotOff(o, gh)) : null;
         groundSel.forEach((u, i) => {
           const c = i % cols, r = Math.floor(i / cols);
-          u.order = MOVE(clamp(cmd.x + (c - (cols - 1) / 2) * sp, 6, W - 6), clamp(cmd.y + (r - (rows - 1) / 2) * sp, 6, H_LAND - 6));
+          const ox = goffs ? goffs[i].x : (c - (cols - 1) / 2) * sp, oy = goffs ? goffs[i].y : (r - (rows - 1) / 2) * sp;
+          u.order = MOVE(clamp(cmd.x + ox, 6, W - 6), clamp(cmd.y + oy, 6, H_LAND - 6));
           if (cmd.attackMove && (u.def.dmg > 0 || u.def.kamikaze)) u.order.amove = true;
           u.target = null; this.planRoute(u, u.order.x, u.order.y);
         });
@@ -1635,6 +1703,15 @@ export class Game {
         this.funds[RU] -= STRIKES.missile.cost; this.missileT = STRIKES.missile.cooldown; this.stats.missiles++;
         this.scheduleStrike(RU, 'missile', t.x, t.y, t.id);
         this.notify(RU, 'Iskander launched: ' + STRIKES.missile.warn + ' seconds to impact');
+        return;
+      }
+      case 'recall': {
+        let n = 0;
+        for (const u of this.units) {
+          if (u.dead || u.team !== team || !u.def.air || !u.def.endurance || u.landed || u.grounded || (u.def.kamikaze && u.target)) continue;
+          u.batt = Math.min(u.batt === undefined ? u.def.endurance : u.batt, u.def.endurance * 0.24); u.ambushed = false; u.target = null; if (u.order.kind === 'attack') u.order = IDLE(); n++;
+        }
+        this.notify(team, n ? n + ' drone' + (n > 1 ? 's' : '') + ' recalled for fresh batteries' : 'No drones in the air');
         return;
       }
       case 'mode': {

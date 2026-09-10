@@ -162,6 +162,27 @@ function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
   if (u.pilotT && u.pilotT > 0) { const pulse = 0.5 + 0.5 * Math.sin(now / 160); c.save(); c.strokeStyle = 'rgba(255,214,10,' + (0.5 + 0.4 * pulse) + ')'; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y + bob, r + 7 + pulse * 3, 0, Math.PI * 2); c.stroke(); c.restore(); }
 }
 
+/** an announced enemy column: a screen-edge arrow toward where it is going while that is off screen, a marker when it is on */
+function drawIncoming(c: CanvasRenderingContext2D, g: Game, v: View, now: number) {
+  const { cam, vw, vh, dpr } = v;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const inc of g.incoming) {
+    if (inc.team !== v.team) continue; const age = g.gameTime - inc.at; if (age > 25) continue;
+    const a = 0.9 - age / 30, pulse = 0.5 + 0.5 * Math.sin(now / 200);
+    const sx = (inc.x - cam.x) * cam.z, sy = (inc.y - cam.y) * cam.z, cx = vw / 2, cy = vh / 2;
+    const on = sx > 20 && sx < vw - 20 && sy > 20 && sy < vh - 20;
+    let ex = sx, ey = sy;
+    if (!on) { const dx = sx - cx, dy = sy - cy, kx = Math.abs(dx) > 1 ? (vw / 2 - 40) / Math.abs(dx) : 1e9, ky = Math.abs(dy) > 1 ? (vh / 2 - 60) / Math.abs(dy) : 1e9, k = Math.min(kx, ky); ex = cx + dx * k; ey = cy + dy * k; }
+    const ang = Math.atan2(sy - cy, sx - cx);
+    c.save(); c.globalAlpha = a; c.translate(ex, ey);
+    if (!on) { c.rotate(ang); c.fillStyle = '#ff6b6b'; c.beginPath(); c.moveTo(16 + pulse * 4, 0); c.lineTo(-6, -10); c.lineTo(-2, 0); c.lineTo(-6, 10); c.closePath(); c.fill(); c.rotate(-ang); }
+    else { c.strokeStyle = '#ff6b6b'; c.lineWidth = 2; c.setLineDash([6, 5]); c.beginPath(); c.arc(0, 0, 26 + pulse * 6, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+    c.font = '600 12px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
+    const label = 'ENEMY COLUMN: ' + inc.name.toUpperCase(); c.strokeText(label, 0, on ? 34 : 14); c.fillStyle = '#ff8a80'; c.fillText(label, 0, on ? 34 : 14);
+    c.restore();
+  }
+}
+
 /** a short tag under a unit that is in a posture other than its default */
 function drawModeTag(c: CanvasRenderingContext2D, u: Unit, v: View) {
   const m = modesOf(u.type); if (!m || !u.mode || u.mode === m[0].key) return;
@@ -511,7 +532,10 @@ export class Renderer {
       ctx.fillStyle = 'rgba(232,228,212,0.85)'; ctx.font = '11px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('swarm ' + ms.length, cx, cy - rr - 4);
     }
     for (const u of g.units) if (u.team === PL && !u.dead && u.mode) drawModeTag(ctx, u, v);
-    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = '#000'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16 * k, 3); }
+    // battery on every own drone in the air: green, amber under 40%, red under 15%
+    for (const u of g.units) if (u.team === PL && !u.dead && u.def.endurance && !u.landed && !u.grounded && !u.ambushed && u.batt !== undefined) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : k < 0.4 ? '#e0a030' : '#7fd1b9'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16 * k, 3); }
+    // spotted enemy squads that are flying drones wear a link mark: kill the pilots, ground the drones
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL] && u.def.operator && g.droneCount(u) > 0) { const r = drawR(u.def); ctx.save(); ctx.translate(u.x, u.y - r - 12); ctx.strokeStyle = '#ff8a80'; ctx.fillStyle = '#ff8a80'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, -2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -2, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, -2, 5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -2, 8, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke(); ctx.font = '600 9px "Barlow Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('x' + g.droneCount(u), 10, 0); ctx.restore(); }
     for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - drawR(u.def) - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
     for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
     for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
@@ -539,6 +563,7 @@ export class Renderer {
       ctx.fillText(err || def.label, w.x, w.y + def.r + 16);
     }
     ctx.restore();
+    drawIncoming(ctx, g, v, now);
     if (v.pilot) drawPilotHud(ctx, g, v, now);
 
     ctx.save();
@@ -608,6 +633,13 @@ export class Renderer {
     f.globalCompositeOperation = 'destination-out';
     for (const vs of g.vision[PL]) { f.beginPath(); f.arc(vs.x * sx, vs.y * sy, Math.max(2, vs.r * sx), 0, Math.PI * 2); f.fill(); }
     mmctx.drawImage(this.mmFog, 0, 0);
+    // enemy columns announced to you: an arrow from where they set out to where they are going
+    for (const inc of g.incoming) {
+      if (inc.team !== PL) continue; const age = g.gameTime - inc.at; if (age > 25) continue;
+      const k = Math.min(1, age / 4), x0 = inc.fx * sx, y0 = inc.fy * sy, x1 = inc.x * sx, y1 = inc.y * sy, hx = x0 + (x1 - x0) * k, hy = y0 + (y1 - y0) * k;
+      mmctx.strokeStyle = 'rgba(255,107,107,0.85)'; mmctx.fillStyle = 'rgba(255,107,107,0.85)'; mmctx.lineWidth = 2; mmctx.setLineDash([3, 3]); mmctx.beginPath(); mmctx.moveTo(x0, y0); mmctx.lineTo(hx, hy); mmctx.stroke(); mmctx.setLineDash([]);
+      const ang = Math.atan2(y1 - y0, x1 - x0); mmctx.save(); mmctx.translate(hx, hy); mmctx.rotate(ang); mmctx.beginPath(); mmctx.moveTo(6, 0); mmctx.lineTo(-4, -4); mmctx.lineTo(-4, 4); mmctx.closePath(); mmctx.fill(); mmctx.restore();
+    }
     // pings: things that just happened to your side, fading over twelve seconds
     for (const a of g.alerts) {
       if (a.team !== PL) continue; const age = g.gameTime - a.at; if (age > 12) continue;

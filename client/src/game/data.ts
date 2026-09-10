@@ -353,6 +353,29 @@ export function drawR(d: UnitDef): number { return d.r * UNIT_SCALE * (d.sizeMul
 export function unitPoints(d: UnitDef): number { return Math.max(1, Math.round((d.cost || d.hp * 2.5) / 20)); }
 export function structPoints(d: StructDef): number { return d.trench ? 0 : d.cost ? Math.round(d.cost / 20) : 250; }
 export const SCORE = { capture: 25, civSite: -30, civCar: -10 };
+/** squad callsigns, handed out in order per side; a lost squad is named in the log */
+export const CALLSIGNS: [string[], string[]] = [
+  ['Sokil', 'Vovk', 'Berkut', 'Bober', 'Kit', 'Lys', 'Kazhan', 'Yastrub', 'Ryś', 'Tur', 'Zubr', 'Orel', 'Kruk', 'Sova', 'Vedmid', 'Kabán'],
+  ['Volk', 'Medved', 'Sokol', 'Bars', 'Tigr', 'Orel', 'Yastreb', 'Ryś', 'Zubr', 'Voron', 'Filin', 'Lis', 'Kaban', 'Lebed', 'Beluga', 'Kit'],
+];
+/** optional skirmish goals, one at a time per side, drawn from this pool; time goals count seconds */
+export interface MissionDef { text: string; goal: number; reward: number; timed?: boolean }
+export const MISSIONS: Record<string, MissionDef> = {
+  holdWheat: { text: 'Hold a wheat field for five minutes', goal: 300, reward: 300, timed: true },
+  pipeline: { text: 'Keep your pipeline whole for ten minutes', goal: 600, reward: 400, timed: true },
+  shootDown: { text: 'Shoot down three enemy drones', goal: 3, reward: 200 },
+  killGun: { text: 'Destroy an enemy gun or air defense vehicle', goal: 1, reward: 250 },
+  capture: { text: 'Capture a town', goal: 1, reward: 200 },
+  trucks: { text: 'Bring five truck loads home', goal: 5, reward: 150 },
+};
+export const MISSION_SCORE = 20;
+/** skirmish starting conditions */
+export const STARTS: Record<string, { label: string; desc: string }> = {
+  standard: { label: 'Standard', desc: 'Clear morning, both sides building up' },
+  night: { label: 'Night start', desc: 'Darkness for the first three minutes: ground units see 60%, the enemy moves' },
+  winter: { label: 'Winter start', desc: 'Snow from the first second: quadcopters grounded, mud off the roads, and more snow to come' },
+  rush: { label: 'Russia attacks first', desc: 'The Belgorod group is already moving: an assault in the first minute and a fatter Russian purse' },
+};
 /** the kill zone: troops and trucks in the open under the eye of an armed enemy drone bleed this many hp a second */
 export const KILLZONE = { troop: 1.5, truck: 2.2, tick: 0.5 };
 /** nets laid along a road by one Road net tunnel order: how many and how far apart */

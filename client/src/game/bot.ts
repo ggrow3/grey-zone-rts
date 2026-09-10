@@ -21,10 +21,10 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   bot.spendT -= dt;
   if (bot.spendT <= 0) { bot.spendT = 1; botSpend(g, bot); }
   bot.attackT += dt;
-  const staging = g.units.filter(u => u.team === T && !u.dead && !u.def.structuresOnly && !u.def.auto && !u.def.indirect && !u.def.recon && u.order.kind === 'idle');
+  const staging = g.units.filter(u => u.team === T && !u.dead && !u.def.structuresOnly && !u.def.auto && !u.def.indirect && !u.def.recon && u.order.kind === 'idle' && u.mode !== 'ambush' && !u.ambushed);
   // bad weather and darkness ground the enemy's drones: that is when to move
   const badLight = g.weather.kind === 'fog' || g.weather.kind === 'rain' || g.weather.kind === 'snow' || g.isNight();
-  const threshold = Math.min(2600, 700 + t * 2) * (badLight ? 0.5 : 1);
+  const threshold = Math.min(2600, 700 + t * 2) * (badLight ? 0.5 : 1) * (g.rush && T === RU ? 0.5 : 1);
   if (badLight) bot.attackT += dt;
   const homeHq = g.structs.find(s => s.team === T && s.type === 'hq');
   const guard = homeHq ? staging.filter(u => !u.def.air).sort((a, b) => dist(a, homeHq) - dist(b, homeHq)).slice(0, 4) : [];
@@ -103,7 +103,36 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
     bot.shahedT -= dt;
     if (bot.shahedT <= 0) { bot.shahedT = g.noGerans ? 20 : Math.max(55, 125 - t / 25) * (g.isNight() ? 0.6 : 1); if (!g.noGerans && g.weather.kind !== 'fog') g.spawnShaheds(); }
   }
-  if (bot.warnT > 0) { bot.warnT -= dt; if (bot.warnT <= 0) g.notify(E, 'Enemy column moving toward ' + bot.warnName); }
+  if (bot.warnT > 0) { bot.warnT -= dt; if (bot.warnT <= 0) { g.notify(E, 'Enemy column moving toward ' + bot.warnName); if (bot.warnAt) g.incoming.push({ team: E, fx: bot.staging.x, fy: bot.staging.y, x: bot.warnAt.x, y: bot.warnAt.y, at: g.gameTime, name: bot.warnName }); } }
+  // FPVs lie in ambush on the roads into the towns it holds; a net tunnel goes up on the road behind the front town
+  bot.ambushT = (bot.ambushT === undefined ? 90 : bot.ambushT) - dt;
+  if (bot.ambushT <= 0) {
+    bot.ambushT = 45;
+    const enemyHq = g.structs.find(s => s.team === E && s.type === 'hq'), held = g.depots.filter(d => d.owner === T);
+    if (enemyHq && held.length) {
+      held.sort((a, b) => dist(a, enemyHq) - dist(b, enemyHq)); const town = held[0];
+      const dd = dist(town, enemyHq) || 1, px = town.x + (enemyHq.x - town.x) / dd * 260, py = town.y + (enemyHq.y - town.y) / dd * 260;
+      const rh = g.terrain.nearestRoad(px, py); const spot = rh && rh.d < 200 ? { x: rh.px, y: rh.py } : { x: px, y: py };
+      const idle = g.units.filter(u => u.team === T && !u.dead && u.type === 'fpv' && !u.target && u.order.kind === 'idle' && !u.ambushed && !u.landed && !u.grounded && !g.needsOperator(u.def, T));
+      const already = g.units.filter(u => u.team === T && !u.dead && u.ambushed).length;
+      if (already < 4) for (const u of idle.slice(0, 2)) { u.mode = 'ambush'; u.order = MOVE(spot.x + g.rand(-40, 40), spot.y + g.rand(-40, 40)); u.target = null; }
+    }
+  }
+  bot.netT = (bot.netT === undefined ? 200 : bot.netT) - dt;
+  if (bot.netT <= 0) {
+    bot.netT = 90; bot.netted = bot.netted || [];
+    const homeHq2 = g.structs.find(s => s.team === T && s.type === 'hq'), enemyHq = g.structs.find(s => s.team === E && s.type === 'hq');
+    const held = g.depots.filter(d => d.owner === T && !bot.netted!.includes(d.name));
+    bot.saving = false;
+    if (homeHq2 && enemyHq && held.length) {
+      held.sort((a, b) => dist(a, enemyHq) - dist(b, enemyHq));
+      // the first held town, nearest the enemy first, that has a road within reach of its building radius
+      let town: typeof held[number] | null = null, rh: ReturnType<typeof g.terrain.nearestRoad> = null;
+      for (const d of held) { const h = g.terrain.nearestRoad(d.x, d.y); if (h && h.d <= 190) { town = d; rh = h; break; } else bot.netted.push(d.name); }
+      // the purchases pause until the net is affordable, then the net goes up on the next pass
+      if (town && rh) { if (g.funds[T] >= 620 && !g.placementError(T, 'netLine', rh.px, rh.py)) { g.apply(T, { kind: 'place', type: 'netLine', x: rh.px, y: rh.py }); bot.netted.push(town.name); } else if (g.funds[T] < 620) { bot.saving = true; bot.netT = 8; } else bot.netted.push(town.name); }
+    }
+  }
   // squads take on extra operators when people are spare, so more drones can fly
   bot.opsT = (bot.opsT === undefined ? 40 : bot.opsT) - dt;
   if (bot.opsT <= 0) {
@@ -140,6 +169,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
 
 function botSpend(g: Game, bot: Bot) {
   const T = bot.team, E = 1 - T, t = g.gameTime;
+  if (bot.saving) return;
   const count = g.units.filter(u => u.team === T && !u.dead && !u.def.auto).length;
   if (count > 90) return;
   const recon = g.units.filter(u => u.team === T && !u.dead && u.def.recon).length;
@@ -181,6 +211,8 @@ function botLaunch(g: Game, bot: Bot, group: Unit[]) {
     es.sort((a, b) => dist(a, bot.staging) - dist(b, bot.staging));
     target = es[0]; name = 'your base';
   }
-  for (const u of group) { u.order = MOVE(target.x + g.rand(-70, 70), target.y + g.rand(-70, 70)); if (u.def.dmg > 0 || u.def.kamikaze) u.order.amove = true; u.target = null; g.planRoute(u, u.order.x, u.order.y); }
-  bot.warnT = 6; bot.warnName = name;
+  // in the dark or in weather the infantry creeps; in daylight it marches
+  const badLight = g.weather.kind !== 'clear' || g.isNight();
+  for (const u of group) { u.order = MOVE(target.x + g.rand(-70, 70), target.y + g.rand(-70, 70)); if (u.def.dmg > 0 || u.def.kamikaze) u.order.amove = true; u.target = null; g.planRoute(u, u.order.x, u.order.y); if (u.def.troop && u.type !== 'fireGroup') u.mode = badLight ? 'creep' : 'march'; }
+  bot.warnT = 6; bot.warnName = name; bot.warnAt = { x: target.x, y: target.y };
 }

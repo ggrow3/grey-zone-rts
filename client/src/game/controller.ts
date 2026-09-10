@@ -335,6 +335,7 @@ export class Controller {
     else if (e.code === 'Comma') this.selectIdle(true);
     else if (e.code === 'Backspace') { this.jumpToAlert(); return true; }
     else if (e.code === 'BracketRight') this.onToggle('speed');
+    else if (e.code === 'Home') { this.submit({ kind: 'recall' }); return true; }
     else if (e.code === 'KeyY') { this.togglePilot(); return true; }
     else if (e.code === 'KeyR') this.cycleMode();
     else if (e.code === 'Space') { if (v.pilot) return true; this.goHome(); return true; }

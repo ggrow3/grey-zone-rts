@@ -42,6 +42,7 @@ function unitRows(e: Unit): [string, string][] {
   if (d.ammo) rows.push(['Shells', (e.ammo || 0) + ' / ' + d.ammo + (e.ammo === 0 ? ', waiting for a truck' : e.ammoTruckId ? ', truck on the way' : '')]);
   if (e.revealT && e.revealT > 0 && d.indirect) rows.push(['Exposed', 'firing revealed you to radar for ' + Math.ceil(e.revealT) + ' s']);
   if (d.indirect) { const cv = e.cover || 'open'; rows.push(['Position', cv === 'forest' ? 'in a wood: hidden beyond 140, drones -65%, 2 s radar exposure' : cv === 'urban' ? 'in a town: hidden beyond 220, drones -55%' : 'IN THE OPEN: seen from anywhere, drones +45%, 6 s radar exposure. Move into the trees']); }
+  if (e.callsign) rows.push(['Callsign', e.callsign + (e.grief && e.grief > 0 ? ', shaken ' + Math.ceil(e.grief) + ' s' : '')]);
   if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)] + ' (' + (e.kills || 0) + ' kills)']);
   if (d.crew) rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul) rows.push(['Roads', (e.onRoad ? 'on a road, ' : 'off road, ') + Math.round((d.roadMul - 1) * 100) + '% faster on roads']);
@@ -83,7 +84,7 @@ function structRows(e: Struct): [string, string][] {
       <div class="row dim">Drag to select units. Right-click to move or attack. Click a building to manage it.</div>
     </template>
     <template v-else-if="one">
-      <h3>{{ one.isStruct ? one.def.label : one.def.label[one.team] }}</h3>
+      <h3>{{ one.isStruct ? one.def.label : one.def.label[one.team] }}<span v-if="(one as Unit).callsign" class="dim" style="font-size:14px;margin-left:8px">{{ (one as Unit).callsign }}</span></h3>
       <div class="hpbar"><i :style="{ width: (clamp(one.hp / one.def.hp, 0, 1) * 100).toFixed(0) + '%', background: hpColor(one.hp / one.def.hp) }" /></div>
       <div class="row"><span>Health</span><b>{{ Math.ceil(one.hp) }} / {{ one.def.hp }}</b></div>
       <template v-if="one.isStruct"><div class="row" v-for="r in structRows(one as Struct)" :key="r[0]"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div></template>
@@ -110,10 +111,8 @@ function structRows(e: Struct): [string, string][] {
       <div v-if="unitsSel.some(u => u.def.operator)" class="forms"><button type="button" @click="ctl.setOps(1)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)">− operator</button></div>
       <button v-if="unitsSel.some(u => u.def.troop)" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E): trench in 5 s</button>
       <button v-if="unitsSel.some(u => u.def.indirect)" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B, or Ctrl+right-click)</button>
-      <template v-if="unitsSel.some(u => u.def.air)">
-        <div class="forms"><button v-for="f in FORMATIONS" :key="f" type="button" :class="{ on: (swarmSel ? swarmSel.formation : ctl.formationType) === f }" @click="ctl.setFormation(f)">{{ f }}</button></div>
-        <button type="button" class="strike" style="border-color:#3a5a7a" @click="ctl.formSwarm()">{{ swarmSel ? 'Disband swarm (G)' : 'Form swarm (G)' }}</button>
-      </template>
+      <div class="forms" title="Formation for the next move order: wedge, line, and column face the way they go; ring is a block for ground units"><button v-for="f in FORMATIONS" :key="f" type="button" :class="{ on: (swarmSel ? swarmSel.formation : ctl.formationType) === f }" @click="ctl.setFormation(f)">{{ f === 'ring' && !unitsSel.some(u => u.def.air) ? 'block' : f }}</button></div>
+      <button v-if="unitsSel.some(u => u.def.air)" type="button" class="strike" style="border-color:#3a5a7a" @click="ctl.formSwarm()">{{ swarmSel ? 'Disband swarm (G)' : 'Form swarm (G)' }}</button>
       <button v-if="unitsSel.some(u => u.def.kamikaze)" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest targets (F)</button>
       <button v-if="unitsSel.some(u => u.def.dmg > 0 || u.def.kamikaze)" type="button" class="strike" :class="{ on: ctl.amoveMode }" style="border-color:#7a4a3a" title="Click a destination: units stop to fight anything they meet on the way, then carry on" @click="ctl.startAttackMove()">Attack-move (Q)</button>
       <div class="row pick" v-for="[k, n] in counts" :key="k" title="Click to select only these" @click="ctl.selection = unitsSel.filter(u => u.type === k)"><span>{{ UNITS[k].label[ctl.team] }}</span><b>{{ n }}</b></div>

@@ -12,7 +12,7 @@ const depotYield = GAS_YIELD * 2.4;
 const side = (s: number) => Object.entries(UNITS).filter(([, d]) => d.side === s).map(([, d]) => d.label[s]).join(', ');
 
 export const FACTION_FACTS: FactionFact[] = [
-  { topic: 'Starting funds', ua: '1200', ru: '300', source: 'Game.funds' },
+  { topic: 'Starting funds', ua: '1200', ru: '600 (1000 in a Russia-attacks-first skirmish)', source: 'Game.funds' },
   { topic: 'Base income', ua: '12 a second scaled by support (40% to 100%), minus 0.5 per Ukrainian civilian site lost, never below 4; Aid package adds 8 once support is 60 or more', ru: 'Flat 12 a second plus gas; War economy adds 8. The computer opponent also gets the difficulty multiplier, rising with time', source: 'Game.income(), teamMul()' },
   { topic: 'Gas', ua: uaGas + ' gas well sites at ' + GAS_YIELD + '/s each on two pipelines with ' + uaPumps + ' pumping stations to guard', ru: ruGas + ' site, the Belgorod fuel depot, at ' + depotYield + '/s on ' + ruPumps + ' pump (the line from Kursk)', source: 'RESOURCES, PIPELINES' },
   { topic: 'Fuel capacity', ua: FUEL_BASE + ' + ' + FUEL_PER_NODE + ' per gas site = ' + (FUEL_BASE + FUEL_PER_NODE * uaGas) + ' vehicles while the line is whole', ru: FUEL_BASE + ' + ' + FUEL_PER_NODE + ' = ' + (FUEL_BASE + FUEL_PER_NODE * ruGas) + ' vehicles while whole, ' + FUEL_BASE + ' when cut', source: 'updateSupply()' },
