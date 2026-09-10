@@ -3,7 +3,9 @@ import type { UnitDef, StructDef, FormationType } from './data';
 export interface Pt { x: number; y: number }
 
 export type OrderKind = 'idle' | 'move' | 'attack' | 'bombard' | 'dig';
-export interface Order { kind: OrderKind; x: number; y: number; target: Entity | null }
+export interface Order { kind: OrderKind; x: number; y: number; target: Entity | null;
+  /** attack-move: stop and fight anything met on the way, then carry on */
+  amove?: boolean }
 
 export interface Unit {
   id: number; isUnit: true; isStruct?: false; type: string; def: UnitDef; team: number; x: number; y: number; hp: number;
@@ -23,12 +25,30 @@ export interface Unit {
   revealT?: number;
   /** queued move destinations (Shift+right-click) taken in order after the current move */
   waypoints?: Pt[];
+  /** posture chosen by the player (see MODE_SETS); undefined means the type's default */
+  mode?: string;
+  /** seconds a human pilot's last steer input stays in force */
+  pilotT?: number;
+  /** a piloted kamikaze drone flying into this point explodes there */
+  diveAt?: Pt | null;
+  /** an FPV sitting on the ground in ambush, motors off */
+  ambushed?: boolean;
+  /** the spot a guarding interceptor returns to */
+  post?: Pt | null;
+  /** shoot-and-scoot: a fire mission was just completed; the point the gun is moving to before it fires again */
+  scootPending?: boolean; scoot?: Pt | null;
+  /** a squad's name, for the log and the panel */
+  callsign?: string;
+  /** seconds of shaken fire (80%) after a veteran squad died nearby */
+  grief?: number;
 }
 
 export interface Struct {
   id: number; isStruct: true; isUnit?: false; type: string; def: StructDef; team: number; x: number; y: number; r: number; hp: number;
   build: number; queue: string[]; progress: number; rally: Pt; cool: number; dead: boolean; seenBy: [boolean, boolean];
   heat: number; overheated: boolean; civ?: boolean; nation?: number; lastHitBy?: number;
+  /** grid supply-to-demand ratio this building runs at (0 with no source), and which grid it is on */
+  pow?: number; grid?: number; unpoweredWarned?: boolean;
 }
 
 export type Entity = Unit | Struct;
@@ -62,6 +82,12 @@ export type WeatherKind = 'clear' | 'rain' | 'fog' | 'snow';
 export interface Weather { kind: WeatherKind; until: number; next: WeatherKind; warned: boolean }
 /** battle log entry; team is the side the event is about (-1 = both) */
 export interface LogEntry { at: number; team: number; kind: LogKind; text: string }
+/** something that happened to a side somewhere on the map: pinged on the minimap, Backspace jumps to the latest */
+export interface Alert { team: number; x: number; y: number; at: number; text: string }
+/** an enemy column on its way: the warned side sees an arrow from where it set out toward where it is going */
+export interface Incoming { team: number; fx: number; fy: number; x: number; y: number; at: number; name: string }
+/** an optional skirmish goal in progress for one side */
+export interface Mission { key: string; progress: number; base: number; startedAt: number; done: boolean }
 
 export interface Swarm { id: number; team: number; members: Unit[]; leader: Unit; formation: FormationType; dead: boolean; t: number }
 
@@ -70,6 +96,12 @@ export interface Supply { food: number; fuel: number; power: number; foodUsed: n
 export interface Bot {
   team: number; staging: Pt; spendT: number; attackT: number; shahedT: number; warnT: number; warnName: string; defendT: number; artyT: number;
   pending: string | null; raidT?: number; resT?: number; opsT?: number; coverT?: number; strikeT?: number;
+  /** ambush FPVs on the roads, road nets by held towns */
+  ambushT?: number; netT?: number; netted?: string[];
+  /** where the announced column is going */
+  warnAt?: Pt;
+  /** purchases paused while it saves for a road net */
+  saving?: boolean;
 }
 
 export interface Notice { team: number; text: string; at: number }
@@ -77,7 +109,7 @@ export interface Scorch { x: number; y: number; r: number }
 
 /** everything a player can ask the simulation to do; ids refer to units/structs owned by the issuing team */
 export type Command =
-  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType; queue?: boolean }
+  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType; queue?: boolean; attackMove?: boolean }
   | { kind: 'attack'; ids: number[]; targetId: number }
   | { kind: 'bombard'; ids: number[]; x: number; y: number }
   | { kind: 'dig'; ids: number[] }
@@ -93,4 +125,10 @@ export type Command =
   | { kind: 'ops'; ids: number[]; delta: 1 | -1 }
   | { kind: 'kab'; x: number; y: number }
   | { kind: 'deep' }
-  | { kind: 'iskander'; targetId: number };
+  | { kind: 'iskander'; targetId: number }
+  /** every airborne battery drone flies home for fresh batteries (Home) */
+  | { kind: 'recall' }
+  /** switch the posture of units that have that mode */
+  | { kind: 'mode'; ids: number[]; mode: string }
+  /** a human pilot's stick input for one drone: fly toward (x, y), attack targetId, or (kamikaze) dive into the point */
+  | { kind: 'steer'; id: number; x: number; y: number; targetId?: number; dive?: boolean };

@@ -48,6 +48,12 @@ export class AudioDirector {
       if (e.kind === 'bark') { this.onBark(e, g, v); continue; }
       if (e.kind === 'boom') { const own = Math.hypot(e.x - cx, e.y - cy) < viewR; if (own && (!biggestBoom || (e.r || 0) > (biggestBoom.r || 0))) biggestBoom = e; }
       if (!this.sfx || !this.ctx || budget <= 0) { this.dropped++; continue; }
+      // a few effects carry their own voice: kill-zone bleeding, friendly fire, a piloted hit, a goal met
+      if (e.sub === 'kz' || e.sub === 'ff' || e.sub === 'pilotHit' || e.sub === 'goal') {
+        if (e.team !== undefined && e.team !== v.team) continue;
+        const cds = e.sub === 'kz' ? 450 : 1500; if (now - (this.lastKind[e.sub] || 0) < cds) { this.dropped++; continue; }
+        this.lastKind[e.sub] = now; budget--; this.playSub(e.sub, e.sub === 'kz' ? Math.max(0.06, 1 - Math.hypot(e.x - cx, e.y - cy) / (0.9 * viewR)) : 1); continue;
+      }
       const cd = COOLDOWN_MS[e.kind] ?? 100;
       if (now - (this.lastKind[e.kind] || 0) < cd) { this.dropped++; continue; }
       const d = Math.hypot(e.x - cx, e.y - cy), gain = Math.max(0.06, 1 - d / (0.9 * viewR));
@@ -73,6 +79,14 @@ export class AudioDirector {
       case 'text': this.tone(660, 0.06, gain * 0.2, t, 'triangle'); break;
       case 'alert': if (e.team === undefined || e.team === this.viewTeam) { for (let i = 0; i < 3; i++) { this.sweep(500, 900, 0.6, 0.35, t + i * 0.7); this.sweep(900, 500, 0.6, 0.35, t + i * 0.7 + 0.3); } } break;
     }
+    this.played++;
+  }
+  private playSub(sub: string, gain: number) {
+    const c = this.ctx!, t = c.currentTime;
+    if (sub === 'kz') { this.burst(0.14, 1, 520, 'bandpass', gain * 0.22, t); this.tone(180, 0.1, gain * 0.12, t, 'sawtooth'); }
+    else if (sub === 'ff') { for (let i = 0; i < 3; i++) { this.tone(920, 0.11, 0.3, t + i * 0.16, 'square'); this.tone(620, 0.11, 0.3, t + i * 0.16 + 0.08, 'square'); } }
+    else if (sub === 'pilotHit') { this.burst(0.6, 1000, 110, 'lowpass', 0.9, t, true); this.tone(48, 0.5, 0.6, t, 'sine'); this.sweep(1200, 2400, 0.22, 0.28, t + 0.05); }
+    else if (sub === 'goal') { for (const [i, f] of [523, 659, 784, 1047].entries()) this.tone(f, 0.14, 0.22, t + i * 0.09, 'triangle'); }
     this.played++;
   }
   private weatherLoop(level: number) {

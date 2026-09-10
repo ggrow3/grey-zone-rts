@@ -2,7 +2,8 @@
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
 import type { Unit, Struct } from '../../game/types';
-import { UNITS, FORMATIONS, FUEL_USERS, TARGET_WORDS, RANK_NAMES } from '../../game/data';
+import { UNITS, FORMATIONS, FUEL_USERS, TARGET_WORDS, RANK_NAMES, MODE_SET_OF, MODE_SETS } from '../../game/data';
+import type { ModeDef } from '../../game/data';
 import { rankOf } from '../../game/sim';
 import { dist, clamp } from '../../game/dmath';
 
@@ -11,6 +12,17 @@ const g = () => props.ctl.game;
 const sel = computed(() => { void props.tick; return props.ctl.selection.filter(e => !e.dead); });
 const one = computed(() => sel.value.length === 1 ? sel.value[0] : null);
 const unitsSel = computed(() => sel.value.filter(e => e.isUnit) as Unit[]);
+/** the postures on offer, one row per kind of unit in the selection */
+const modeGroups = computed(() => {
+  const groups = new Map<string, { defs: ModeDef[]; units: Unit[]; label: string }>();
+  for (const u of unitsSel.value) { const s = MODE_SET_OF[u.type]; if (!s) continue; const grp = groups.get(s) || groups.set(s, { defs: MODE_SETS[s], units: [], label: '' }).get(s)!; grp.units.push(u); }
+  for (const grp of groups.values()) { const types = [...new Set(grp.units.map(u => u.type))]; grp.label = types.length === 1 ? UNITS[types[0]].label[props.ctl.team] : grp.units.length + ' units'; }
+  return [...groups.values()];
+});
+const modeOn = (grp: { units: Unit[] }, key: string) => grp.units.every(u => g().modeOf(u) === key);
+const modeDesc = (grp: { defs: ModeDef[]; units: Unit[] }) => { const k = g().modeOf(grp.units[0]); const d = grp.defs.find(m => m.key === k); return grp.units.every(u => g().modeOf(u) === k) && d ? d.desc : 'Mixed postures'; };
+const canPilot = computed(() => { const u = one.value; return !!u && u.isUnit && !!u.def.air && !u.def.auto && !u.grounded && !u.landed; });
+const piloting = computed(() => { void props.tick; return !!props.ctl.view.pilot; });
 const swarmSel = computed(() => { const u = unitsSel.value; return u.length && u.every(x => g().swarmOf(x) === g().swarmOf(u[0]) && g().swarmOf(x)) ? g().swarmOf(u[0]) : null; });
 const counts = computed(() => { const c: Record<string, number> = {}; for (const u of unitsSel.value) c[u.type] = (c[u.type] || 0) + 1; return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5); });
 const hpColor = (r: number) => r > 0.5 ? 'var(--ok)' : r > 0.25 ? 'var(--warn)' : 'var(--ru)';
@@ -30,6 +42,7 @@ function unitRows(e: Unit): [string, string][] {
   if (d.ammo) rows.push(['Shells', (e.ammo || 0) + ' / ' + d.ammo + (e.ammo === 0 ? ', waiting for a truck' : e.ammoTruckId ? ', truck on the way' : '')]);
   if (e.revealT && e.revealT > 0 && d.indirect) rows.push(['Exposed', 'firing revealed you to radar for ' + Math.ceil(e.revealT) + ' s']);
   if (d.indirect) { const cv = e.cover || 'open'; rows.push(['Position', cv === 'forest' ? 'in a wood: hidden beyond 140, drones -65%, 2 s radar exposure' : cv === 'urban' ? 'in a town: hidden beyond 220, drones -55%' : 'IN THE OPEN: seen from anywhere, drones +45%, 6 s radar exposure. Move into the trees']); }
+  if (e.callsign) rows.push(['Callsign', e.callsign + (e.grief && e.grief > 0 ? ', shaken ' + Math.ceil(e.grief) + ' s' : '')]);
   if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)] + ' (' + (e.kills || 0) + ' kills)']);
   if (d.crew) rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul) rows.push(['Roads', (e.onRoad ? 'on a road, ' : 'off road, ') + Math.round((d.roadMul - 1) * 100) + '% faster on roads']);
@@ -42,7 +55,10 @@ function unitRows(e: Unit): [string, string][] {
   if (FUEL_USERS.has(e.type) && G.supply[e.team].fuel < 1) rows.push(['Supply', 'short of fuel: speed ' + Math.round(G.fuelMul(e) * 100) + '%']);
   if (d.morale) rows.push(['Morale', Math.round(e.morale === undefined ? 90 : e.morale) + '%' + (e.shaken ? ', shaken: falling back' : '') + (d.upkeep ? ', wages ' + d.upkeep + '/s' : '')]);
   if (d.troop) { const cv = e.cover || 'open', wood = cv === 'trench' && G.terrain.coverOf(e.x, e.y) === 'forest'; rows.push(['Cover', cv === 'trench' ? (wood ? 'trench in a wood: -45% damage, drones -85%, seen only within 110' : 'trench: -45% damage, drones -75%, seen only within 110') : cv === 'forest' ? 'forest: +50% fire, -40% damage, drones -65%, seen only within 140' : cv === 'urban' ? 'town: +20% fire, -25% damage, drones -55%, seen within 220' : 'OPEN GROUND: +30% damage, drones +45%. Get into a town, a wood, or a trench']); }
-  if (d.endurance) rows.push(['Flight time', e.landed ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s' : Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s of ' + d.endurance + (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : '')]);
+  if (e.ambushed) rows.push(['Ambush', 'on the ground, motors off: pounces within 220']);
+  if (e.scoot) rows.push(['Scooting', 'displacing before the next shot']);
+  if (G.piloted(e)) rows.push(['Pilot', 'you: +' + Math.round(15) + '% evasion' + (d.kamikaze ? ', +20% warhead' : '')]);
+  if (d.endurance) rows.push(['Flight time', e.landed ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s' : e.ambushed ? Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s, not draining' : Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s of ' + d.endurance + (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : '')]);
   if (d.operated) rows.push(['Operator', !G.needsOperator(d, e.team) ? 'autonomous' : e.grounded ? 'none: grounded until a squad within 900 has a free slot' : e.operator && !e.operator.dead ? UNITS[e.operator.type].label[0] + ', ' + Math.round(dist(e, e.operator)) + ' of ' + G.linkRange(e) + ' range' : 'none, searching']);
   if (d.operator) { rows.push(['Operators', (e.ops || 1) + ' of 4, ' + G.opCap(e.team) + ' drones each']); rows.push(['Flying', G.droneCount(e) + ' of ' + G.opCapOf(e) + ' drones']); }
   if (d.jam) rows.push(['Jam radius', String(d.jam)]);
@@ -56,6 +72,9 @@ function structRows(e: Struct): [string, string][] {
   if (d.produces) rows.push(['Rally', 'right-click on map']);
   if (d.jam) rows.push(['Jam radius', String(d.jam)]);
   if (d.netR) rows.push(['Net radius', String(d.netR)]);
+  if (d.power) rows.push(['Power output', d.power + (d.pylon ? '' : ' to the grid it stands on')]);
+  if (d.demand) { const p = e.pow ?? 1; rows.push(['Power', p === 0 ? 'NONE: stopped. Run pylons from the grid or add a generator set' : p < 1 ? Math.round(p * 100) + '% of its ' + d.demand + ': the grid is short' : 'on the grid, drawing ' + d.demand]); }
+  if (d.pylon) rows.push(['Reach', 'carries the grid 190 farther; two FPVs break it']);
   if (d.heal) rows.push(['Heals troops', 'within ' + d.heal + ', ' + Math.round((d.healRate || 0) * 100) + '% a second']);
   return rows;
 }
@@ -68,13 +87,19 @@ function structRows(e: Struct): [string, string][] {
       <div class="row dim">Drag to select units. Right-click to move or attack. Click a building to manage it.</div>
     </template>
     <template v-else-if="one">
-      <h3>{{ one.isStruct ? one.def.label : one.def.label[one.team] }}</h3>
+      <h3>{{ one.isStruct ? one.def.label : one.def.label[one.team] }}<span v-if="(one as Unit).callsign" class="dim" style="font-size:14px;margin-left:8px">{{ (one as Unit).callsign }}</span></h3>
       <div class="hpbar"><i :style="{ width: (clamp(one.hp / one.def.hp, 0, 1) * 100).toFixed(0) + '%', background: hpColor(one.hp / one.def.hp) }" /></div>
       <div class="row"><span>Health</span><b>{{ Math.ceil(one.hp) }} / {{ one.def.hp }}</b></div>
       <template v-if="one.isStruct"><div class="row" v-for="r in structRows(one as Struct)" :key="r[0]"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div></template>
       <template v-else>
-        <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, 8)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
+        <template v-for="grp in modeGroups" :key="grp.label">
+          <div class="forms modes"><button v-for="m in grp.defs" :key="m.key" type="button" :class="{ on: modeOn(grp, m.key) }" :title="m.desc + ' (R cycles)'" @click="ctl.setMode(m.key, grp.units)">{{ m.label }}</button></div>
+          <div class="modeDesc">{{ modeDesc(grp) }}</div>
+        </template>
+        <button v-if="canPilot" type="button" class="strike" :class="{ on: piloting }" style="border-color:#7a6a1a" :title="'Fly this drone yourself: it follows your cursor, dodges 15% more' + ((one as Unit).def.kamikaze ? ', and hits 20% harder when you put it on a target' : '') + '. Left-click attacks; Y or Esc hands it back.'" @click="ctl.togglePilot()">{{ piloting ? 'Hand back the sticks (Y)' : 'Take the sticks (Y)' }}</button>
+        <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, modeGroups.length ? 6 : 8)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
         <div v-if="(one as Unit).def.operator" class="forms"><button type="button" @click="ctl.setOps(1)" title="One person from the pool joins as a drone operator (O)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)" title="Send one operator back to the pool (Shift+O)">− operator</button></div>
+        <button v-if="(one as Unit).def.dmg > 0 || (one as Unit).def.kamikaze" type="button" class="strike" :class="{ on: ctl.amoveMode }" style="border-color:#7a4a3a" title="Click a destination: the unit stops to fight anything it meets on the way, then carries on" @click="ctl.startAttackMove()">Attack-move (Q)</button>
         <button v-if="(one as Unit).def.troop" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E)</button>
         <button v-if="(one as Unit).def.indirect" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B)</button>
         <button v-if="(one as Unit).def.kamikaze" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest target (F)</button>
@@ -82,15 +107,18 @@ function structRows(e: Struct): [string, string][] {
     </template>
     <template v-else>
       <h3>{{ swarmSel ? 'Swarm of ' + unitsSel.length : unitsSel.length + ' units selected' }}</h3>
+      <template v-for="grp in modeGroups" :key="grp.label">
+        <div class="modeLabel">{{ grp.label }}</div>
+        <div class="forms modes"><button v-for="m in grp.defs" :key="m.key" type="button" :class="{ on: modeOn(grp, m.key) }" :title="m.desc + ' (R cycles)'" @click="ctl.setMode(m.key, grp.units)">{{ m.label }}</button></div>
+      </template>
       <div v-if="unitsSel.some(u => u.def.operator)" class="forms"><button type="button" @click="ctl.setOps(1)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)">− operator</button></div>
       <button v-if="unitsSel.some(u => u.def.troop)" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E): trench in 5 s</button>
       <button v-if="unitsSel.some(u => u.def.indirect)" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B, or Ctrl+right-click)</button>
-      <template v-if="unitsSel.some(u => u.def.air)">
-        <div class="forms"><button v-for="f in FORMATIONS" :key="f" type="button" :class="{ on: (swarmSel ? swarmSel.formation : ctl.formationType) === f }" @click="ctl.setFormation(f)">{{ f }}</button></div>
-        <button type="button" class="strike" style="border-color:#3a5a7a" @click="ctl.formSwarm()">{{ swarmSel ? 'Disband swarm (G)' : 'Form swarm (G)' }}</button>
-      </template>
+      <div class="forms" title="Formation for the next move order: wedge, line, and column face the way they go; ring is a block for ground units"><button v-for="f in FORMATIONS" :key="f" type="button" :class="{ on: (swarmSel ? swarmSel.formation : ctl.formationType) === f }" @click="ctl.setFormation(f)">{{ f === 'ring' && !unitsSel.some(u => u.def.air) ? 'block' : f }}</button></div>
+      <button v-if="unitsSel.some(u => u.def.air)" type="button" class="strike" style="border-color:#3a5a7a" @click="ctl.formSwarm()">{{ swarmSel ? 'Disband swarm (G)' : 'Form swarm (G)' }}</button>
       <button v-if="unitsSel.some(u => u.def.kamikaze)" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest targets (F)</button>
-      <div class="row" v-for="[k, n] in counts" :key="k"><span>{{ UNITS[k].label[ctl.team] }}</span><b>{{ n }}</b></div>
+      <button v-if="unitsSel.some(u => u.def.dmg > 0 || u.def.kamikaze)" type="button" class="strike" :class="{ on: ctl.amoveMode }" style="border-color:#7a4a3a" title="Click a destination: units stop to fight anything they meet on the way, then carry on" @click="ctl.startAttackMove()">Attack-move (Q)</button>
+      <div class="row pick" v-for="[k, n] in counts" :key="k" title="Click to select only these" @click="ctl.selection = unitsSel.filter(u => u.type === k)"><span>{{ UNITS[k].label[ctl.team] }}</span><b>{{ n }}</b></div>
     </template>
   </div>
 </template>

@@ -1,5 +1,5 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, UNIT_SCALE } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT, POWER } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
@@ -13,10 +13,14 @@ export interface View {
   team: number; cam: Cam; vw: number; vh: number; dpr: number;
   selection: Entity[]; placing: string | null; mouse: { x: number; y: number; inside: boolean }; bombardMode: boolean;
   drag: { x0: number; y0: number; x1: number; y1: number } | null; marker: Marker | null;
+  /** the drone whose sticks the player holds, and what the pilot has clicked */
+  pilot: Unit | null; pilotTarget: Entity | null; pilotDive: { x: number; y: number } | null;
+  /** the next click is an attack-move destination */
+  amoveMode: boolean;
 }
 
-/** 0 ground, 1 low aircraft, 2 high-altitude aircraft */
-export function altOf(u: Unit): number { return !u.def.air || u.landed || u.grounded ? 0 : u.def.highAlt ? 2 : 1; }
+/** 0 ground, 1 low aircraft, 2 high-altitude aircraft (a Mavic switched to Low flies at 1) */
+export function altOf(u: Unit): number { return !u.def.air || u.landed || u.grounded || u.ambushed ? 0 : u.def.highAlt && u.mode !== 'low' ? 2 : 1; }
 /** where an aircraft is drawn: it slides away from the screen centre with altitude, so panning the camera gives depth */
 export function parallaxOf(u: Unit, v: View): { x: number; y: number } {
   const alt = altOf(u); if (!alt) return { x: u.x, y: u.y };
@@ -45,6 +49,8 @@ export function shapePath(c: CanvasRenderingContext2D, shape: string, r: number)
       c.lineTo(-r * 1.1, r * 0.2); c.lineTo(-r * 1.3, r * 0.55); c.lineTo(-r * 1.4, 0); c.lineTo(-r * 1.3, -r * 0.55); c.lineTo(-r * 1.1, -r * 0.2); c.lineTo(-r * 0.35, -r * 0.25);
       c.lineTo(-r * 0.45, -r * 1.1); c.lineTo(-r * 0.1, -r * 1.1); c.lineTo(r * 0.3, -r * 0.25); c.closePath(); break;
     case 'car': c.roundRect(-r, -r * 0.5, r * 2, r, 3); break;
+    case 'ugv': c.roundRect(-r * 1.1, -r * 0.7, r * 2.2, r * 1.4, 2); break;
+    case 'relay': c.rect(-r, -r * 0.6, r * 2, r * 1.2); break;
     default: c.arc(0, 0, r, 0, Math.PI * 2);
   }
 }
@@ -72,6 +78,8 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
       c.beginPath(); c.arc(-r * 0.35, r * 0.4, r * 0.22, 0, Math.PI * 2); c.arc(-r * 0.35, -r * 0.4, r * 0.22, 0, Math.PI * 2); c.fill(); break;
     case 'moto': c.beginPath(); c.arc(-r * 0.7, 0, r * 0.32, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(r * 0.7, 0, r * 0.32, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(-r * 0.05, -r * 0.1, r * 0.25, 0, Math.PI * 2); c.fill(); break;
+    case 'ugv': c.lineWidth = 2; for (const y of [-r * 0.7, r * 0.7]) { c.beginPath(); c.moveTo(-r * 1.1, y); c.lineTo(r * 1.1, y); c.stroke(); } c.beginPath(); c.arc(0, 0, r * 0.28, 0, Math.PI * 2); c.fill(); c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(r * 1.4, 0); c.stroke(); break;
+    case 'relay': c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -r * 1.6); c.stroke(); c.beginPath(); c.arc(0, -r * 1.6, r * 0.45, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke(); c.beginPath(); c.arc(-r * 0.5, r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.5, r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill(); break;
     case 'truck': c.fillRect(r * 0.45, -r * 0.45, r * 0.55, r * 0.9); if (cargo === 'oil') { c.beginPath(); c.arc(-r * 0.25, 0, r * 0.38, 0, Math.PI * 2); c.stroke(); } else if (cargo === 'grain') { c.fillStyle = '#d6b04a'; c.fillRect(-r * 0.85, -r * 0.35, r * 1.1, r * 0.7); c.fillStyle = stroke; }
       c.beginPath(); c.arc(-r * 0.55, r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.35, r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(-r * 0.55, -r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.35, -r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill(); break;
@@ -80,7 +88,7 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
 
 /** shovel, flying dirt, and a trench line growing under a squad that is digging in */
 function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
-  const r = u.def.r * UNIT_SCALE, k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
+  const r = drawR(u.def), k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
   c.save(); c.translate(u.x, u.y);
   // the trench taking shape
   c.globalAlpha = 0.25 + 0.75 * k; c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round';
@@ -105,7 +113,7 @@ function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
 }
 
 function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
-  const d = u.def, alt = altOf(u), r = d.r * UNIT_SCALE * (alt === 2 ? 1.15 : 1);
+  const d = u.def, alt = altOf(u), r = drawR(d) * (alt === 2 ? 1.15 : 1);
   if (u.order.kind === 'dig') drawDigging(c, u, now);
   const team = u.team < 0 ? { color: '#efeadf', stroke: '#5d584c' } : TEAMS[u.team];
   // shadow on the ground at the true position; aircraft cast it farther away the higher they fly
@@ -117,7 +125,7 @@ function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
   const p = v ? parallaxOf(u, v) : { x: u.x, y: u.y };
   const bob = alt === 1 ? Math.sin(now / 420 + u.id) * 1.2 : alt === 2 ? Math.sin(now / 900 + u.id) * 2 : 0;
   c.save(); c.translate(p.x, p.y + bob);
-  if (u.landed) { c.scale(0.7, 0.7); c.globalAlpha = 0.6; }
+  if (u.landed || u.ambushed) { c.scale(0.7, 0.7); c.globalAlpha = 0.6; }
   if (u.grounded) { c.scale(0.7, 0.7); c.globalAlpha = 0.5; }
   c.rotate(u.angle);
   const body = u.jamT > 0 && Math.floor(u.jamT * 40) % 2 === 0 ? '#ffffff' : d.hollow ? 'rgba(90,20,24,0.5)' : team.color;
@@ -148,6 +156,76 @@ function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
   }
   // a gun caught firing by enemy radar
   if (u.revealT && u.revealT > 0 && u.def.indirect) { c.save(); c.strokeStyle = 'rgba(255,107,107,' + (0.3 + 0.5 * (u.revealT / 3)) + ')'; c.lineWidth = 1.5; c.setLineDash([3, 3]); c.beginPath(); c.arc(u.x, u.y, r + 9, 0, Math.PI * 2); c.stroke(); c.restore(); }
+  // a vehicle hull down behind a berm
+  if (u.mode === 'hullDown' && !u.def.air) { c.save(); c.translate(u.x, u.y); c.rotate(u.angle); c.strokeStyle = '#6b5a3e'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, r + 5, -0.9, 0.9); c.stroke(); c.strokeStyle = '#9a8660'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, r + 7, -0.8, 0.8); c.stroke(); c.restore(); }
+  // a piloted drone: pulsing ring
+  if (u.pilotT && u.pilotT > 0) { const pulse = 0.5 + 0.5 * Math.sin(now / 160); c.save(); c.strokeStyle = 'rgba(255,214,10,' + (0.5 + 0.4 * pulse) + ')'; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y + bob, r + 7 + pulse * 3, 0, Math.PI * 2); c.stroke(); c.restore(); }
+}
+
+/** an announced enemy column: a screen-edge arrow toward where it is going while that is off screen, a marker when it is on */
+function drawIncoming(c: CanvasRenderingContext2D, g: Game, v: View, now: number) {
+  const { cam, vw, vh, dpr } = v;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const inc of g.incoming) {
+    if (inc.team !== v.team) continue; const age = g.gameTime - inc.at; if (age > 25) continue;
+    const a = 0.9 - age / 30, pulse = 0.5 + 0.5 * Math.sin(now / 200);
+    const sx = (inc.x - cam.x) * cam.z, sy = (inc.y - cam.y) * cam.z, cx = vw / 2, cy = vh / 2;
+    const on = sx > 20 && sx < vw - 20 && sy > 20 && sy < vh - 20;
+    let ex = sx, ey = sy;
+    if (!on) { const dx = sx - cx, dy = sy - cy, kx = Math.abs(dx) > 1 ? (vw / 2 - 40) / Math.abs(dx) : 1e9, ky = Math.abs(dy) > 1 ? (vh / 2 - 60) / Math.abs(dy) : 1e9, k = Math.min(kx, ky); ex = cx + dx * k; ey = cy + dy * k; }
+    const ang = Math.atan2(sy - cy, sx - cx);
+    c.save(); c.globalAlpha = a; c.translate(ex, ey);
+    if (!on) { c.rotate(ang); c.fillStyle = '#ff6b6b'; c.beginPath(); c.moveTo(16 + pulse * 4, 0); c.lineTo(-6, -10); c.lineTo(-2, 0); c.lineTo(-6, 10); c.closePath(); c.fill(); c.rotate(-ang); }
+    else { c.strokeStyle = '#ff6b6b'; c.lineWidth = 2; c.setLineDash([6, 5]); c.beginPath(); c.arc(0, 0, 26 + pulse * 6, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+    c.font = '600 12px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
+    const label = 'ENEMY COLUMN: ' + inc.name.toUpperCase(); c.strokeText(label, 0, on ? 34 : 14); c.fillStyle = '#ff8a80'; c.fillText(label, 0, on ? 34 : 14);
+    c.restore();
+  }
+}
+
+/** a short tag under a unit that is in a posture other than its default */
+function drawModeTag(c: CanvasRenderingContext2D, u: Unit, v: View) {
+  const m = modesOf(u.type); if (!m || !u.mode || u.mode === m[0].key) return;
+  const md = m.find(x => x.key === u.mode); if (!md || !md.short) return;
+  const r = drawR(u.def), sp = parallaxOf(u, v);
+  c.save(); c.font = '600 9px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
+  const y = sp.y + r + (u.def.air ? 8 : 6) + (rankOf(u) > 0 ? rankOf(u) * 3 + 4 : 0);
+  c.strokeText(md.short, sp.x, y); c.fillStyle = md.key === 'ambush' || md.key === 'silent' || md.key === 'passive' ? '#c6e48b' : '#9fd6e8'; c.fillText(md.short, sp.x, y);
+  c.restore();
+}
+
+/** the pilot's view: line to the stick input, reticle, target ring, link leash, vignette, and a status line */
+function drawPilotHud(c: CanvasRenderingContext2D, g: Game, v: View, now: number) {
+  const u = v.pilot; if (!u || u.dead) return;
+  const { cam, vw, vh, dpr } = v, sp = parallaxOf(u, v);
+  c.save(); c.scale(cam.z, cam.z); c.translate(-cam.x, -cam.y);
+  // leash: the squad's control range
+  if (u.operator && !u.operator.dead && g.needsOperator(u.def, u.team)) { c.strokeStyle = 'rgba(159,214,232,0.45)'; c.setLineDash([6, 8]); c.lineWidth = 1.5; c.beginPath(); c.arc(u.operator.x, u.operator.y, g.linkRange(u), 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  const tgt = v.pilotTarget && !v.pilotTarget.dead ? v.pilotTarget : null;
+  const aim = tgt ? (tgt.isUnit ? parallaxOf(tgt, v) : { x: tgt.x, y: tgt.y }) : v.pilotDive ? v.pilotDive : v.mouse.inside ? toWorld(v, v.mouse.x, v.mouse.y) : null;
+  if (aim) {
+    c.strokeStyle = tgt ? 'rgba(255,107,107,0.8)' : v.pilotDive ? 'rgba(255,160,60,0.8)' : 'rgba(255,214,10,0.55)'; c.lineWidth = 1.5; c.setLineDash([4, 5]);
+    c.beginPath(); c.moveTo(sp.x, sp.y); c.lineTo(aim.x, aim.y); c.stroke(); c.setLineDash([]);
+    const rr = tgt ? (tgt.isUnit ? drawR(tgt.def) : tgt.r) + 6 : 10, spin = now / 600;
+    c.lineWidth = 2; c.beginPath(); c.arc(aim.x, aim.y, rr, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 4; i++) { const a = spin + i * Math.PI / 2; c.beginPath(); c.moveTo(aim.x + Math.cos(a) * (rr + 3), aim.y + Math.sin(a) * (rr + 3)); c.lineTo(aim.x + Math.cos(a) * (rr + 9), aim.y + Math.sin(a) * (rr + 9)); c.stroke(); }
+    if (v.pilotDive && u.def.kamikaze) { c.font = '600 10px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ffb060'; c.fillText('DIVE', aim.x, aim.y - rr - 6); }
+  }
+  c.restore();
+  // screen space: vignette and the status line
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const vg = c.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.38, vw / 2, vh / 2, Math.max(vw, vh) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.42)'); c.fillStyle = vg; c.fillRect(0, 0, vw, vh);
+  c.strokeStyle = 'rgba(255,214,10,0.5)'; c.lineWidth = 2; c.strokeRect(8, 8, vw - 16, vh - 16);
+  const batt = u.def.endurance ? Math.ceil(u.batt === undefined ? u.def.endurance : u.batt) + ' s battery' : u.def.fuelDrone ? 'gasoline' : '';
+  const link = u.operator && !u.operator.dead && g.needsOperator(u.def, u.team) ? 'link ' + Math.round(Math.hypot(u.x - u.operator.x, u.y - u.operator.y)) + ' / ' + g.linkRange(u) : 'autonomous';
+  const what = tgt ? 'ON TARGET: ' + (tgt.isUnit ? tgt.def.label[tgt.team] : tgt.def.label) : v.pilotDive ? 'DIVING ON THE POINT' : 'flying to the cursor';
+  const line1 = 'PILOT  ·  ' + u.def.label[u.team] + '  ·  ' + [batt, link].filter(Boolean).join('  ·  ') + '  ·  +' + Math.round(PILOT.evade * 100) + '% evasion' + (u.def.kamikaze ? ', +' + Math.round((PILOT.dmg - 1) * 100) + '% warhead' : '');
+  const line2 = what + '   ·   left-click: ' + (u.def.kamikaze ? 'attack or dive on the point' : 'attack') + '   ·   right-click: let go   ·   Y or Esc: hand back';
+  // the status lines sit along the bottom edge, clear of the message toast at the top
+  c.font = '600 14px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
+  c.strokeText(line1, vw / 2, vh - 32); c.fillStyle = '#ffd60a'; c.fillText(line1, vw / 2, vh - 32);
+  c.font = '500 12px "Barlow Condensed", sans-serif'; c.strokeText(line2, vw / 2, vh - 16); c.fillStyle = tgt ? '#ff8a80' : v.pilotDive ? '#ffb060' : '#e8e4d4'; c.fillText(line2, vw / 2, vh - 16);
 }
 
 function hpBar(c: CanvasRenderingContext2D, x: number, y: number, w: number, ratio: number) {
@@ -208,6 +286,10 @@ function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
       c.beginPath(); c.arc(0, 0, r * 0.55, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(0, 0, r * 0.2, 0, Math.PI * 2); c.stroke(); break;
     case 'trench': c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(-20, -4); c.lineTo(-10, 4); c.lineTo(0, -4); c.lineTo(10, 4); c.lineTo(20, -4); c.stroke();
       c.strokeStyle = '#8a7a58'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-20, -8); c.lineTo(-10, 0); c.lineTo(0, -8); c.lineTo(10, 0); c.lineTo(20, -8); c.stroke(); break;
+    case 'pylon': c.strokeStyle = team.color; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-7, 9); c.lineTo(0, -11); c.lineTo(7, 9); c.moveTo(-8, -4); c.lineTo(8, -4); c.moveTo(-5, 3); c.lineTo(5, 3); c.stroke(); c.fillStyle = team.stroke; c.beginPath(); c.arc(0, -11, 2, 0, Math.PI * 2); c.fill(); break;
+    case 'powerPlant': c.fillRect(-r, -r * 0.75, r * 2, r * 1.5); c.strokeRect(-r, -r * 0.75, r * 2, r * 1.5);
+      c.fillStyle = '#8a8a80'; for (const x of [-r * 0.55, -r * 0.15]) { c.beginPath(); c.arc(x, -r * 0.2, r * 0.2, 0, Math.PI * 2); c.fill(); c.stroke(); }
+      c.strokeStyle = '#ffd60a'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(r * 0.55, -r * 0.55); c.lineTo(r * 0.25, 0); c.lineTo(r * 0.55, 0); c.lineTo(r * 0.25, r * 0.55); c.stroke(); break;
     case 'generator': c.fillStyle = '#5a5a52'; c.fillRect(-r, -r * 0.7, r * 2, r * 1.4); c.strokeRect(-r, -r * 0.7, r * 2, r * 1.4);
       c.strokeStyle = '#ffd60a'; c.lineWidth = 2; c.beginPath(); c.moveTo(r * 0.2, -r * 0.6); c.lineTo(-r * 0.25, 0); c.lineTo(r * 0.2, 0); c.lineTo(-r * 0.2, r * 0.6); c.stroke(); break;
     case 'aidPost': c.fillStyle = '#efeadf'; c.fillRect(-r, -r * 0.8, r * 2, r * 1.6); c.strokeRect(-r, -r * 0.8, r * 2, r * 1.6);
@@ -230,7 +312,7 @@ function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
   }
   c.setLineDash([]);
   c.fillStyle = 'rgba(232,228,212,0.92)'; c.font = '11px Barlow, sans-serif'; c.textAlign = 'center';
-  if (!s.def.trench) c.fillText(s.def.label, 0, r + 14);
+  if (!s.def.trench && !s.def.pylon) c.fillText(s.def.label, 0, r + 14);
   if (s.build < 1) { c.fillStyle = '#000'; c.fillRect(-r, -r - 10, r * 2, 5); c.fillStyle = team.stroke; c.fillRect(-r, -r - 10, r * 2 * s.build, 5); }
   else if (s.hp < s.def.hp) hpBar(c, -r, -r - 10, r * 2, s.hp / s.def.hp);
   c.restore();
@@ -360,6 +442,8 @@ export class Renderer {
 
   render(ctx: CanvasRenderingContext2D, g: Game, v: View, now: number, shake = 0) {
     const { vw, vh, dpr } = v, PL = v.team, EN = 1 - PL; let cam: Cam = v.cam;
+    // a hidden or collapsed stage has no size: drawing into a zero-sized canvas throws
+    if (ctx.canvas.width <= 0 || ctx.canvas.height <= 0) return;
     if (shake > 0) { cam = { x: cam.x + (Math.random() * 2 - 1) * shake / cam.z, y: cam.y + (Math.random() * 2 - 1) * shake / cam.z, z: cam.z }; }
     for (const s of g.scorches) this.tc.scorch(s.x, s.y, s.r); g.scorches = [];
     if (this.fog.width !== ctx.canvas.width || this.fog.height !== ctx.canvas.height) { this.fog.width = ctx.canvas.width; this.fog.height = ctx.canvas.height; }
@@ -375,7 +459,11 @@ export class Renderer {
     }
     for (const rs of g.resources) drawResource(ctx, rs, this.localFx);
     for (const d of g.depots) drawDepot(ctx, d);
+    // the grids: own lines in yellow, the enemy's in red, drawn under the buildings
+    for (const T of [PL, EN]) { const ed = g.powerEdges[T]; if (!ed.length) continue; ctx.strokeStyle = T === PL ? 'rgba(255,214,10,0.32)' : 'rgba(255,107,107,0.22)'; ctx.lineWidth = 1.5; ctx.beginPath(); for (const e of ed) { ctx.moveTo(e[0], e[1]); ctx.lineTo(e[2], e[3]); } ctx.stroke(); }
     for (const s of g.structs) drawStruct(ctx, s);
+    // a building short of power says so
+    for (const s of g.structs) if (!s.dead && s.team === PL && s.build >= 1 && s.def.demand && (s.pow ?? 1) < 1) { const p = s.pow ?? 1, pulse = 0.5 + 0.5 * Math.sin(now / 250); ctx.save(); ctx.translate(s.x, s.y - s.r - 22); ctx.globalAlpha = p === 0 ? 0.6 + 0.4 * pulse : 0.9; ctx.strokeStyle = p === 0 ? '#ff6b6b' : '#e0a030'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(3, -9); ctx.lineTo(-3, 0); ctx.lineTo(2, 0); ctx.lineTo(-3, 9); ctx.stroke(); ctx.font = '600 10px "Barlow Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(12,14,10,0.9)'; const t = p === 0 ? 'NO POWER' : 'POWER ' + Math.round(p * 100) + '%'; ctx.strokeText(t, 8, 0); ctx.fillStyle = p === 0 ? '#ff8a80' : '#ffd08a'; ctx.fillText(t, 8, 0); ctx.restore(); }
     for (const s of v.selection) if (s.isStruct && s.def.produces && !s.dead) {
       ctx.strokeStyle = 'rgba(255,214,10,0.7)'; ctx.setLineDash([5, 6]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.rally.x, s.rally.y); ctx.stroke(); ctx.setLineDash([]);
@@ -395,7 +483,7 @@ export class Renderer {
     ctx.save(); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
     for (const e of v.selection) {
       if (e.dead) continue;
-      const r = (e.isUnit ? e.def.r * UNIT_SCALE : e.r) + 5;
+      const r = (e.isUnit ? drawR(e.def) : e.r) + 5;
       const sp = e.isUnit ? parallaxOf(e, v) : { x: e.x, y: e.y };
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.stroke();
@@ -420,6 +508,10 @@ export class Renderer {
         ctx.fillStyle = 'rgba(255,214,10,0.8)'; e.waypoints.forEach((w, i) => { ctx.fillRect(w.x - 3, w.y - 3, 6, 6); ctx.font = '600 9px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(i + 1), w.x, w.y - 6); });
       }
       if (e.def.operated && e.operator && !e.operator.dead) { ctx.strokeStyle = 'rgba(159,214,232,0.5)'; ctx.setLineDash([3, 6]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.operator.x, e.operator.y); ctx.stroke(); ctx.setLineDash([]); }
+      // postures with a radius: an FPV in ambush, an interceptor guarding its post
+      if (e.ambushed) { const pulse = 0.5 + 0.5 * Math.sin(now / 500); ctx.strokeStyle = 'rgba(198,228,139,' + (0.3 + 0.3 * pulse) + ')'; ctx.setLineDash([5, 7]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(e.x, e.y, PILOT.ambushReach, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (e.mode === 'guard' && e.post) { ctx.strokeStyle = 'rgba(159,214,232,0.45)'; ctx.setLineDash([5, 7]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(e.post.x, e.post.y, PILOT.guardReach, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (e.scoot) { ctx.strokeStyle = 'rgba(240,138,93,0.7)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.scoot.x, e.scoot.y); ctx.stroke(); ctx.setLineDash([]); }
       if (e.def.operator && g.needsOperator(UNITS.fpv, PL)) {
         ctx.strokeStyle = 'rgba(159,214,232,0.35)'; ctx.setLineDash([4, 8]); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 650 + (g.upgrades[PL].auto1 ? 150 : 0), 0, Math.PI * 2); ctx.stroke();
         for (const dr of (e.drones || [])) if (!dr.dead) { ctx.setLineDash([3, 6]); ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(dr.x, dr.y); ctx.stroke(); }
@@ -432,6 +524,7 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(e.order.x - 10, e.order.y); ctx.lineTo(e.order.x + 10, e.order.y); ctx.moveTo(e.order.x, e.order.y - 10); ctx.lineTo(e.order.x, e.order.y + 10); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.order.x, e.order.y); ctx.stroke(); ctx.setLineDash([]);
     }
+    if (v.amoveMode && v.mouse.inside) { const w = toWorld(v, v.mouse.x, v.mouse.y); ctx.strokeStyle = '#ff9a80'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(w.x, w.y, 14, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w.x - 20, w.y); ctx.lineTo(w.x + 20, w.y); ctx.moveTo(w.x, w.y - 20); ctx.lineTo(w.x, w.y + 20); ctx.stroke(); ctx.setLineDash([]); }
     if (v.bombardMode && v.mouse.inside) { const w = toWorld(v, v.mouse.x, v.mouse.y); ctx.strokeStyle = '#ff6b6b'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(w.x, w.y, 40, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (v.marker) {
       const m = v.marker, pulse = 0.5 + 0.5 * Math.sin(now / 300);
@@ -446,13 +539,21 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(58,134,255,0.55)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(232,228,212,0.85)'; ctx.font = '11px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('swarm ' + ms.length, cx, cy - rr - 4);
     }
-    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = '#000'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16 * k, 3); }
-    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - u.def.r * UNIT_SCALE - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
-    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
-    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
+    for (const u of g.units) if (u.team === PL && !u.dead && u.mode) drawModeTag(ctx, u, v);
+    // battery on every own drone in the air: green, amber under 40%, red under 15%
+    for (const u of g.units) if (u.team === PL && !u.dead && u.def.endurance && !u.landed && !u.grounded && !u.ambushed && u.batt !== undefined) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : k < 0.4 ? '#e0a030' : '#7fd1b9'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16 * k, 3); }
+    // spotted enemy squads that are flying drones wear a link mark: kill the pilots, ground the drones
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL] && u.def.operator && g.droneCount(u) > 0) { const r = drawR(u.def); ctx.save(); ctx.translate(u.x, u.y - r - 12); ctx.strokeStyle = '#ff8a80'; ctx.fillStyle = '#ff8a80'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, -2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -2, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, -2, 5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -2, 8, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke(); ctx.font = '600 9px "Barlow Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('x' + g.droneCount(u), 10, 0); ctx.restore(); }
+    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - drawR(u.def) - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
+    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
+    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
     for (const s of g.structs) if (s.team === PL && s.def.jam && s.build >= 1) { ctx.strokeStyle = 'rgba(196,139,224,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(s.x, s.y, s.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const st of g.structs) if (!st.dead && st.def.heal && st.build >= 1 && (st.civ ? st.nation === PL : st.team === PL)) { ctx.strokeStyle = 'rgba(139,195,74,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(st.x, st.y, st.def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const u of g.units) if (u.team === PL && u.def.jam) { ctx.strokeStyle = 'rgba(196,139,224,0.3)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(u.x, u.y, u.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    // relay carriers: the control bubble they project for the squads' drones
+    for (const u of g.units) if (u.team === PL && !u.dead && u.def.relay) { ctx.strokeStyle = v.selection.includes(u) ? 'rgba(159,214,232,0.6)' : 'rgba(159,214,232,0.28)'; ctx.setLineDash([4, 8]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(u.x, u.y, u.def.relay, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    // the kill zone: a red ring under every armed enemy drone you can see, as far as it can see
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL] && g.isKillZoneDrone(u)) { const rr = g.visionR(u); ctx.strokeStyle = 'rgba(255,90,90,0.28)'; ctx.fillStyle = 'rgba(255,90,90,0.05)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(u.x, u.y, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); }
     if (v.placing && v.mouse.inside) {
       const w = toWorld(v, v.mouse.x, v.mouse.y), def = STRUCTS[v.placing];
       const hq = g.hq(PL);
@@ -460,6 +561,7 @@ export class Renderer {
       for (const d of g.depots) if (d.owner === PL) { ctx.strokeStyle = 'rgba(255,214,10,0.35)'; ctx.setLineDash([6, 8]); ctx.beginPath(); ctx.arc(d.x, d.y, TOWN_BUILD_RADIUS, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       if (def.netR) { ctx.setLineDash([4, 6]); ctx.strokeStyle = '#e6e2cd'; ctx.beginPath(); ctx.arc(w.x, w.y, def.netR, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       if (def.heal) { ctx.setLineDash([4, 6]); ctx.strokeStyle = '#8bc34a'; ctx.beginPath(); ctx.arc(w.x, w.y, def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (def.pylon || def.power) { ctx.setLineDash([4, 6]); ctx.strokeStyle = 'rgba(255,214,10,0.6)'; ctx.beginPath(); ctx.arc(w.x, w.y, (def.pylon ? POWER.pylonR : POWER.linkR) + def.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       const err = g.placementError(PL, v.placing, w.x, w.y);
       ctx.globalAlpha = 0.55;
       ctx.fillStyle = err ? '#c1121f' : '#3a86ff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
@@ -470,6 +572,8 @@ export class Renderer {
       ctx.fillText(err || def.label, w.x, w.y + def.r + 16);
     }
     ctx.restore();
+    drawIncoming(ctx, g, v, now);
+    if (v.pilot) drawPilotHud(ctx, g, v, now);
 
     ctx.save();
     ctx.font = '600 13px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -538,6 +642,19 @@ export class Renderer {
     f.globalCompositeOperation = 'destination-out';
     for (const vs of g.vision[PL]) { f.beginPath(); f.arc(vs.x * sx, vs.y * sy, Math.max(2, vs.r * sx), 0, Math.PI * 2); f.fill(); }
     mmctx.drawImage(this.mmFog, 0, 0);
+    // enemy columns announced to you: an arrow from where they set out to where they are going
+    for (const inc of g.incoming) {
+      if (inc.team !== PL) continue; const age = g.gameTime - inc.at; if (age > 25) continue;
+      const k = Math.min(1, age / 4), x0 = inc.fx * sx, y0 = inc.fy * sy, x1 = inc.x * sx, y1 = inc.y * sy, hx = x0 + (x1 - x0) * k, hy = y0 + (y1 - y0) * k;
+      mmctx.strokeStyle = 'rgba(255,107,107,0.85)'; mmctx.fillStyle = 'rgba(255,107,107,0.85)'; mmctx.lineWidth = 2; mmctx.setLineDash([3, 3]); mmctx.beginPath(); mmctx.moveTo(x0, y0); mmctx.lineTo(hx, hy); mmctx.stroke(); mmctx.setLineDash([]);
+      const ang = Math.atan2(y1 - y0, x1 - x0); mmctx.save(); mmctx.translate(hx, hy); mmctx.rotate(ang); mmctx.beginPath(); mmctx.moveTo(6, 0); mmctx.lineTo(-4, -4); mmctx.lineTo(-4, 4); mmctx.closePath(); mmctx.fill(); mmctx.restore();
+    }
+    // pings: things that just happened to your side, fading over twelve seconds
+    for (const a of g.alerts) {
+      if (a.team !== PL) continue; const age = g.gameTime - a.at; if (age > 12) continue;
+      const k = age / 12, pulse = 0.5 + 0.5 * Math.sin(age * 9);
+      mmctx.strokeStyle = 'rgba(255,90,90,' + (0.9 - 0.7 * k) + ')'; mmctx.lineWidth = 1.5; mmctx.beginPath(); mmctx.arc(a.x * sx, a.y * sy, 4 + pulse * 3 + k * 4, 0, Math.PI * 2); mmctx.stroke();
+    }
     mmctx.strokeStyle = '#fff'; mmctx.lineWidth = 1;
     mmctx.strokeRect(v.cam.x * sx + 0.5, v.cam.y * sy + 0.5, v.vw / v.cam.z * sx, v.vh / v.cam.z * sy);
   }
@@ -546,7 +663,7 @@ export class Renderer {
 export function toWorld(v: View, mx: number, my: number) { return { x: mx / v.cam.z + v.cam.x, y: my / v.cam.z + v.cam.y }; }
 
 export function drawLegend(cv: HTMLCanvasElement) {
-  const list = ['fpv', 'fiberFpv', 'mavic', 'fwRecon', 'interceptor', 'bomber', 'liutyi', 'lancet', 'molniya', 'geran', 'geran3', 'gerbera', 'infantry', 'fireGroup', 'moto', 'merc', 'dprk', 'defector', 'truck', 'civcar', 'tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs'];
+  const list = ['fpv', 'fiberFpv', 'mavic', 'fwRecon', 'interceptor', 'bomber', 'liutyi', 'lancet', 'molniya', 'geran', 'geran3', 'geran5', 'gerbera', 'infantry', 'fireGroup', 'moto', 'merc', 'dprk', 'defector', 'truck', 'civcar', 'tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs', 'ugv', 'relay'];
   const cw = cv.clientWidth || 640, ch = cv.clientHeight || 150, d = window.devicePixelRatio || 1;
   cv.width = cw * d; cv.height = ch * d;
   const c = cv.getContext('2d')!; c.setTransform(d, 0, 0, d, 0, 0);

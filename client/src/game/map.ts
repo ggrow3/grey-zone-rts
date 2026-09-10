@@ -1,7 +1,11 @@
 // Kharkiv - Belgorod border region: projection and hand-placed geography (from the original game).
 import { q3 } from './dmath';
 
-export const W = 3600, H = 2110, H_LAND = 2110, MM_W = 260, MM_H = 152;
+/** the world is this much larger than the first version's 3600 x 2110: more ground between the towns, longer drives, farther for a drone to reach */
+export const MAP_SCALE = 1.4;
+export const W = Math.round(3600 * MAP_SCALE), H = Math.round(2110 * MAP_SCALE), H_LAND = H, MM_W = 260, MM_H = 152;
+/** pixel sizes of hand-placed geography (forest radii, town sizes, road widths) were drawn for the old scale */
+export const px = (v: number) => v * MAP_SCALE;
 export const LON0 = 35.10, LON1 = 37.90, LAT0 = 49.68, LAT1 = 50.73;
 export const PX_PER_KM = W / ((LON1 - LON0) * 71.1);
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
-import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, WAVE_COST, STRIKES, upgLabel, RU, UA } from '../../game/data';
+import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER, WAVE_COST, STRIKES, upgLabel, RU, UA } from '../../game/data';
 import { clamp } from '../../game/dmath';
 
 const props = defineProps<{ ctl: Controller; tick: number }>();
@@ -9,12 +9,14 @@ const emit = defineEmits<{ (e: 'tech'): void }>();
 const g = () => props.ctl.game;
 const fac = computed(() => { void props.tick; const f = props.ctl.selFactories(); return f.length === 1 ? f[0] : null; });
 const produces = computed(() => fac.value ? fac.value.def.produces!.filter(k => UNITS[k].side === undefined || UNITS[k].side === props.ctl.team) : []);
+const compact = computed(() => produces.value.length > 6);
+const locked = (type: string) => { void props.tick; return !!UNITS[type].fixedWing && !g().upgrades[props.ctl.team].launchRail; };
 const owned = computed(() => { void props.tick; return Object.keys(UPGRADES).filter(k => g().upgrades[props.ctl.team][k]).length; });
 const avail = computed(() => { void props.tick; return Object.entries(UPGRADES).filter(([k]) => g().upgAvailable(props.ctl.team, k)).slice(0, 4); });
 function crewText(type: string) { const d = UNITS[type]; return g().needsOperator(d, props.ctl.team) ? 'needs a squad' : d.operated ? 'autonomous' : g().crewLabel(d, props.ctl.team); }
 function buildTitle(type: string) {
   const d = STRUCTS[type];
-  return d.produces ? 'Produces: ' + d.produces.map(k => UNITS[k].label[props.ctl.team]).join(', ') : d.power ? 'Diesel generators: charging capacity for ' + POWER_PER_GENERATOR + ' more battery drones' : d.heal ? 'Heals troops within ' + d.heal + ' at ' + Math.round((d.healRate || 0) * 100) + '% a second. Put it in a wood behind the line.' : type === 'radar' ? 'Sees ' + d.vision + ' out. Buildings do not shoot; put fire groups and mobile air defense under its coverage.' : d.netR ? 'Catches most FPVs that fly into its ' + d.netR + ' radius. Place over towns and truck routes.' : 'Jams enemy drones within ' + d.jam;
+  return d.pylon ? 'Carries the grid ' + POWER.pylonR + ' farther. Chain them from a building or generator to a forward base; each breaks to two FPVs, and a broken line stalls everything past it.' : type === 'powerPlant' ? d.power + ' power for the grid it stands on: enough for a second base and forty drones. Gerans and missiles will come for it.' : d.tunnel ? 'Five nets strung along the nearest road around the point you click: a safe corridor for trucks. Click within ' + 70 + ' of a road.' : d.produces ? 'Produces: ' + d.produces.map(k => UNITS[k].label[props.ctl.team]).join(', ') + '. Draws ' + d.demand + ' power; stops without it.' : d.power ? 'Diesel generators: ' + d.power + ' power for the grid it stands on. Beside a lone forward building it needs no line at all.' : d.heal ? 'Heals troops within ' + d.heal + ' at ' + Math.round((d.healRate || 0) * 100) + '% a second. Put it in a wood behind the line.' : type === 'radar' ? 'Sees ' + d.vision + ' out. Buildings do not shoot; put fire groups and mobile air defense under its coverage.' : d.netR ? 'Catches most FPVs that fly into its ' + d.netR + ' radius. Place over towns and truck routes.' : 'Jams enemy drones within ' + d.jam;
 }
 function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSelectionChange(); }
 </script>
@@ -30,9 +32,9 @@ function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSele
             <span class="heat" :title="'Production heat ' + Math.round(fac.heat) + '%'"><i :style="{ width: Math.round(fac.heat) + '%', background: fac.overheated ? 'var(--ru)' : fac.heat > 70 ? 'var(--warn)' : 'var(--ok)' }" /></span>
             <span class="hint">{{ fac.overheated ? 'overheated' : 'heat ' + Math.round(fac.heat) + '%' }}</span>
           </template>
-          <span class="hint">{{ fac.queue.length ? fac.queue.length + ' in queue' : 'Queue empty' }}</span>
+          <span class="hint">{{ fac.queue.length ? fac.queue.length + ' in queue' : 'Queue empty' }} · Shift-click for 5</span>
         </div>
-        <button v-for="(type, i) in produces" :key="type" type="button" class="cmd" :class="fac.type" :title="UNITS[type].blurb" @click="ctl.enqueue(fac!, type)">
+        <button v-for="(type, i) in produces" :key="type" type="button" class="cmd" :class="[fac.type, { compact, locked: locked(type) }]" :title="(locked(type) ? 'Needs Launch rails (research, T). ' : '') + UNITS[type].blurb" @click="ctl.enqueue(fac!, type, $event.shiftKey ? 5 : 1)">
           <div class="name">{{ UNITS[type].label[ctl.team] }}</div>
           <div class="meta"><span>{{ UNITS[type].cost }} funds</span><span>{{ crewText(type) }}</span><span v-if="UNITS[type].kamikaze" class="tag">kamikaze</span><span>{{ UNITS[type].time }}s</span></div>
           <span class="key">{{ HOTKEYS[i] }}</span>

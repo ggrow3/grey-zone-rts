@@ -1,5 +1,5 @@
 // Player input: camera, selection, hotkeys, and turning clicks into simulation commands.
-import { UNITS, STRUCTS, HOTKEYS, UNIT_SCALE } from './data';
+import { UNITS, STRUCTS, HOTKEYS, drawR, MODE_SET_OF, MODE_SETS } from './data';
 import type { FormationType } from './data';
 import { W, H } from './map';
 import { clamp, dist } from './dmath';
@@ -17,14 +17,21 @@ export class Controller {
   cmdTab: 'build' | 'procure' | 'market' = 'build';
   /** next left click on the map picks the strike point (glide bomb) or the enemy building (missile) */
   strikeMode: 'kab' | 'iskander' | null = null;
+  /** next left click is an attack-move destination (Q) */
+  get amoveMode(): boolean { return this.view.amoveMode; }
+  set amoveMode(v: boolean) { this.view.amoveMode = v; }
+  private idleIdx = 0;
   private pan: { mx: number; my: number; cx: number; cy: number } | null = null;
+  /** stick input goes out once a turn while piloting; the zoom to restore when the sticks are handed back */
+  private steerT = 0; private zoomBefore = 1;
   onMessage: (text: string) => void = () => {};
   onSelectionChange: () => void = () => {};
-  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend' | 'audio' | 'log') => void = () => {};
+  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend' | 'audio' | 'log' | 'speed') => void = () => {};
 
   constructor(public session: Session, team: number) {
-    this.view = { team, cam: { x: 0, y: 0, z: 1 }, vw: 800, vh: 600, dpr: 1, selection: [], placing: null, mouse: { x: 0, y: 0, inside: false }, bombardMode: false, drag: null, marker: null };
+    this.view = { team, cam: { x: 0, y: 0, z: 1 }, vw: 800, vh: 600, dpr: 1, selection: [], placing: null, mouse: { x: 0, y: 0, inside: false }, bombardMode: false, drag: null, marker: null, pilot: null, pilotTarget: null, pilotDive: null, amoveMode: false };
   }
+  get pilot(): Unit | null { return this.view.pilot; }
   get game(): Game { return this.session.game; }
   get team(): number { return this.view.team; }
   get selection(): Entity[] { return this.view.selection; }
@@ -42,7 +49,7 @@ export class Controller {
   toWorld(mx: number, my: number) { const { cam } = this.view; return { x: mx / cam.z + cam.x, y: my / cam.z + cam.y }; }
   zoomAt(factor: number, mx: number, my: number) {
     const { cam } = this.view, before = this.toWorld(mx, my);
-    cam.z = clamp(cam.z * factor, 0.35, 2.5);
+    cam.z = clamp(cam.z * factor, 0.25, 2.5);
     cam.x = before.x - mx / cam.z; cam.y = before.y - my / cam.z;
     this.clampCam();
   }
@@ -50,6 +57,7 @@ export class Controller {
   goHome() { const hq = this.game.hq(this.team); if (hq) this.centerOn(hq.x, hq.y); }
   handleCamera(dt: number) {
     const { cam, vw, vh, mouse, drag } = this.view, k = this.keys;
+    if (this.view.pilot) { this.flyPilot(dt); return; }
     const sp = 560 * dt / cam.z;
     if (k.ArrowLeft || k.KeyA) cam.x -= sp; if (k.ArrowRight || k.KeyD) cam.x += sp;
     if (k.ArrowUp || k.KeyW) cam.y -= sp; if (k.ArrowDown || k.KeyS) cam.y += sp;
@@ -66,14 +74,79 @@ export class Controller {
     this.view.selection = this.view.selection.filter(e => !e.dead);
     if (this.view.selection.length !== before) this.onSelectionChange();
     for (const k in this.groups) this.groups[k] = this.groups[k].filter(u => !u.dead);
+    const v = this.view;
+    if (v.pilot && (v.pilot.dead || v.pilot.grounded || v.pilot.landed)) this.releasePilot(v.pilot.dead ? (v.pilot.def.kamikaze && v.pilot.hp > 0 ? 'Impact. Sticks handed back.' : 'Drone lost. Sticks handed back.') : 'The drone is down for charging: sticks handed back');
+    if (v.pilotTarget && v.pilotTarget.dead) { v.pilotTarget = null; if (v.pilot) this.onMessage('Target destroyed'); }
+  }
+
+  // ---- pilot mode: a human on the sticks of one drone
+  /** take the sticks of the selected drone, or hand them back */
+  togglePilot() {
+    if (this.view.pilot) return this.releasePilot('Sticks handed back');
+    const g = this.game;
+    const u = this.selUnits().find(x => x.def.air && !x.def.auto && !x.grounded && !x.landed && !x.dead && !(g.needsOperator(x.def, x.team) && (!x.operator || x.operator.dead)));
+    if (!u) return this.onMessage(this.selUnits().some(x => x.def.air) ? 'That drone cannot take a pilot right now: it is grounded, charging, or has no squad' : 'Select an airborne drone first (Y)');
+    const v = this.view; v.pilot = u; v.pilotTarget = null; v.pilotDive = null; this.selection = [u];
+    this.zoomBefore = v.cam.z; if (v.cam.z < 1.4) v.cam.z = 1.4;
+    v.placing = null; v.bombardMode = false; this.strikeMode = null; v.drag = null; this.steerT = 0.1;
+    this.onMessage('You have the sticks of the ' + u.def.label[u.team] + ': it flies to your cursor. Left-click ' + (u.def.kamikaze ? 'a target to attack, or the ground to dive on it' : 'a target to attack') + '. Y or Esc hands it back.');
+    this.onSelectionChange();
+  }
+  releasePilot(text?: string) {
+    const v = this.view; if (!v.pilot) return;
+    v.pilot = null; v.pilotTarget = null; v.pilotDive = null;
+    v.cam.z = this.zoomBefore; this.clampCam();
+    if (text) this.onMessage(text);
+    this.onSelectionChange();
+  }
+  /** camera follows the drone; the stick position goes to the simulation once a turn */
+  private flyPilot(dt: number) {
+    const v = this.view, u = v.pilot!, { cam, vw, vh } = v;
+    const tx = u.x - vw / (2 * cam.z), ty = u.y - vh / (2 * cam.z), k = Math.min(1, dt * 7);
+    cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k; this.clampCam();
+    this.steerT -= dt;
+    if (this.steerT > 0) return;
+    this.steerT = 0.1;
+    if (v.pilotTarget && !v.pilotTarget.dead) { this.submit({ kind: 'steer', id: u.id, x: v.pilotTarget.x, y: v.pilotTarget.y, targetId: v.pilotTarget.id }); return; }
+    if (v.pilotDive) { this.submit({ kind: 'steer', id: u.id, x: v.pilotDive.x, y: v.pilotDive.y, dive: true }); return; }
+    if (!v.mouse.inside) { this.submit({ kind: 'steer', id: u.id, x: u.x, y: u.y }); return; }
+    const w = this.toWorld(v.mouse.x, v.mouse.y);
+    this.submit({ kind: 'steer', id: u.id, x: clamp(w.x, 6, W - 6), y: clamp(w.y, 6, H - 6) });
+  }
+  /** the pilot clicks: an enemy becomes the target, the ground becomes a dive point for a kamikaze drone */
+  private pilotClick(x: number, y: number) {
+    const v = this.view, u = v.pilot!;
+    const t = this.findEnemyAt(x, y);
+    if (t) {
+      if (!this.game.canHitTarget(u, t)) return this.onMessage('This drone cannot hit that: ' + (t.isUnit ? t.def.label[t.team] : t.def.label));
+      if (!this.game.inLink(u, t)) return this.onMessage('Beyond the squad\'s control range: move the squad closer or pick a nearer target');
+      v.pilotTarget = t; v.pilotDive = null; this.steerT = 0; this.onMessage('Attacking the ' + (t.isUnit ? t.def.label[t.team] : t.def.label));
+    } else if (u.def.kamikaze) { v.pilotDive = { x, y }; v.pilotTarget = null; this.steerT = 0; this.onMessage('Diving on the point: right-click to pull up'); }
+  }
+
+  // ---- postures
+  /** switch these units (or the selection) to a mode; only units whose type has it are affected */
+  setMode(mode: string, units?: Unit[]) {
+    const list = (units || this.selUnits()).filter(u => { const s = MODE_SET_OF[u.type]; return s && MODE_SETS[s].some(m => m.key === mode); });
+    if (!list.length) return this.onMessage('Nothing selected can switch to that');
+    this.submit({ kind: 'mode', ids: this.ids(list), mode });
+  }
+  /** R: every kind of unit in the selection steps to its next posture */
+  cycleMode() {
+    const g = this.game, sets = new Map<string, Unit[]>();
+    for (const u of this.selUnits()) { const s = MODE_SET_OF[u.type]; if (s) (sets.get(s) || sets.set(s, []).get(s)!).push(u); }
+    if (!sets.size) return this.onMessage('Nothing selected has postures to switch (R)');
+    for (const [s, list] of sets) { const defs = MODE_SETS[s], i = defs.findIndex(m => m.key === g.modeOf(list[0])); this.submit({ kind: 'mode', ids: this.ids(list), mode: defs[(i + 1) % defs.length].key }); }
   }
 
   // ---- mouse
   mouseDown(px: number, py: number, button: number, shift: boolean) {
     const w = this.toWorld(px, py);
     if (button === 0) {
+      if (this.view.pilot) { this.pilotClick(w.x, w.y); return; }
       if (this.strikeMode) { const m = this.strikeMode; this.strikeMode = null; if (m === 'kab') this.submit({ kind: 'kab', x: w.x, y: w.y }); else { const t = this.findEnemyAt(w.x, w.y); if (t && t.isStruct) this.submit({ kind: 'iskander', targetId: t.id }); else this.onMessage('Missiles need an enemy building: click one'); } this.onSelectionChange(); return; }
       if (this.view.bombardMode) { this.view.bombardMode = false; this.bombardAt(w.x, w.y); return; }
+      if (this.amoveMode) { this.amoveMode = false; this.attackMove(w.x, w.y, shift); this.onSelectionChange(); return; }
       if (this.view.placing) { this.tryPlace(w.x, w.y, shift); return; }
       this.view.drag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
       (this.view.drag as { shift?: boolean }).shift = shift;
@@ -94,17 +167,21 @@ export class Controller {
   }
   mouseLeave() { this.view.mouse.inside = false; }
   doubleClick(px: number, py: number) {
+    if (this.view.pilot) return;
     const w = this.toWorld(px, py), { cam, vw, vh } = this.view, g = this.game, PL = this.team;
     const onScreen = (u: Unit) => (u.x - cam.x) * cam.z >= 0 && (u.x - cam.x) * cam.z <= vw && (u.y - cam.y) * cam.z >= 0 && (u.y - cam.y) * cam.z <= vh;
+    // the unit under the cursor, ground units first like a single click; every unit of that type on screen joins the selection
     let hit: Unit | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && u.def.air && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), w); if (dd <= u.def.r * UNIT_SCALE + 8 && dd < bd) { bd = dd; hit = u; } }
-    const picked = g.units.filter(u => u.team === PL && !u.dead && u.def.air && !u.def.auto && onScreen(u) && (!hit || u.type === hit.type));
+    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), w) + (u.def.air ? 3 : 0); if (dd <= drawR(u.def) + 8 && dd < bd) { bd = dd; hit = u; } }
+    const picked = g.units.filter(u => u.team === PL && !u.dead && !u.def.auto && onScreen(u) && (hit ? u.type === hit.type : u.def.air));
     if (!picked.length) return this.onMessage('No drones on screen');
     this.selection = g.expandSwarms(picked); this.view.drag = null;
     this.onMessage(picked.length + ' ' + (hit ? UNITS[hit.type].label[PL] : 'drone') + (picked.length > 1 ? 's' : '') + ' selected');
   }
   contextMenu(px: number, py: number, ctrl: boolean, shift = false) {
+    if (this.view.pilot) { const v = this.view; if (v.pilotTarget || v.pilotDive) { v.pilotTarget = null; v.pilotDive = null; this.steerT = 0; this.onMessage('Let go: flying to the cursor'); } return; }
     if (this.strikeMode) { this.strikeMode = null; this.onSelectionChange(); return; }
+    if (this.amoveMode) { this.amoveMode = false; this.onSelectionChange(); return; }
     if (this.view.placing) { this.view.placing = null; this.onSelectionChange(); return; }
     const w = this.toWorld(px, py);
     if (this.view.bombardMode) { this.view.bombardMode = false; return this.bombardAt(w.x, w.y); }
@@ -122,7 +199,7 @@ export class Controller {
     const g = this.game, PL = this.team;
     // aircraft hover over squads: prefer the ground unit under the click unless the drone itself was hit dead centre
     let best: Entity | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), { x, y }) + (u.def.air ? 3 : 0); if (dd <= u.def.r * UNIT_SCALE + 5 && dd < bd) { bd = dd; best = u; } }
+    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), { x, y }) + (u.def.air ? 3 : 0); if (dd <= drawR(u.def) + 5 && dd < bd) { bd = dd; best = u; } }
     if (!best) for (const s of g.structs) if (s.team === PL && !s.dead && dist(s, { x, y }) <= s.r) best = s;
     if (!best) { if (!shift) this.selection = []; else this.onSelectionChange(); return; }
     let sel = this.view.selection;
@@ -143,7 +220,7 @@ export class Controller {
   findEnemyAt(x: number, y: number): Entity | null {
     const g = this.game, PL = this.team, EN = 1 - PL;
     let best: Entity | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL]) { const dd = dist(parallaxOf(u, this.view), { x, y }); if (dd <= u.def.r * UNIT_SCALE + 7 && dd < bd) { bd = dd; best = u; } }
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL]) { const dd = dist(parallaxOf(u, this.view), { x, y }); if (dd <= drawR(u.def) + 7 && dd < bd) { bd = dd; best = u; } }
     if (!best) for (const s of g.structs) if (s.team === EN && !s.dead && dist(s, { x, y }) <= s.r + 4) best = s;
     return best;
   }
@@ -191,6 +268,33 @@ export class Controller {
     if (sw) this.submit({ kind: 'swarmFormation', swarmId: sw.id, formation: f });
     this.onSelectionChange();
   }
+  /** Q: the next click is an attack-move: units fight whatever they meet on the way and then carry on */
+  startAttackMove() {
+    const units = this.selUnits().filter(u => u.def.dmg > 0 || u.def.kamikaze);
+    if (!units.length) return this.onMessage('Select units that can shoot first');
+    this.amoveMode = !this.amoveMode; this.view.bombardMode = false; this.strikeMode = null;
+    if (this.amoveMode) this.onMessage('Attack-move: click where to go. They will stop for anything they meet. Right-click or Esc to cancel.');
+    this.onSelectionChange();
+  }
+  attackMove(x: number, y: number, queue = false) {
+    const units = this.selUnits(); if (!units.length) return;
+    this.submit({ kind: 'move', ids: this.ids(units), x, y, formation: this.formationType, attackMove: true, queue });
+  }
+  /** cycle through squads (or drones) that have nothing to do, centring the camera on each */
+  selectIdle(air: boolean) {
+    const g = this.game, PL = this.team;
+    const idle = g.units.filter(u => u.team === PL && !u.dead && !u.def.auto && (air ? u.def.air : u.def.troop) && u.order.kind === 'idle' && !u.target && !u.landed && !u.grounded && !u.ambushed && !u.shaken);
+    if (!idle.length) return this.onMessage(air ? 'No idle drones' : 'No idle squads');
+    const u = idle[this.idleIdx++ % idle.length];
+    this.selection = g.expandSwarms([u]); this.centerOn(u.x, u.y);
+    this.onMessage((air ? 'Idle drone ' : 'Idle squad ') + ((this.idleIdx - 1) % idle.length + 1) + ' of ' + idle.length + ': ' + u.def.label[PL]);
+  }
+  /** Backspace: jump to the latest thing that happened to your side */
+  jumpToAlert() {
+    const list = this.game.alerts.filter(a => a.team === this.team);
+    if (!list.length) return this.onMessage('Nothing to jump to');
+    const a = list[list.length - 1]; this.centerOn(a.x, a.y); this.onMessage(a.text);
+  }
   startBombard() { if (this.selUnits().some(u => u.def.indirect)) { this.view.bombardMode = true; this.onMessage('Click where the guns should fire. Right-click or Esc to cancel.'); } }
   startPlacing(type: string | null) {
     if (type && this.game.funds[this.team] < STRUCTS[type].cost) return this.onMessage('Not enough funds');
@@ -205,7 +309,8 @@ export class Controller {
     this.submit({ kind: 'place', type, x, y });
     if (!keep) { this.view.placing = null; this.onSelectionChange(); }
   }
-  enqueue(fac: Struct, type: string) { this.submit({ kind: 'enqueue', facId: fac.id, type }); }
+  /** Shift-click queues up to five */
+  enqueue(fac: Struct, type: string, n = 1) { const room = Math.max(1, 5 - fac.queue.length); for (let i = 0; i < Math.min(n, room); i++) this.submit({ kind: 'enqueue', facId: fac.id, type }); }
   cancelQueued(fac: Struct, index: number) { this.submit({ kind: 'cancel', facId: fac.id, index }); }
   buyUpgrade(key: string) { this.submit({ kind: 'upgrade', key }); }
   geranWave() { this.submit({ kind: 'wave' }); }
@@ -223,9 +328,17 @@ export class Controller {
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return false;
     const v = this.view;
-    if (e.code === 'Escape') { if (this.strikeMode) this.strikeMode = null; else if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
+    if (e.code === 'Escape') { if (v.pilot) this.releasePilot('Sticks handed back'); else if (this.amoveMode) this.amoveMode = false; else if (this.strikeMode) this.strikeMode = null; else if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
     else if (e.code === 'KeyP') this.onToggle('pause');
-    else if (e.code === 'Space') { this.goHome(); return true; }
+    else if (e.code === 'KeyQ') this.startAttackMove();
+    else if (e.code === 'Period') this.selectIdle(false);
+    else if (e.code === 'Comma') this.selectIdle(true);
+    else if (e.code === 'Backspace') { this.jumpToAlert(); return true; }
+    else if (e.code === 'BracketRight') this.onToggle('speed');
+    else if (e.code === 'Home') { this.submit({ kind: 'recall' }); return true; }
+    else if (e.code === 'KeyY') { this.togglePilot(); return true; }
+    else if (e.code === 'KeyR') this.cycleMode();
+    else if (e.code === 'Space') { if (v.pilot) return true; this.goHome(); return true; }
     else if (e.code === 'Equal' || e.code === 'NumpadAdd') this.zoomAt(1.25, v.vw / 2, v.vh / 2);
     else if (e.code === 'Minus' || e.code === 'NumpadSubtract') this.zoomAt(0.8, v.vw / 2, v.vh / 2);
     else if (e.code === 'KeyF') this.strikeNearest();

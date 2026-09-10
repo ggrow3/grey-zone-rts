@@ -1,6 +1,7 @@
 // How the two armies differ, with the numbers taken from the rules in data.ts and sim.ts.
 import { UNITS, UPGRADES, GAS_YIELD, FUEL_BASE, FUEL_PER_NODE, WAVE_COST, WAVE_COOLDOWN, BARKS } from './data';
-import { RESOURCES, PIPELINES } from './map';
+import { RESOURCES, PIPELINES, KHARKIV, BELGOROD, placePos } from './map';
+import { dist } from './dmath';
 
 export interface FactionFact { topic: string; ua: string; ru: string; source: string }
 
@@ -11,7 +12,7 @@ const depotYield = GAS_YIELD * 2.4;
 const side = (s: number) => Object.entries(UNITS).filter(([, d]) => d.side === s).map(([, d]) => d.label[s]).join(', ');
 
 export const FACTION_FACTS: FactionFact[] = [
-  { topic: 'Starting funds', ua: '1200', ru: '300', source: 'Game.funds' },
+  { topic: 'Starting funds', ua: '1200', ru: '600 (1000 in a Russia-attacks-first skirmish)', source: 'Game.funds' },
   { topic: 'Base income', ua: '12 a second scaled by support (40% to 100%), minus 0.5 per Ukrainian civilian site lost, never below 4; Aid package adds 8 once support is 60 or more', ru: 'Flat 12 a second plus gas; War economy adds 8. The computer opponent also gets the difficulty multiplier, rising with time', source: 'Game.income(), teamMul()' },
   { topic: 'Gas', ua: uaGas + ' gas well sites at ' + GAS_YIELD + '/s each on two pipelines with ' + uaPumps + ' pumping stations to guard', ru: ruGas + ' site, the Belgorod fuel depot, at ' + depotYield + '/s on ' + ruPumps + ' pump (the line from Kursk)', source: 'RESOURCES, PIPELINES' },
   { topic: 'Fuel capacity', ua: FUEL_BASE + ' + ' + FUEL_PER_NODE + ' per gas site = ' + (FUEL_BASE + FUEL_PER_NODE * uaGas) + ' vehicles while the line is whole', ru: FUEL_BASE + ' + ' + FUEL_PER_NODE + ' = ' + (FUEL_BASE + FUEL_PER_NODE * ruGas) + ' vehicles while whole, ' + FUEL_BASE + ' when cut', source: 'updateSupply()' },
@@ -22,7 +23,7 @@ export const FACTION_FACTS: FactionFact[] = [
   { topic: 'Defections', ua: 'Cut-off wounded Russian squads near your lines surrender while support is 70 or more; holding Shebekino or Zhuravlyovka brings a volunteer squad every 75 s', ru: 'Loses them', source: 'updateCivilians()' },
   { topic: 'Morale', ua: 'International Legion squads have morale and wages', ru: 'North Koreans and mercenaries have morale; Koreans lose 0.8 a second while Russia holds fewer towns', source: 'updateMorale()' },
   { topic: 'Trade convoys', ua: 'West to the NATO border, first at 0:30 then every 75 s', ru: 'East into the interior, first at 0:45 then every 75 s', source: 'tradeEdge(), tradeT' },
-  { topic: 'Nearest town', ua: 'Lyptsi, 487 px north-east of Kharkiv', ru: 'Zhuravlyovka, 448 px south of Belgorod', source: 'TOWNS' },
+  { topic: 'Nearest town', ua: 'Lyptsi, ' + Math.round(dist(KHARKIV, placePos('Lyptsi'))) + ' px north-east of Kharkiv', ru: 'Zhuravlyovka, ' + Math.round(dist(BELGOROD, placePos('Zhuravlyovka'))) + ' px south of Belgorod', source: 'TOWNS' },
   { topic: 'Starting forces', ua: '5 squads, an IFV, air defense, 2 fire groups, 9 buildings', ru: 'The same', source: 'Game.setup()' },
   { topic: 'Aviation', ua: 'F-16 glide bombs: 500 funds, 90 s reload', ru: 'KAB-500 glide bombs: 350 funds, 40 s reload, plus Iskander missiles on buildings (800, 120 s)', source: 'STRIKES, apply(kab), apply(iskander)' },
   { topic: 'Deep strike', ua: 'A Liutyi and 600 funds sent at a refinery: 60% get through, each burning refinery cuts Russian income 15% for four minutes', ru: 'Refineries burn; no equivalent on this map (the grid takes it from Gerans and missiles)', source: 'apply(deep), refineriesBurning()' },

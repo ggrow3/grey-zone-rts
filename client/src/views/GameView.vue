@@ -2,8 +2,8 @@
 import { ref, shallowRef, markRaw, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { Game } from '../game/sim';
-import { LocalSession, NetSession } from '../game/session';
-import type { Session, TurnDto } from '../game/session';
+import { LocalSession, NetSession, ReplaySession } from '../game/session';
+import type { Session, TurnDto, Recorded } from '../game/session';
 import { Controller } from '../game/controller';
 import { Renderer } from '../game/render';
 import { TerrainCanvas } from '../game/terrainCanvas';
@@ -12,7 +12,7 @@ import type { BasemapMode } from '../game/terrainCanvas';
 import { levelById } from '../game/levels';
 import type { Level } from '../game/levels';
 import { CIV_SITES, UA, TEAMS, UNITS } from '../game/data';
-import { MM_W, MM_H } from '../game/map';
+import { MM_W, MM_H, W, H } from '../game/map';
 import { hub } from '../net/hub';
 import type { MatchInfo, ChatMsg } from '../net/hub';
 import { api } from '../api';
@@ -28,14 +28,18 @@ import LegendPanel from '../components/game/LegendPanel.vue';
 import BattleLog from '../components/game/BattleLog.vue';
 import Cutscene from '../components/game/Cutscene.vue';
 
-const props = defineProps<{ mode: 'level' | 'skirmish' | 'multiplayer'; levelId?: string; side?: number; difficulty?: number; matchId?: string }>();
+const props = defineProps<{ mode: 'level' | 'skirmish' | 'multiplayer'; levelId?: string; side?: number; difficulty?: number; matchId?: string; start?: string; replay?: boolean }>();
+/** the last solo game, kept for replay: seed, options, and every command with its tick */
+interface SavedReplay { seed: number; side: number; difficulty: number; start?: string; levelId?: string; at: number; commands: Recorded[] }
+const REPLAY_KEY = 'gz.replay';
+let seedUsed = 0;
 const router = useRouter(); const auth = useAuth();
 
 const ready = ref(false), error = ref(''), hudTick = ref(0), msgText = ref(''), msgShow = ref(false);
 const showTech = ref(false), showManual = ref(false), showLegend = ref(false), showLog = ref(false), paused = ref(false);
 const audio = new AudioDirector(); const audioMode = ref(audio.mode);
 const objIdx = ref(0), chat = ref<ChatMsg[]>([]), opponent = ref(''), netStatus = ref(''), basemap = ref<BasemapMode>('drawn');
-const result = ref<{ won: boolean; title: string; text: string; stats: [string, string][] } | null>(null);
+const result = ref<{ won: boolean; title: string; text: string; stats: [string, string][]; graph: { ua: string; ru: string; max: number } } | null>(null);
 const level = shallowRef<Level | null>(null);
 const cut = ref<{ title: string; lines: string[]; index: number } | null>(null);
 let cutShots: { x: number; y: number }[] = []; let cutT = 0, cutDone = 0;
@@ -53,12 +57,15 @@ const offs: (() => void)[] = [];
 const cleanups: (() => void)[] = [];
 
 function msg(text: string) { msgText.value = text; msgShow.value = true; msgTimer = 2.6; }
-function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log') {
+const speed = ref(1);
+function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed') {
+  if (p === 'speed') { if (!session.canPause) return; speed.value = speed.value >= 3 ? 1 : speed.value + 1; session.speed = speed.value; msg('Speed ' + speed.value + 'x'); return; }
   if (p === 'tech') showTech.value = !showTech.value; else if (p === 'manual') showManual.value = !showManual.value; else if (p === 'legend') showLegend.value = !showLegend.value;
   else if (p === 'pause') togglePause(); else if (p === 'log') showLog.value = !showLog.value;
   else if (p === 'audio') { audio.cycle(); audioMode.value = audio.mode; msg('Sound: ' + (audio.mode === 'on' ? 'effects and voice' : audio.mode === 'sfx' ? 'effects only' : 'off')); }
 }
 const isNet = computed(() => props.mode === 'multiplayer');
+const piloting = computed(() => { void hudTick.value; return !!ctl.value?.view.pilot; });
 
 onMounted(async () => {
   try {
@@ -72,15 +79,29 @@ onMounted(async () => {
 });
 
 function setupSolo() {
+  if (props.replay) {
+    let saved: SavedReplay | null = null; try { saved = JSON.parse(localStorage.getItem(REPLAY_KEY) || 'null'); } catch { /* ignore */ }
+    if (!saved) throw new Error('No replay saved yet: finish a solo game first');
+    const l = saved.levelId ? levelById(saved.levelId) : null;
+    team.value = saved.side; seedUsed = saved.seed;
+    game = markRaw(new Game({ seed: saved.seed, bots: [saved.side === 1, saved.side === 0], difficulty: saved.difficulty, passive: !!l && 0 < l.passiveUntil, noGerans: !!l && 0 < l.noGeransUntil, scenario: l?.scenario, start: saved.start }));
+    session = new ReplaySession(game, saved.side, saved.commands);
+    return;
+  }
   let side = props.side ?? 0, difficulty = props.difficulty ?? 0.7, passive = false, noGerans = false;
   if (props.mode === 'level') {
     const l = levelById(props.levelId || ''); if (!l) throw new Error('Unknown level');
     level.value = l; side = l.side; difficulty = l.difficulty; passive = 0 < l.passiveUntil; noGerans = 0 < l.noGeransUntil;
   }
-  team.value = side;
-  game = markRaw(new Game({ seed: (Math.random() * 0x7fffffff) | 0, bots: [side === 1, side === 0], difficulty, passive, noGerans, scenario: level.value?.scenario }));
+  team.value = side; seedUsed = (Math.random() * 0x7fffffff) | 0;
+  game = markRaw(new Game({ seed: seedUsed, bots: [side === 1, side === 0], difficulty, passive, noGerans, scenario: level.value?.scenario, start: props.mode === 'level' ? undefined : props.start }));
   session = new LocalSession(game, side);
   api.post<{ id: string }>('/api/games', { mode: props.mode, levelId: props.levelId, side, difficulty }).then(r => { gameLogId = r.id; }).catch(e => console.warn('game log', e));
+}
+/** keep the finished solo game so it can be watched again */
+function saveReplay() {
+  if (isNet.value || props.replay || !(session instanceof LocalSession)) return;
+  try { localStorage.setItem(REPLAY_KEY, JSON.stringify({ seed: seedUsed, side: team.value, difficulty: props.mode === 'level' ? level.value?.difficulty ?? 0.7 : props.difficulty ?? 0.7, start: props.mode === 'level' ? undefined : props.start, levelId: props.mode === 'level' ? props.levelId : undefined, at: Date.now(), commands: session.record } as SavedReplay)); } catch { /* storage full or blocked */ }
 }
 
 async function setupMatch() {
@@ -116,13 +137,14 @@ function attach() {
   controller.onSelectionChange = () => { hudTick.value++; };
   controller.onToggle = onToggle;
   ctl.value = controller;
-  if (import.meta.env.DEV) (window as unknown as { gz: unknown }).gz = { game, ctl: controller, session, audio };
+  if (import.meta.env.DEV) (window as unknown as { gz: unknown }).gz = { game, ctl: controller, session, audio, LocalSession, ReplaySession };
   level.value?.objectives[0]?.onStart?.(game);
   const resize = () => { const vw = st.clientWidth, vh = st.clientHeight, dpr = window.devicePixelRatio || 1; c.width = Math.floor(vw * dpr); c.height = Math.floor(vh * dpr); controller.resize(vw, vh, dpr); };
   resize(); const ro = new ResizeObserver(resize); ro.observe(st); cleanups.push(() => ro.disconnect());
   const hq = game.hq(team.value); if (hq) controller.centerOn(hq.x, hq.y + (team.value === UA ? -60 : 60));
   camStart = { x: controller.view.cam.x, y: controller.view.cam.y };
-  if (!isNet.value) startCutscene();
+  if (!isNet.value && !props.replay) startCutscene();
+  if (props.replay) { session.speed = 2; speed.value = 2; msg('Replay of your last game at 2x: watch, pan, and zoom; orders are ignored. ] changes the speed.'); }
   const pos = (e: MouseEvent) => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, ev: K, fn: (e: HTMLElementEventMap[K]) => void, opts?: AddEventListenerOptions) => { el.addEventListener(ev, fn as EventListener, opts); cleanups.push(() => el.removeEventListener(ev, fn as EventListener, opts)); };
   on(c, 'mousedown', e => { audio.unlock(); if (result.value) return; const p = pos(e); controller.mouseDown(p.x, p.y, e.button, e.shiftKey); if (e.button === 1) e.preventDefault(); });
@@ -183,7 +205,7 @@ function frame(now: number) {
 function startCutscene() {
   const l = level.value, hq = game.hq(team.value);
   const lines = l ? l.briefing : SKIRMISH_BRIEF[team.value];
-  cutShots = l ? l.shots(game) : [hq || { x: 1800, y: 1000 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: 1800, y: 1000 }];
+  cutShots = l ? l.shots(game) : [hq || { x: W / 2, y: H / 2 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: W / 2, y: H / 2 }];
   cut.value = { title: l ? l.title : (team.value === UA ? 'Skirmish: the Kharkiv front' : 'Skirmish: the Belgorod front'), lines, index: 0 };
   session.paused = true; cutT = 0; cutDone = 0;
   if (cutShots[0]) ctl.value!.centerOn(cutShots[0].x, cutShots[0].y);
@@ -220,12 +242,19 @@ function advanceObjective() {
 function statsFor(): [string, string][] {
   const PL = team.value, EN = 1 - PL, civTotal = CIV_SITES.filter(c => c[1] === 0).length;
   const fmt = (t: number) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; };
-  return [[fmt(game.gameTime), 'Time'], [String(game.stats.lost[EN]), 'Enemy units destroyed'], [game.depots.filter(d => d.owner === PL).length + ' of ' + game.depots.length, 'Towns held'],
+  return [[String(Math.round(game.stats.score[PL])) + ' vs ' + Math.round(game.stats.score[EN]), 'Score'], [fmt(game.gameTime), 'Time'], [String(game.stats.kills[PL]), 'Enemy units destroyed'], [String(game.stats.lost[PL]), 'Your units lost'],
+    [String(game.stats.structsKilled[PL]), 'Enemy buildings destroyed'], [String(game.stats.friendlyFire[PL]), 'Lost to your own artillery'], [Math.floor(game.funds[PL]) + ' funds, ' + Math.floor(game.people[PL].total) + ' people', 'Resources at the end'], [game.depots.filter(d => d.owner === PL).length + ' of ' + game.depots.length, 'Towns held'],
     [(civTotal - game.civ.lost[0]) + ' of ' + civTotal, 'Ukrainian civilian sites standing'], [String(game.civ.harmedByUA + game.civ.carsKilled[0]), 'Russian civilian sites and vehicles hit by Ukraine'], [String(game.civ.defectors), 'Russian volunteers and defectors'],
     [PL === UA ? Math.round(game.support) + '%' : String(game.captured[PL]), PL === UA ? 'Support at the end' : 'Enemy trucks captured'], [game.resources.filter(r => r.owner === PL).length + ' of ' + game.resources.length, 'Gas and wheat sites held'], [String(game.tradeTotal[PL]), 'Funds from trade convoys'],
-    [String(game.stats.vets[PL]), 'Units that earned a rank'], [Object.entries(game.stats.killsOf[PL]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => n + ' ' + (UNITS[k] ? UNITS[k].label[EN].toLowerCase() : k)).join(', ') || 'none', 'Most destroyed'], [String(game.log.length), 'Battle log entries']];
+    [String(game.missionsDone[PL]), 'Goals met'], [String(game.stats.vets[PL]), 'Units that earned a rank'], [Object.entries(game.stats.killsOf[PL]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => n + ' ' + (UNITS[k] ? UNITS[k].label[EN].toLowerCase() : k)).join(', ') || 'none', 'Most destroyed']];
 }
-function showResult(won: boolean, title: string, text: string) { result.value = { won, title, text, stats: statsFor() }; ctl.value!.view.placing = null; ctl.value!.view.bombardMode = false; }
+function scoreGraph() {
+  const h = game.history.length ? game.history : [{ t: 0, score: [0, 0] as [number, number] }];
+  const max = Math.max(10, ...h.map(p => Math.max(p.score[0], p.score[1]))), tmax = Math.max(1, h[h.length - 1].t);
+  const line = (i: 0 | 1) => h.map(p => (p.t / tmax * 300).toFixed(1) + ',' + (80 - p.score[i] / max * 76).toFixed(1)).join(' ');
+  return { ua: line(0), ru: line(1), max };
+}
+function showResult(won: boolean, title: string, text: string) { result.value = { won, title, text, stats: statsFor(), graph: scoreGraph() }; ctl.value!.view.placing = null; ctl.value!.view.bombardMode = false; saveReplay(); }
 
 function onGameOver() {
   const won = game.winner === team.value;
@@ -243,7 +272,9 @@ function onMatchEnded(m: { winnerTeam: number; reason: string; winnerUsername?: 
 }
 function finishSolo(res: 'won' | 'lost' | 'abandoned') {
   if (isNet.value || finished) return; finished = true;
-  const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime) }).catch(() => {});
+  saveReplay();
+  if (props.replay) return;
+  const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime), score: Math.round(game.stats.score[team.value]), kills: game.stats.kills[team.value], losses: game.stats.lost[team.value] }).catch(() => {});
   if (gameLogId) send(); else setTimeout(() => { if (gameLogId) send(); }, 1500);
 }
 function togglePause() { if (!session.canPause || result.value || cut.value) return; session.paused = !session.paused; paused.value = session.paused; }
@@ -264,13 +295,13 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
   <div id="game-root">
     <div v-if="error" class="page"><div class="card"><h2>Could not start the game</h2><p class="err">{{ error }}</p><router-link to="/"><button type="button">Back</button></router-link></div></div>
     <template v-else-if="ready">
-      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
+      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :speed="speed" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
       <div id="stage" ref="stage">
-        <canvas id="game" ref="canvas" />
+        <canvas id="game" ref="canvas" :class="{ pilot: piloting }" />
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>
         <div id="paused" v-if="paused">Paused</div>
         <div id="netstatus" v-if="netStatus || (isNet && (session as any)?.waiting)">{{ netStatus || 'Waiting for the server…' }}</div>
-        <ObjectivesPanel v-if="level && objIdx < level.objectives.length && !cut" :level="level" :index="objIdx" @skip="advanceObjective" />
+        <ObjectivesPanel v-if="level && objIdx < level.objectives.length && !cut" :level="level" :index="objIdx" :game="game" :team="team" :tick="hudTick" @skip="advanceObjective" />
         <Cutscene v-if="cut" :title="cut.title" :side="team" :lines="cut.lines" :index="cut.index" @next="nextCutLine" @skip="endCutscene" />
         <LegendPanel v-if="showLegend" />
         <BattleLog v-if="showLog" :game="game" :team="team" :tick="hudTick" @close="showLog = false" />
@@ -283,6 +314,8 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
             <h1>{{ result.title }}</h1>
             <p class="result">{{ result.text }}</p>
             <div class="stats"><div v-for="[v, l] in result.stats" :key="l"><b>{{ v }}</b><span>{{ l }}</span></div></div>
+            <div class="graph"><div class="dim" style="font-size:12px">Score over time · <span class="ua">Ukraine</span> · <span class="ru">Russia</span> · top {{ result.graph.max }}</div>
+              <svg viewBox="0 0 300 80" preserveAspectRatio="none"><polyline :points="result.graph.ua" fill="none" stroke="#3a86ff" stroke-width="2" /><polyline :points="result.graph.ru" fill="none" stroke="#ff6b6b" stroke-width="2" /></svg></div>
             <div class="row">
               <button type="button" class="primary" @click="playAgain">{{ isNet ? 'Back to the lobby' : 'Play again' }}</button>
               <button type="button" v-if="!game.gameOver" @click="continuePlaying">Keep playing</button>
