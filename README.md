@@ -7,6 +7,8 @@ What makes it feel like the real front: the two armies are not mirrors (Ukrainia
 
 You can also fly a drone yourself: select one and press Y to take the sticks. The camera rides with it, it flies toward your cursor, and a click puts it on a target or dives it onto a treeline; a human on the sticks dodges more and hits harder. Many units have postures (R cycles them): FPVs hunt, hold, or land in ambush with the motors off; interceptors patrol or guard a post; Mavics fly high or drop low to see into woods; guns shoot and scoot; armor goes hull down; infantry creeps across open ground; jammers and air defense go silent to hide from radar; fire groups escort trucks.
 
+The 2026 front is in here too: a kill zone where anything in the open under an armed enemy drone bleeds, road net tunnels laid five nets at a time, assault robots that take towns with nobody aboard, relay carriers that project a squad's control range, robot logistics trucks, launch rails that let the drone works build fixed-wing aircraft, AI-guided interceptors, and the jet Geran-5 leading the late waves.
+
 - **Client**: Vue 3 + TypeScript (Vite). The whole game simulation runs in the browser as a deterministic lockstep engine.
 - **Server**: C# ASP.NET Core (.NET 10) minimal API + SignalR. Accounts (JWT), lobby, matchmaking, chat, the authoritative match turn clock, level progress, and a log of every game played. SQLite via EF Core.
 

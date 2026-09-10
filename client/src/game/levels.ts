@@ -260,7 +260,7 @@ export const LEVELS: Level[] = [
     shots: g => [BELGOROD, KHARKIV, { x: KHARKIV.x + 150, y: KHARKIV.y + 126 }, g.site('Gas wells')],
     sideNote: 'Russia: Geran waves are a 600-fund command with a 90 s reload. The bot gets them free; a human pays but chooses the moment.',
     // Ukraine's air-defense battery is away tonight: fire groups and a Sting are what stand between the wave and the grid
-    scenario: g => { g.funds[RU] = 1500; const kh = KHARKIV; g.spawn('interceptor', UA, kh.x + 60, kh.y - 220); for (const a of g.units.filter(u => u.team === UA && u.type === 'aa')) g.removeUnit(a); },
+    scenario: g => { g.funds[RU] = 1500; g.grant(RU, 'launchRail'); const kh = KHARKIV; g.spawn('interceptor', UA, kh.x + 60, kh.y - 220); for (const a of g.units.filter(u => u.team === UA && u.type === 'aa')) g.removeUnit(a); },
     objectives: [
       { title: 'High eye', text: 'Queue an Orlan-10 at the launch site (Z) and fly it over Kharkiv. It flies above machine guns; only air defense and Stings reach it.',
         done: g => g.units.some(u => u.team === RU && u.type === 'fwRecon' && !u.dead && dist(u, KHARKIV) < 600), marker: () => ({ x: KHARKIV.x, y: KHARKIV.y, r: 300 }) },
@@ -286,13 +286,13 @@ export const LEVELS: Level[] = [
     ],
     shots: g => [g.pumpSites[1], g.site('Gas wells'), g.pumpSites.find(p => p.team === 1) || BELGOROD, g.structs.find(s => s.team === 0 && s.type === 'armorPlant') || KHARKIV],
     sideNote: 'Ukraine: two gas wells on two pipelines with three pumps to guard. Russia has one pump on the line from Kursk.',
-    scenario: g => { g.funds[UA] = 1800; g.capture('Lyptsi', UA); const p = g.pumpSites[1]; g.spawn('fireGroup', UA, p.x - 40, p.y - 40); g.spawn('fireGroup', UA, p.x + 40, p.y - 40); g.spawn('aa', UA, p.x, p.y - 70); },
+    scenario: g => { g.funds[UA] = 1800; g.grant(UA, 'launchRail'); g.capture('Lyptsi', UA); const p = g.pumpSites[1]; g.spawn('fireGroup', UA, p.x - 40, p.y - 40); g.spawn('fireGroup', UA, p.x + 40, p.y - 40); g.spawn('aa', UA, p.x, p.y - 70); },
     objectives: [
       { title: 'Raid on the pump', text: 'Four enemy FPVs are diving at the pumping station south-east of your headquarters. While any pump is down, gas income and fuel stop. Shoot three down.',
         onStart: g => { const p = g.pumpSites[1]; if (p.struct) for (let i = 0; i < 4; i++) g.spawn('fpv', RU, p.x + i * 30 - 45, p.y - 700, ATTACK(p.struct)); },
         done: g => g.stats.shotDown[UA] >= 3, marker: g => ({ x: g.pumpSites[1].x, y: g.pumpSites[1].y, r: 120 }) },
       { title: 'Deep strike', text: 'Queue two Liutyi strike drones at the launch site (X): 300 funds each, 2 crew, a 350 warhead, buildings only. A pumping station has 500 hp, so it takes two.',
-        done: has(UA, 'liutyi', 2), marker: own('launchSite') },
+        done: has(UA, 'liutyi', 2), marker: own('droneWorks') },
       { title: 'Cut the Kursk line', text: 'Russia\'s only pump stands north-east of Belgorod, and Belgorod air defense sits on the straight line to it. A Liutyi with no orders dives at the nearest enemy building within 700 on its own, so keep them well clear of Belgorod: fly both far east past Vovchansk, then north to the state border, and from there right-click the pump. A direct attack order flies straight at its target. Repair crews rebuild it after two quiet minutes.',
         done: g => g.pumpSites.some(ps => ps.team === RU && (!ps.struct || ps.struct.dead || ps.struct.build < 1)), marker: g => { const p = g.pumpSites.find(ps => ps.team === RU)!; return { x: p.x, y: p.y, r: 100 }; } },
       { title: 'Hold your own line', text: 'The enemy is awake and raids pumps every 100 seconds. Keep all three of yours standing for 90 seconds: fire groups, a net, a Sting.',

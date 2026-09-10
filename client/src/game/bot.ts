@@ -132,7 +132,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   bot.resT = (bot.resT === undefined ? 200 : bot.resT) - dt;
   if (bot.resT <= 0) {
     bot.resT = 90;
-    const prio = ['auto1', 'training', 'armorDrone', 'cages', 'auto2', 'aaRange', 'repeaters', 'logistics', 'medevac', 'evasion', 'ammo', 'gunnery', 'relay', 'thermal', 'auto3', 'nightOps', 'ewPlus', 'shells', 'mobilization', 'freqHop', 'aid', 'samNet'];
+    const prio = ['launchRail', 'auto1', 'training', 'armorDrone', 'cages', 'auto2', 'aaRange', 'repeaters', 'logistics', 'medevac', 'evasion', 'ammo', 'ugvLogistics', 'gunnery', 'relay', 'thermal', 'aiIntercept', 'auto3', 'nightOps', 'ewPlus', 'shells', 'mobilization', 'freqHop', 'aid', 'samNet'];
     const pick = prio.find(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6);
     if (pick) { g.funds[T] = Math.max(0, g.funds[T] - UPGRADES[pick].cost * 0.6); g.upgrades[T][pick] = true; if (pick === 'mobilization') g.people[T].total = Math.min(240, g.people[T].total + 40); }
   }
@@ -152,6 +152,7 @@ function botSpend(g: Game, bot: Bot) {
     ['dprk', T === RU && t > 90 && g.typeCount(RU, 'dprk') < UNITS.dprk.cap! ? 1.5 : 0], ['merc', t > 150 && g.typeCount(T, 'merc') < UNITS.merc.cap! && g.funds[T] > 400 ? 1 : 0],
     ['lancet', (T === RU && t > 120 ? 1.5 : 0) * hasOp], ['molniya', (T === RU && t > 180 ? 1.5 : 0) * hasOp], ['liutyi', T === UA && t > 300 ? 0.6 : 0],
     ['jammer', t > 120 ? 1.5 : 0], ['aa', t > 90 ? 1.5 : 0.7], ['ifv', t > 150 ? 1.2 : 0], ['tank', t > 300 ? 0.7 : 0],
+    ['ugv', T === UA && t > 200 ? 1 : 0], ['relay', T === UA && t > 240 && g.typeCount(UA, 'relay') < 2 && !autonomous ? 0.6 : 0],
     ['howitzer', t > 200 ? (enemyEW ? 2 : 1.2) : 0], ['mlrs', t > 500 ? 0.6 : 0],
   ] as [string, number][]).filter(x => x[1] > 0);
   if (!table.length) return;
@@ -159,7 +160,7 @@ function botSpend(g: Game, bot: Bot) {
   for (let guard = 0; guard < 4 && bot.pending; guard++) {
     const def = UNITS[bot.pending];
     const fac = g.structs.find(s => s.team === T && !s.dead && s.build >= 1 && s.type === def.factory && s.queue.length < 4);
-    if (!fac || g.freePeople(T) < g.crewOf(def, T) || (g.needsOperator(def, T) && g.freeSlots(T) < 1) || (def.side !== undefined && def.side !== T) || (def.cap && g.typeCount(T, bot.pending) >= def.cap) || (FUEL_USERS.has(bot.pending) && g.supply[T].fuelUsed + 1 > g.supply[T].fuelCap) || (def.electric && g.supply[T].powerUsed + 1 > g.supply[T].powerCap) || (def.troop && g.supply[T].foodUsed + 1 > g.supply[T].foodCap + 2)) { bot.pending = weightedPick(g, table); continue; }
+    if (!fac || g.freePeople(T) < g.crewOf(def, T) || (g.needsOperator(def, T) && g.freeSlots(T) < 1) || (def.side !== undefined && def.side !== T) || (def.fixedWing && !g.upgrades[T].launchRail) || (def.cap && g.typeCount(T, bot.pending) >= def.cap) || (FUEL_USERS.has(bot.pending) && g.supply[T].fuelUsed + 1 > g.supply[T].fuelCap) || (def.electric && g.supply[T].powerUsed + 1 > g.supply[T].powerCap) || (def.troop && g.supply[T].foodUsed + 1 > g.supply[T].foodCap + 2)) { bot.pending = weightedPick(g, table); continue; }
     if (g.funds[T] < def.cost) break;
     g.funds[T] -= def.cost; fac.queue.push(bot.pending);
     bot.pending = weightedPick(g, table);

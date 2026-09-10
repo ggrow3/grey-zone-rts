@@ -47,6 +47,8 @@ export function shapePath(c: CanvasRenderingContext2D, shape: string, r: number)
       c.lineTo(-r * 1.1, r * 0.2); c.lineTo(-r * 1.3, r * 0.55); c.lineTo(-r * 1.4, 0); c.lineTo(-r * 1.3, -r * 0.55); c.lineTo(-r * 1.1, -r * 0.2); c.lineTo(-r * 0.35, -r * 0.25);
       c.lineTo(-r * 0.45, -r * 1.1); c.lineTo(-r * 0.1, -r * 1.1); c.lineTo(r * 0.3, -r * 0.25); c.closePath(); break;
     case 'car': c.roundRect(-r, -r * 0.5, r * 2, r, 3); break;
+    case 'ugv': c.roundRect(-r * 1.1, -r * 0.7, r * 2.2, r * 1.4, 2); break;
+    case 'relay': c.rect(-r, -r * 0.6, r * 2, r * 1.2); break;
     default: c.arc(0, 0, r, 0, Math.PI * 2);
   }
 }
@@ -74,6 +76,8 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
       c.beginPath(); c.arc(-r * 0.35, r * 0.4, r * 0.22, 0, Math.PI * 2); c.arc(-r * 0.35, -r * 0.4, r * 0.22, 0, Math.PI * 2); c.fill(); break;
     case 'moto': c.beginPath(); c.arc(-r * 0.7, 0, r * 0.32, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(r * 0.7, 0, r * 0.32, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(-r * 0.05, -r * 0.1, r * 0.25, 0, Math.PI * 2); c.fill(); break;
+    case 'ugv': c.lineWidth = 2; for (const y of [-r * 0.7, r * 0.7]) { c.beginPath(); c.moveTo(-r * 1.1, y); c.lineTo(r * 1.1, y); c.stroke(); } c.beginPath(); c.arc(0, 0, r * 0.28, 0, Math.PI * 2); c.fill(); c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(r * 1.4, 0); c.stroke(); break;
+    case 'relay': c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -r * 1.6); c.stroke(); c.beginPath(); c.arc(0, -r * 1.6, r * 0.45, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke(); c.beginPath(); c.arc(-r * 0.5, r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.5, r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill(); break;
     case 'truck': c.fillRect(r * 0.45, -r * 0.45, r * 0.55, r * 0.9); if (cargo === 'oil') { c.beginPath(); c.arc(-r * 0.25, 0, r * 0.38, 0, Math.PI * 2); c.stroke(); } else if (cargo === 'grain') { c.fillStyle = '#d6b04a'; c.fillRect(-r * 0.85, -r * 0.35, r * 1.1, r * 0.7); c.fillStyle = stroke; }
       c.beginPath(); c.arc(-r * 0.55, r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.35, r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(-r * 0.55, -r * 0.6, r * 0.2, 0, Math.PI * 2); c.arc(r * 0.35, -r * 0.6, r * 0.2, 0, Math.PI * 2); c.fill(); break;
@@ -511,6 +515,10 @@ export class Renderer {
     for (const s of g.structs) if (s.team === PL && s.def.jam && s.build >= 1) { ctx.strokeStyle = 'rgba(196,139,224,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(s.x, s.y, s.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const st of g.structs) if (!st.dead && st.def.heal && st.build >= 1 && (st.civ ? st.nation === PL : st.team === PL)) { ctx.strokeStyle = 'rgba(139,195,74,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(st.x, st.y, st.def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const u of g.units) if (u.team === PL && u.def.jam) { ctx.strokeStyle = 'rgba(196,139,224,0.3)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(u.x, u.y, u.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    // relay carriers: the control bubble they project for the squads' drones
+    for (const u of g.units) if (u.team === PL && !u.dead && u.def.relay) { ctx.strokeStyle = v.selection.includes(u) ? 'rgba(159,214,232,0.6)' : 'rgba(159,214,232,0.28)'; ctx.setLineDash([4, 8]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(u.x, u.y, u.def.relay, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    // the kill zone: a red ring under every armed enemy drone you can see, as far as it can see
+    for (const u of g.units) if (u.team === EN && !u.dead && u.seenBy[PL] && g.isKillZoneDrone(u)) { const rr = g.visionR(u); ctx.strokeStyle = 'rgba(255,90,90,0.28)'; ctx.fillStyle = 'rgba(255,90,90,0.05)'; ctx.setLineDash([6, 8]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(u.x, u.y, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); }
     if (v.placing && v.mouse.inside) {
       const w = toWorld(v, v.mouse.x, v.mouse.y), def = STRUCTS[v.placing];
       const hq = g.hq(PL);
@@ -605,7 +613,7 @@ export class Renderer {
 export function toWorld(v: View, mx: number, my: number) { return { x: mx / v.cam.z + v.cam.x, y: my / v.cam.z + v.cam.y }; }
 
 export function drawLegend(cv: HTMLCanvasElement) {
-  const list = ['fpv', 'fiberFpv', 'mavic', 'fwRecon', 'interceptor', 'bomber', 'liutyi', 'lancet', 'molniya', 'geran', 'geran3', 'gerbera', 'infantry', 'fireGroup', 'moto', 'merc', 'dprk', 'defector', 'truck', 'civcar', 'tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs'];
+  const list = ['fpv', 'fiberFpv', 'mavic', 'fwRecon', 'interceptor', 'bomber', 'liutyi', 'lancet', 'molniya', 'geran', 'geran3', 'geran5', 'gerbera', 'infantry', 'fireGroup', 'moto', 'merc', 'dprk', 'defector', 'truck', 'civcar', 'tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs', 'ugv', 'relay'];
   const cw = cv.clientWidth || 640, ch = cv.clientHeight || 150, d = window.devicePixelRatio || 1;
   cv.width = cw * d; cv.height = ch * d;
   const c = cv.getContext('2d')!; c.setTransform(d, 0, 0, d, 0, 0);
