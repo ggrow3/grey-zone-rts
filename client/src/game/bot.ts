@@ -152,7 +152,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       if (pool.length) { pool.sort((a, b) => dist(a, bot.staging) - dist(b, bot.staging)); const t = pool[0]; g.apply(T, { kind: 'kab', x: t.x, y: t.y }); }
     }
     if (T === RU && g.funds[RU] >= 1600 && g.missileT <= 0) {
-      const prio = ['power', 'droneWorks', 'artyDepot', 'launchSite', 'armorPlant'];
+      const prio = ['powerPlant', 'power', 'droneWorks', 'artyDepot', 'armorPlant'];
       const targets = g.structs.filter(s => !s.dead && (s.team === E || (s.civ && s.nation === E && s.type === 'power')) && prio.includes(s.type)).sort((a, b) => prio.indexOf(a.type) - prio.indexOf(b.type));
       if (targets.length) g.apply(RU, { kind: 'iskander', targetId: targets[0].id });
     }

@@ -198,7 +198,7 @@ export const LEVELS: Level[] = [
     scenario: g => {
       g.capture('Lyptsi', UA); const L = g.site('Lyptsi'); squads(g, UA, 'infantry', L.x, L.y - 30, 3, true);
       const h = g.spawn('howitzer', UA, L.x - 40, L.y + 120); g.tags.gun = h.id;
-      g.spawn('mavic', UA, L.x, L.y + 60); g.build('radar', UA, L.x + 120, L.y + 90); g.funds[UA] = 1200;
+      g.spawn('mavic', UA, L.x, L.y + 60); g.build('radar', UA, L.x + 120, L.y + 90); g.build('generator', UA, L.x + 170, L.y + 60); g.funds[UA] = 1200;
       for (const r of g.structs.filter(x => x.team === RU && x.type === 'radar')) g.removeStruct(r);
       const Z = g.site('Zhuravlyovka'); g.capture('Zhuravlyovka', RU); squads(g, RU, 'infantry', Z.x, Z.y + 30, 2, true);
       for (const dx of [-60, 60]) g.spawn('howitzer', RU, Z.x + dx, Z.y - 90, { kind: 'bombard', x: L.x, y: L.y, target: null });

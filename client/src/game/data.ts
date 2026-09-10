@@ -126,28 +126,34 @@ export interface StructDef {
   produces?: string[]; heatPer?: number; cool?: number; jam?: number; netR?: number; heal?: number; healRate?: number; power?: number; trench?: boolean; range?: number;
   /** placed as a chain of nets along the nearest road */
   tunnel?: boolean;
+  /** power drawn from the grid it stands on; a building with demand runs at the grid's supply-to-demand ratio */
+  demand?: number;
+  /** a pylon: conducts farther than a building and needs no headquarters or town nearby */
+  pylon?: boolean;
 }
 export const STRUCTS: Record<string, StructDef> = {
-  hq: { label: 'Headquarters', hp: 4500, r: 38, cost: 0, time: 0, vision: 260 },
-  barracks: { label: 'Barracks', hp: 1000, r: 26, cost: 500, time: 12, vision: 180, produces: ['infantry', 'fireGroup', 'moto', 'merc', 'dprk'] },
-  droneWorks: { label: 'Drone works', hp: 1100, r: 28, cost: 700, time: 14, vision: 180, produces: ['fpv', 'fiberFpv', 'mavic', 'interceptor', 'bomber', 'fwRecon', 'liutyi', 'lancet', 'molniya'] },
-  armorPlant: { label: 'Armor plant', hp: 1500, r: 32, cost: 1000, time: 18, vision: 180, produces: ['tank', 'ifv', 'aa', 'jammer', 'ugv', 'relay'] },
-  artyDepot: { label: 'Artillery depot', hp: 1100, r: 28, cost: 900, time: 16, vision: 180, produces: ['howitzer', 'mlrs'] },
-  radar: { label: 'Radar post', hp: 700, r: 18, cost: 300, time: 8, vision: 380 },
-  ewStation: { label: 'EW station', hp: 650, r: 18, cost: 450, time: 10, vision: 200, jam: 240 },
+  hq: { label: 'Headquarters', hp: 4500, r: 38, cost: 0, time: 0, vision: 260, power: 30 },
+  barracks: { label: 'Barracks', hp: 1000, r: 26, cost: 500, time: 12, vision: 180, produces: ['infantry', 'fireGroup', 'moto', 'merc', 'dprk'], demand: 5 },
+  droneWorks: { label: 'Drone works', hp: 1100, r: 28, cost: 700, time: 14, vision: 180, produces: ['fpv', 'fiberFpv', 'mavic', 'interceptor', 'bomber', 'fwRecon', 'liutyi', 'lancet', 'molniya'], demand: 10 },
+  armorPlant: { label: 'Armor plant', hp: 1500, r: 32, cost: 1000, time: 18, vision: 180, produces: ['tank', 'ifv', 'aa', 'jammer', 'ugv', 'relay'], demand: 8 },
+  artyDepot: { label: 'Artillery depot', hp: 1100, r: 28, cost: 900, time: 16, vision: 180, produces: ['howitzer', 'mlrs'], demand: 6 },
+  radar: { label: 'Radar post', hp: 700, r: 18, cost: 300, time: 8, vision: 380, demand: 4 },
+  ewStation: { label: 'EW station', hp: 650, r: 18, cost: 450, time: 10, vision: 200, jam: 240, demand: 8 },
   net: { label: 'Anti-drone net', hp: 300, r: 14, cost: 250, time: 8, vision: 80, netR: 95 },
   netLine: { label: 'Road net tunnel', hp: 300, r: 14, cost: 600, time: 8, vision: 80, netR: 95, tunnel: true },
   pump: { label: 'Pumping station', hp: 500, r: 14, cost: 400, time: 10, vision: 120 },
-  aidPost: { label: 'Field hospital', hp: 400, r: 14, cost: 350, time: 8, vision: 100, heal: 110, healRate: 0.04 },
-  generator: { label: 'Generator set', hp: 300, r: 12, cost: 300, time: 8, vision: 60, power: 15 },
+  aidPost: { label: 'Field hospital', hp: 400, r: 14, cost: 350, time: 8, vision: 100, heal: 110, healRate: 0.04, demand: 3 },
+  generator: { label: 'Generator set', hp: 300, r: 12, cost: 300, time: 8, vision: 60, power: 20 },
+  powerPlant: { label: 'Power plant', hp: 900, r: 26, cost: 900, time: 20, vision: 120, power: 90 },
+  pylon: { label: 'Pylon', hp: 120, r: 6, cost: 40, time: 3, vision: 40, pylon: true },
   trench: { label: 'Trench', hp: 300, r: 10, cost: 0, time: 0, vision: 0, trench: true },
 };
-export const BUILDABLE = ['net', 'netLine', 'generator', 'aidPost', 'radar', 'ewStation', 'barracks', 'droneWorks', 'armorPlant', 'artyDepot'];
+export const BUILDABLE = ['pylon', 'generator', 'powerPlant', 'net', 'netLine', 'aidPost', 'radar', 'ewStation', 'barracks', 'droneWorks', 'armorPlant', 'artyDepot'];
 export const CIV_TYPES: Record<string, StructDef> = {
   apartments: { label: 'Apartments', hp: 600, r: 18, cost: 0, time: 0, vision: 0 },
   hospital: { label: 'Hospital', hp: 500, r: 16, cost: 0, time: 0, vision: 0, heal: 140, healRate: 0.06 },
   school: { label: 'School', hp: 400, r: 14, cost: 0, time: 0, vision: 0 },
-  power: { label: 'Substation', hp: 450, r: 14, cost: 0, time: 0, vision: 0 },
+  power: { label: 'Substation', hp: 450, r: 14, cost: 0, time: 0, vision: 0, power: 60 },
   market: { label: 'Market', hp: 350, r: 12, cost: 0, time: 0, vision: 0 },
 };
 // [type, nation (0 Ukrainian, 1 Russian), place, dx, dy]
@@ -203,7 +209,9 @@ export const SWARM_CAP = [6, 12, 24, 48];
 export const GAS_YIELD = 5;
 export const FOOD_BASE = 4, FOOD_PER_FIELD = 6, FUEL_BASE = 3, FUEL_PER_NODE = 6;
 export const FUEL_USERS = new Set(['tank', 'ifv', 'aa', 'jammer', 'howitzer', 'mlrs', 'moto', 'liutyi', 'fwRecon']);
-export const POWER_BASE = 24, POWER_PER_SUBSTATION = 30, POWER_PER_GENERATOR = 15;
+/** the grid: sources and consumers link when their edges are within linkR (a pylon reaches pylonR); one point of spare supply charges one battery drone */
+export const POWER = { linkR: 150, pylonR: 190, hq: 30, substation: 60, plant: 90, generator: 20 };
+export const POWER_BASE = POWER.hq, POWER_PER_SUBSTATION = POWER.substation, POWER_PER_GENERATOR = POWER.generator;
 // drones are the killer of troops in the open: cover is the counter, and a trench dug under trees is the best of all
 export const COVER: Record<string, { give: number; take: number; drone: number; spot: number }> = {
   trench: { give: 1.1, take: 0.55, drone: 0.25, spot: 110 }, forest: { give: 1.5, take: 0.6, drone: 0.35, spot: 140 },
@@ -381,13 +389,13 @@ export const KILLZONE = { troop: 1.5, truck: 2.2, tick: 0.5 };
 /** nets laid along a road by one Road net tunnel order: how many and how far apart */
 export const NET_LINE = { count: 5, spacing: 150, snap: 70 };
 
-export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly. With Launch rails researched it also builds the fixed-wing aircraft: the Shark spotter and Liutyi for Ukraine, the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers, and for Ukraine assault robots and relay carriers. Vehicles need fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', netLine: 'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
+export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly. With Launch rails researched it also builds the fixed-wing aircraft: the Shark spotter and Liutyi for Ukraine, the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers, and for Ukraine assault robots and relay carriers. Vehicles need fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', netLine: 'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'A diesel source of 20 power. Put it beside a forward barracks or radar and that building runs with no line to the grid at all; at home it is insurance against losing the substation.', powerPlant: 'A 90-power thermal plant: the biggest source you can build, and the biggest target after the headquarters. Gerans and missiles come for it.', pylon: 'Forty funds of steel that carries the grid 190 farther. A line of them powers a forward base; two FPVs or one shell break one, and a broken line stalls everything past it. Pylons mend themselves when nothing hostile is near.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
 
 export const STRATEGY: [string, string][] = [
   ['The shape of the war', 'Everything on this map is either a drone, something that feeds and flies drones, or something drones are hunting. Nothing on the ground survives in the open for long, so the game is about who sees whom first, who has squads to fly, who has power to charge, and who keeps the roads and pipelines running. Wins come from grinding the enemy economy down and then walking artillery and fiber FPVs onto the headquarters, not from a single charge.'],
   ['Opening', 'Send your five squads to the nearest town at once, Lyptsi as Ukraine or Zhuravlyovka as Russia: towns pay by truck and let you build forward. Put a fire group and a Sting over your substation before the first Geran wave (about four minutes). Queue Mavics before FPVs: you can only hit what you see. Take the contested wheat field in the middle early; food is the first supply line you hit.'],
   ['Squads and drones', 'Until Drone swarm control, one squad flies one drone, so your airborne drone force is capped by your infantry count. Build more drones anyway: extras sit grounded and take off the moment a squad is free. Keep squads in woods, trenches, or towns a few hundred pixels behind the point you want to strike; drones cannot go beyond the squad\'s control range.'],
-  ['Power, fuel, food', 'Battery drones need charging capacity: base generators plus your substation plus generator sets. The enemy targets the substation first. Gasoline aircraft and vehicles draw on gas flowing through an intact pipeline. Squads eat: past the wheat line your infantry fight at 60%.'],
+  ['Power, fuel, food', 'Every building except nets and trenches draws power from the grid it stands on: the headquarters gives 30, the city substation 60, a power plant 90, a generator set 20; a barracks draws 5, the works 10, the armor plant 8, the depot 6, radar 4, an EW station 8, a hospital 3. Buildings link to neighbours within 150; pylons carry the line 190 at a time. A grid short of supply runs every building on it at the ratio, and a grid with no source runs nothing: factories stop, radar sees 30%, jammers go quiet. Whatever supply is left after the buildings charges battery drones, one point each. The enemy cuts pylons and hits the substation first; a generator set beside a forward building is the cheap island. Gasoline aircraft and vehicles draw on gas flowing through an intact pipeline. Squads eat: past the wheat line your infantry fight at 60%.'],
   ['The kill zone', 'Where an armed enemy drone can see, nothing survives in the open: troops and trucks outside cover under its eye bleed 1.5 and 2.2 health a second, on top of the strikes themselves. A red dashed ring under every enemy drone you can see marks its zone. Cover, nets, and road net tunnels are the answer, and the zone is 25 km deep on the real front now.'],
   ['Air defense', 'Drones dodge bullets, so guns need volume and research. Jammers and EW stations do not miss: radio drones inside the bubble fall unless they are fiber-optic. Nets catch FPVs over a spot. Stings hunt on their own. Layer them.'],
   ['Ground and cover', 'Drones kill troops in the open: a squad in a field takes 45% extra from every drone strike. Get them into a town (55% less from drones), a wood (65% less, and hidden beyond 140), or a trench (75% less), and dig the trench inside a wood for the best of all (85% less). Infantry in forest also hit 50% harder. Tanks only shoot vehicles and buildings, IFVs are what shoot at troops.'],

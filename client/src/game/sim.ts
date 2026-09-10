@@ -1,7 +1,7 @@
 // The Grey Zone simulation. Pure and deterministic: no DOM, no Math.random, no player-specific branches.
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
-  AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
+  AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER, upgLabel,
   BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE, KILLZONE, NET_LINE, CALLSIGNS, MISSIONS, MISSION_SCORE } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
@@ -68,6 +68,8 @@ export class Game {
   history: { t: number; score: [number, number] }[] = []; historyT = 0;
   /** towns captured per side (missions) */
   capturesN = [0, 0];
+  /** the power grids: links drawn per side, spare supply (drone charging) per side, recomputed twice a second */
+  powerEdges: [[number, number, number, number][], [number, number, number, number][]] = [[], []]; powerCapGrid = [0, 0]; powerT = 0;
   /** seconds added to the clock for the day cycle: a night start begins in the dark */
   dayOffset = 0;
   /** a Russian rush: the bot attacks with half the usual strength */
@@ -102,11 +104,11 @@ export class Game {
     this.terrain = getTerrain();
     this.isBot = opts.bots; this.difficulty = opts.difficulty;
     this.botPassive = !!opts.passive; this.noGerans = !!opts.noGerans;
-    this.setup();
+    this.setup(); this.updatePower(); this.updateSupply();
     if (opts.start === 'night') this.dayOffset = Game.NIGHT_FROM;
     else if (opts.start === 'winter') { this.weather = { kind: 'snow', until: 200, next: 'snow', warned: false }; this.winter = true; for (const u of this.units) if (!u.dead && u.def.air && u.def.electric && !u.def.large) { u.landed = true; u.rechargeT = 5; u.batt = u.def.endurance; } }
     else if (opts.start === 'rush') { this.rush = true; this.funds[RU] += 400; const b = this.bots[RU]; if (b) b.attackT = 40; }
-    if (opts.scenario) { opts.scenario(this); this.computeVision(); this.updateSupply(); }
+    if (opts.scenario) { opts.scenario(this); this.computeVision(); this.updatePower(); this.updateSupply(); }
   }
   /** winter start: snow comes back more often */
   winter = false;
@@ -329,6 +331,7 @@ export class Game {
       this.people[T].total = Math.min(200, this.people[T].total + (1 / 15 + towns / 60 + this.wheatHeld(T) * 1.5 / 60) * (this.upgrades[T].training ? 2 : 1) * (this.isBot[T] ? this.difficulty : 1) * this.supply[T].food * dt);
     }
     this.computeVision();
+    this.powerT -= dt; if (this.powerT <= 0) { this.powerT = 0.5; this.updatePower(); }
     this.updateSupply();
     this.updateDepots(dt);
     this.updateJamming(dt);
@@ -479,7 +482,7 @@ export class Game {
   computeVision() {
     this.vision = [[], []];
     for (const u of this.units) if (!u.dead && u.team >= 0) { const low = u.def.highAlt && !this.isHigh(u) && !u.landed && !u.grounded; this.vision[u.team].push({ x: u.x, y: u.y, r: this.visionR(u), deep: low || undefined, kz: this.isKillZoneDrone(u) || undefined }); }
-    for (const s of this.structs) if (!s.dead && s.build >= 1 && s.team >= 0) this.vision[s.team].push({ x: s.x, y: s.y, r: s.def.vision * this.visMul(s.team) * this.visionMul(null) * (this.isNight() && s.type === 'radar' ? 1.4 : 1) });
+    for (const s of this.structs) if (!s.dead && s.build >= 1 && s.team >= 0) this.vision[s.team].push({ x: s.x, y: s.y, r: s.def.vision * this.visMul(s.team) * this.visionMul(null) * (this.isNight() && s.type === 'radar' ? 1.4 : 1) * (s.type === 'radar' ? 0.3 + 0.7 * (s.pow ?? 1) : 1) });
     for (const u of this.units) {
       if (u.dead) continue;
       u.cover = u.def.air ? 'open' : (u.def.troop && this.trenchAt(u.x, u.y)) ? 'trench' : this.terrain.coverOf(u.x, u.y);
@@ -556,13 +559,40 @@ export class Game {
     }
     return 0;
   }
+  /** nodes of a side's grid: its finished buildings (not trenches or nets) and its nation's substations */
+  private powerNodes(T: number, building = false): Struct[] { return this.structs.filter(s => !s.dead && (building || s.build >= 1) && !s.def.trench && !s.def.netR && (s.civ ? (s.type === 'power' && s.nation === T) : s.team === T)); }
+  private powerLinked(a: Struct, b: Struct): boolean { return dist(a, b) <= (a.def.pylon || b.def.pylon ? POWER.pylonR : POWER.linkR) + a.r + b.r; }
+  /** a pylon can be placed here: something of the grid is within reach (buildings still going up count) */
+  powerReach(team: number, x: number, y: number, r: number): boolean { const p = { x, y, r, def: STRUCTS.pylon } as Struct; return this.powerNodes(team, true).some(n => this.powerLinked(n, p)); }
+  /** union the nodes within reach into grids; each grid shares its supply, and what is left over charges drones */
+  updatePower() {
+    for (const T of [UA, RU]) {
+      const nodes = this.powerNodes(T), n = nodes.length, parent = nodes.map((_, i) => i);
+      const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+      const edges: [number, number, number, number][] = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (this.powerLinked(nodes[i], nodes[j])) { const a = find(i), b = find(j); if (a !== b) parent[a] = b; edges.push([nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y]); }
+      const supply = new Map<number, number>(), demand = new Map<number, number>();
+      for (let i = 0; i < n; i++) { const r = find(i); supply.set(r, (supply.get(r) || 0) + (nodes[i].def.power || 0)); demand.set(r, (demand.get(r) || 0) + (nodes[i].def.demand || 0)); }
+      let cap = 0;
+      for (const [r, s] of supply) cap += Math.max(0, s - (demand.get(r) || 0));
+      for (let i = 0; i < n; i++) {
+        const s = nodes[i], r = find(i), sup = supply.get(r) || 0, dem = demand.get(r) || 0;
+        s.grid = r; s.pow = sup <= 0 ? 0 : dem <= sup ? 1 : sup / dem;
+        if (s.def.demand && !s.civ) {
+          if (s.pow === 0 && !s.unpoweredWarned) { s.unpoweredWarned = true; this.notify(T, s.def.label + ' has no power: run pylons from the grid or put a generator set beside it'); }
+          else if (s.pow > 0) s.unpoweredWarned = false;
+        }
+      }
+      this.powerCapGrid[T] = Math.floor(cap); this.powerEdges[T] = edges;
+    }
+  }
   updateSupply() {
     for (const T of [UA, RU]) {
       const sp = this.supply[T];
       let foodUsed = 0, fuelUsed = 0, powerUsed = 0;
       for (const u of this.units) { if (u.dead || u.team !== T) continue; if (u.def.troop) foodUsed++; if (FUEL_USERS.has(u.type)) fuelUsed++; if (u.def.electric) powerUsed++; }
       const foodCap = FOOD_BASE + FOOD_PER_FIELD * this.wheatHeld(T), fuelCap = FUEL_BASE + Math.round(FUEL_PER_NODE * this.gasIncome(T) / GAS_YIELD);
-      const powerCap = POWER_BASE + POWER_PER_SUBSTATION * this.structs.filter(st => st.civ && st.type === 'power' && st.nation === T && !st.dead).length + POWER_PER_GENERATOR * this.structs.filter(st => st.team === T && st.type === 'generator' && !st.dead && st.build >= 1).length;
+      const powerCap = this.powerCapGrid[T];
       const food = foodUsed > foodCap ? foodCap / foodUsed : 1, fuel = fuelUsed > fuelCap ? fuelCap / fuelUsed : 1, power = powerUsed > powerCap ? powerCap / powerUsed : 1;
       if (food < 1 && sp.food >= 1) this.notify(T, 'Food shortage: ' + foodUsed + ' squads, ' + foodCap + ' fed. Hungry troops fight at ' + Math.round((0.6 + 0.4 * food) * 100) + '%. Hold more wheat fields.');
       if (fuel < 1 && sp.fuel >= 1) this.notify(T, 'Fuel shortage: ' + fuelUsed + ' vehicles, fuel for ' + fuelCap + '. Vehicles slow to ' + Math.round((0.35 + 0.65 * fuel) * 100) + '%. Hold gas and keep the pipeline whole.');
@@ -744,7 +774,7 @@ export class Game {
       for (const u of this.units) {
         if (u.dead || u.team !== team || !u.def.troop || u.hp >= u.def.hp) continue;
         if (dist(u, st) > st.def.heal) continue;
-        u.hp = Math.min(u.def.hp, u.hp + u.def.hp * (st.def.healRate || 0) * (this.upgrades[team!].medevac ? 2 : 1) * this.supply[team!].food * dt);
+        u.hp = Math.min(u.def.hp, u.hp + u.def.hp * (st.def.healRate || 0) * (this.upgrades[team!].medevac ? 2 : 1) * this.supply[team!].food * (st.civ ? 1 : (st.pow ?? 1)) * dt);
         if (this.rng.next() < dt * 1.5) this.effects.push({ kind: 'heal', x: u.x + this.rand(-6, 6), y: u.y - 8, t: 0, dur: 0.8 });
       }
     }
@@ -767,7 +797,7 @@ export class Game {
   updateJamming(dt: number) {
     const src: { x: number; y: number; r: number; team: number }[] = [];
     for (const u of this.units) if (!u.dead && u.def.jam && this.modeOf(u) !== 'silent') src.push({ x: u.x, y: u.y, r: u.def.jam, team: u.team });
-    for (const s of this.structs) if (!s.dead && s.build >= 1 && s.def.jam) src.push({ x: s.x, y: s.y, r: s.def.jam, team: s.team });
+    for (const s of this.structs) if (!s.dead && s.build >= 1 && s.def.jam && (s.pow ?? 1) >= 0.5) src.push({ x: s.x, y: s.y, r: s.def.jam, team: s.team });
     if (!src.length) return;
     for (const u of this.units) {
       if (u.dead || !u.def.air || !u.def.jammable || u.landed || u.ambushed) continue;
@@ -792,7 +822,7 @@ export class Game {
     }
     if (s.queue.length) {
       const d = UNITS[s.queue[0]];
-      if (!(s.overheated && d.air)) s.progress += dt;
+      if (!(s.overheated && d.air)) s.progress += dt * (s.pow ?? 1);
       if (s.progress >= d.time) {
         s.progress = 0; this.spawnFromFactory(s, s.queue.shift()!);
         if (s.def.heatPer && d.air) { s.heat += s.def.heatPer; if (s.heat >= 100) { s.heat = 100; s.overheated = true; this.notify(s.team, s.def.label + ' overheated: production backlog until it cools'); } }
@@ -1392,7 +1422,7 @@ export class Game {
       const type = i < n ? (this.gameTime > 900 && i === 0 ? 'geran5' : this.gameTime > 600 && i < Math.max(1, Math.floor(n / 3)) ? 'geran3' : 'geran') : 'gerbera';
       const roll = this.rng.next();
       const u = roll < 0.4 ? this.makeUnit(type, RU, this.rand(W * 0.3, W - 40), 10) : roll < 0.65 ? this.makeUnit(type, RU, W - 10, this.rand(40, H_LAND * 0.5)) : this.makeUnit(type, RU, this.rand(W * 0.35, W - 60), H - 10);
-      const pool = targets.flatMap(s => s.type === 'hq' ? [s] : s.civ ? (s.type === 'power' ? [s, s, s, s, s] : [s, s]) : [s, s, s]);
+      const pool = targets.flatMap(s => s.type === 'hq' ? [s] : s.civ ? (s.type === 'power' ? [s, s, s, s, s] : [s, s]) : s.type === 'powerPlant' ? [s, s, s, s, s] : s.type === 'pylon' ? [s] : [s, s, s]);
       const t = (i < 2 && power) ? power : this.rng.pick(pool);
       u.order = ATTACK(t); u.target = t;
       this.units.push(u);
@@ -1484,7 +1514,8 @@ export class Game {
     const hq = this.hq(team);
     if (!hq) return 'No headquarters';
     const nearTown = this.depots.some(d => d.owner === team && dist(d, { x, y }) <= TOWN_BUILD_RADIUS);
-    if (dist(hq, { x, y }) > BUILD_RADIUS && !nearTown) return 'Build near headquarters or a town you hold';
+    if (def.pylon) { if (!this.powerReach(team, x, y, def.r)) return 'A pylon must stand within reach of your grid: a building, another pylon, or a generator set'; }
+    else if (dist(hq, { x, y }) > BUILD_RADIUS && !nearTown) return 'Build near headquarters or a town you hold';
     if (x < def.r + 10 || y < def.r + 10 || x > W - def.r - 10) return 'Too close to the map edge';
     for (const s of this.structs) if (!s.dead && dist(s, { x, y }) < s.r + def.r + 12) return 'Overlaps another building';
     if (!def.netR) for (const d of this.depots) if (dist(d, { x, y }) < d.r + def.r + 12) return 'Overlaps a town';

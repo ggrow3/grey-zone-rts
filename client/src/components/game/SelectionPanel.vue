@@ -72,6 +72,9 @@ function structRows(e: Struct): [string, string][] {
   if (d.produces) rows.push(['Rally', 'right-click on map']);
   if (d.jam) rows.push(['Jam radius', String(d.jam)]);
   if (d.netR) rows.push(['Net radius', String(d.netR)]);
+  if (d.power) rows.push(['Power output', d.power + (d.pylon ? '' : ' to the grid it stands on')]);
+  if (d.demand) { const p = e.pow ?? 1; rows.push(['Power', p === 0 ? 'NONE: stopped. Run pylons from the grid or add a generator set' : p < 1 ? Math.round(p * 100) + '% of its ' + d.demand + ': the grid is short' : 'on the grid, drawing ' + d.demand]); }
+  if (d.pylon) rows.push(['Reach', 'carries the grid 190 farther; two FPVs break it']);
   if (d.heal) rows.push(['Heals troops', 'within ' + d.heal + ', ' + Math.round((d.healRate || 0) * 100) + '% a second']);
   return rows;
 }

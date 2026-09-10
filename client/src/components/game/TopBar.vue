@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Game } from '../../game/sim';
-import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE, WEATHER_TEXT, MISSIONS } from '../../game/data';
+import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER, WEATHER_TEXT, MISSIONS } from '../../game/data';
 
 const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; speed: number; basemap: string; audio: string; opponent?: string }>();
 const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
@@ -26,7 +26,7 @@ const supply = computed(() => {
   return { text: 'food ' + sp.foodUsed + '/' + sp.foodCap + ', fuel ' + sp.fuelUsed + '/' + sp.fuelCap + ', power ' + sp.powerUsed + '/' + sp.powerCap,
     color: (sp.food < 1 || sp.fuel < 1 || sp.power < 1) ? 'var(--ru)' : (sp.foodUsed >= sp.foodCap - 1 || sp.fuelUsed >= sp.fuelCap - 1 || sp.powerUsed >= sp.powerCap - 2) ? 'var(--warn)' : '' };
 });
-const supplyTitle = 'Each wheat field held feeds ' + FOOD_PER_FIELD + ' squads (plus ' + FOOD_BASE + ' from stores); each gas site with a working pipeline fuels ' + FUEL_PER_NODE + ' vehicles (plus ' + FUEL_BASE + ' from reserves); each intact substation charges ' + POWER_PER_SUBSTATION + ' battery drones and each generator set ' + POWER_PER_GENERATOR + ' (plus ' + POWER_BASE + ' base)';
+const supplyTitle = 'Each wheat field held feeds ' + FOOD_PER_FIELD + ' squads (plus ' + FOOD_BASE + ' from stores); each gas site with a working pipeline fuels ' + FUEL_PER_NODE + ' vehicles (plus ' + FUEL_BASE + ' from reserves); power is what the grids have left after the buildings draw theirs (headquarters ' + POWER.hq + ', substation ' + POWER.substation + ', power plant ' + POWER.plant + ', generator set ' + POWER.generator + '), one point per battery drone';
 function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()); return r.owner === UA ? (intact || PL() !== UA ? 'ua' : 'cut') : r.owner === RU ? (intact || PL() !== RU ? 'ru' : 'cut') : ''; }
 </script>
 

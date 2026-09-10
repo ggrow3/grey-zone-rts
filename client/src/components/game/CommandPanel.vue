@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Controller } from '../../game/controller';
-import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER_PER_GENERATOR, WAVE_COST, STRIKES, upgLabel, RU, UA } from '../../game/data';
+import { UNITS, STRUCTS, BUILDABLE, UPGRADES, HOTKEYS, POWER, WAVE_COST, STRIKES, upgLabel, RU, UA } from '../../game/data';
 import { clamp } from '../../game/dmath';
 
 const props = defineProps<{ ctl: Controller; tick: number }>();
@@ -16,7 +16,7 @@ const avail = computed(() => { void props.tick; return Object.entries(UPGRADES).
 function crewText(type: string) { const d = UNITS[type]; return g().needsOperator(d, props.ctl.team) ? 'needs a squad' : d.operated ? 'autonomous' : g().crewLabel(d, props.ctl.team); }
 function buildTitle(type: string) {
   const d = STRUCTS[type];
-  return d.tunnel ? 'Five nets strung along the nearest road around the point you click: a safe corridor for trucks. Click within ' + 70 + ' of a road.' : d.produces ? 'Produces: ' + d.produces.map(k => UNITS[k].label[props.ctl.team]).join(', ') : d.power ? 'Diesel generators: charging capacity for ' + POWER_PER_GENERATOR + ' more battery drones' : d.heal ? 'Heals troops within ' + d.heal + ' at ' + Math.round((d.healRate || 0) * 100) + '% a second. Put it in a wood behind the line.' : type === 'radar' ? 'Sees ' + d.vision + ' out. Buildings do not shoot; put fire groups and mobile air defense under its coverage.' : d.netR ? 'Catches most FPVs that fly into its ' + d.netR + ' radius. Place over towns and truck routes.' : 'Jams enemy drones within ' + d.jam;
+  return d.pylon ? 'Carries the grid ' + POWER.pylonR + ' farther. Chain them from a building or generator to a forward base; each breaks to two FPVs, and a broken line stalls everything past it.' : type === 'powerPlant' ? d.power + ' power for the grid it stands on: enough for a second base and forty drones. Gerans and missiles will come for it.' : d.tunnel ? 'Five nets strung along the nearest road around the point you click: a safe corridor for trucks. Click within ' + 70 + ' of a road.' : d.produces ? 'Produces: ' + d.produces.map(k => UNITS[k].label[props.ctl.team]).join(', ') + '. Draws ' + d.demand + ' power; stops without it.' : d.power ? 'Diesel generators: ' + d.power + ' power for the grid it stands on. Beside a lone forward building it needs no line at all.' : d.heal ? 'Heals troops within ' + d.heal + ' at ' + Math.round((d.healRate || 0) * 100) + '% a second. Put it in a wood behind the line.' : type === 'radar' ? 'Sees ' + d.vision + ' out. Buildings do not shoot; put fire groups and mobile air defense under its coverage.' : d.netR ? 'Catches most FPVs that fly into its ' + d.netR + ' radius. Place over towns and truck routes.' : 'Jams enemy drones within ' + d.jam;
 }
 function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSelectionChange(); }
 </script>

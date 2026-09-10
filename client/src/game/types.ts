@@ -47,6 +47,8 @@ export interface Struct {
   id: number; isStruct: true; isUnit?: false; type: string; def: StructDef; team: number; x: number; y: number; r: number; hp: number;
   build: number; queue: string[]; progress: number; rally: Pt; cool: number; dead: boolean; seenBy: [boolean, boolean];
   heat: number; overheated: boolean; civ?: boolean; nation?: number; lastHitBy?: number;
+  /** grid supply-to-demand ratio this building runs at (0 with no source), and which grid it is on */
+  pow?: number; grid?: number; unpoweredWarned?: boolean;
 }
 
 export type Entity = Unit | Struct;

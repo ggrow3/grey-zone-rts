@@ -1,5 +1,5 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT, POWER } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
@@ -286,6 +286,10 @@ function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
       c.beginPath(); c.arc(0, 0, r * 0.55, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(0, 0, r * 0.2, 0, Math.PI * 2); c.stroke(); break;
     case 'trench': c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(-20, -4); c.lineTo(-10, 4); c.lineTo(0, -4); c.lineTo(10, 4); c.lineTo(20, -4); c.stroke();
       c.strokeStyle = '#8a7a58'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-20, -8); c.lineTo(-10, 0); c.lineTo(0, -8); c.lineTo(10, 0); c.lineTo(20, -8); c.stroke(); break;
+    case 'pylon': c.strokeStyle = team.color; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-7, 9); c.lineTo(0, -11); c.lineTo(7, 9); c.moveTo(-8, -4); c.lineTo(8, -4); c.moveTo(-5, 3); c.lineTo(5, 3); c.stroke(); c.fillStyle = team.stroke; c.beginPath(); c.arc(0, -11, 2, 0, Math.PI * 2); c.fill(); break;
+    case 'powerPlant': c.fillRect(-r, -r * 0.75, r * 2, r * 1.5); c.strokeRect(-r, -r * 0.75, r * 2, r * 1.5);
+      c.fillStyle = '#8a8a80'; for (const x of [-r * 0.55, -r * 0.15]) { c.beginPath(); c.arc(x, -r * 0.2, r * 0.2, 0, Math.PI * 2); c.fill(); c.stroke(); }
+      c.strokeStyle = '#ffd60a'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(r * 0.55, -r * 0.55); c.lineTo(r * 0.25, 0); c.lineTo(r * 0.55, 0); c.lineTo(r * 0.25, r * 0.55); c.stroke(); break;
     case 'generator': c.fillStyle = '#5a5a52'; c.fillRect(-r, -r * 0.7, r * 2, r * 1.4); c.strokeRect(-r, -r * 0.7, r * 2, r * 1.4);
       c.strokeStyle = '#ffd60a'; c.lineWidth = 2; c.beginPath(); c.moveTo(r * 0.2, -r * 0.6); c.lineTo(-r * 0.25, 0); c.lineTo(r * 0.2, 0); c.lineTo(-r * 0.2, r * 0.6); c.stroke(); break;
     case 'aidPost': c.fillStyle = '#efeadf'; c.fillRect(-r, -r * 0.8, r * 2, r * 1.6); c.strokeRect(-r, -r * 0.8, r * 2, r * 1.6);
@@ -308,7 +312,7 @@ function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
   }
   c.setLineDash([]);
   c.fillStyle = 'rgba(232,228,212,0.92)'; c.font = '11px Barlow, sans-serif'; c.textAlign = 'center';
-  if (!s.def.trench) c.fillText(s.def.label, 0, r + 14);
+  if (!s.def.trench && !s.def.pylon) c.fillText(s.def.label, 0, r + 14);
   if (s.build < 1) { c.fillStyle = '#000'; c.fillRect(-r, -r - 10, r * 2, 5); c.fillStyle = team.stroke; c.fillRect(-r, -r - 10, r * 2 * s.build, 5); }
   else if (s.hp < s.def.hp) hpBar(c, -r, -r - 10, r * 2, s.hp / s.def.hp);
   c.restore();
@@ -455,7 +459,11 @@ export class Renderer {
     }
     for (const rs of g.resources) drawResource(ctx, rs, this.localFx);
     for (const d of g.depots) drawDepot(ctx, d);
+    // the grids: own lines in yellow, the enemy's in red, drawn under the buildings
+    for (const T of [PL, EN]) { const ed = g.powerEdges[T]; if (!ed.length) continue; ctx.strokeStyle = T === PL ? 'rgba(255,214,10,0.32)' : 'rgba(255,107,107,0.22)'; ctx.lineWidth = 1.5; ctx.beginPath(); for (const e of ed) { ctx.moveTo(e[0], e[1]); ctx.lineTo(e[2], e[3]); } ctx.stroke(); }
     for (const s of g.structs) drawStruct(ctx, s);
+    // a building short of power says so
+    for (const s of g.structs) if (!s.dead && s.team === PL && s.build >= 1 && s.def.demand && (s.pow ?? 1) < 1) { const p = s.pow ?? 1, pulse = 0.5 + 0.5 * Math.sin(now / 250); ctx.save(); ctx.translate(s.x, s.y - s.r - 22); ctx.globalAlpha = p === 0 ? 0.6 + 0.4 * pulse : 0.9; ctx.strokeStyle = p === 0 ? '#ff6b6b' : '#e0a030'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(3, -9); ctx.lineTo(-3, 0); ctx.lineTo(2, 0); ctx.lineTo(-3, 9); ctx.stroke(); ctx.font = '600 10px "Barlow Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(12,14,10,0.9)'; const t = p === 0 ? 'NO POWER' : 'POWER ' + Math.round(p * 100) + '%'; ctx.strokeText(t, 8, 0); ctx.fillStyle = p === 0 ? '#ff8a80' : '#ffd08a'; ctx.fillText(t, 8, 0); ctx.restore(); }
     for (const s of v.selection) if (s.isStruct && s.def.produces && !s.dead) {
       ctx.strokeStyle = 'rgba(255,214,10,0.7)'; ctx.setLineDash([5, 6]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.rally.x, s.rally.y); ctx.stroke(); ctx.setLineDash([]);
@@ -553,6 +561,7 @@ export class Renderer {
       for (const d of g.depots) if (d.owner === PL) { ctx.strokeStyle = 'rgba(255,214,10,0.35)'; ctx.setLineDash([6, 8]); ctx.beginPath(); ctx.arc(d.x, d.y, TOWN_BUILD_RADIUS, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       if (def.netR) { ctx.setLineDash([4, 6]); ctx.strokeStyle = '#e6e2cd'; ctx.beginPath(); ctx.arc(w.x, w.y, def.netR, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       if (def.heal) { ctx.setLineDash([4, 6]); ctx.strokeStyle = '#8bc34a'; ctx.beginPath(); ctx.arc(w.x, w.y, def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      if (def.pylon || def.power) { ctx.setLineDash([4, 6]); ctx.strokeStyle = 'rgba(255,214,10,0.6)'; ctx.beginPath(); ctx.arc(w.x, w.y, (def.pylon ? POWER.pylonR : POWER.linkR) + def.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
       const err = g.placementError(PL, v.placing, w.x, w.y);
       ctx.globalAlpha = 0.55;
       ctx.fillStyle = err ? '#c1121f' : '#3a86ff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
