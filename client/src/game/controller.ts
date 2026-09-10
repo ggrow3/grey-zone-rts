@@ -165,9 +165,10 @@ export class Controller {
     if (this.view.pilot) return;
     const w = this.toWorld(px, py), { cam, vw, vh } = this.view, g = this.game, PL = this.team;
     const onScreen = (u: Unit) => (u.x - cam.x) * cam.z >= 0 && (u.x - cam.x) * cam.z <= vw && (u.y - cam.y) * cam.z >= 0 && (u.y - cam.y) * cam.z <= vh;
+    // the unit under the cursor, ground units first like a single click; every unit of that type on screen joins the selection
     let hit: Unit | null = null, bd = Infinity;
-    for (const u of g.units) if (u.team === PL && !u.dead && u.def.air && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), w); if (dd <= drawR(u.def) + 8 && dd < bd) { bd = dd; hit = u; } }
-    const picked = g.units.filter(u => u.team === PL && !u.dead && u.def.air && !u.def.auto && onScreen(u) && (!hit || u.type === hit.type));
+    for (const u of g.units) if (u.team === PL && !u.dead && !u.def.auto) { const dd = dist(parallaxOf(u, this.view), w) + (u.def.air ? 3 : 0); if (dd <= drawR(u.def) + 8 && dd < bd) { bd = dd; hit = u; } }
+    const picked = g.units.filter(u => u.team === PL && !u.dead && !u.def.auto && onScreen(u) && (hit ? u.type === hit.type : u.def.air));
     if (!picked.length) return this.onMessage('No drones on screen');
     this.selection = g.expandSwarms(picked); this.view.drag = null;
     this.onMessage(picked.length + ' ' + (hit ? UNITS[hit.type].label[PL] : 'drone') + (picked.length > 1 ? 's' : '') + ' selected');
