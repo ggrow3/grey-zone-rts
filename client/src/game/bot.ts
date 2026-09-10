@@ -81,7 +81,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
           .concat(g.depots.filter(dp => dp.owner === E).map(dp => ({ x: dp.x, y: dp.y, w: 2 })))
           // counter-battery: enemy guns caught firing by radar
           .concat(g.units.filter(e => e.team === E && !e.dead && e.def.indirect && e.seenBy[T]).map(e => ({ x: e.x, y: e.y, w: 3 })))
-          .filter(pnt => { const dd = dist(u, pnt); return dd <= rng && dd >= minR; });
+          .filter(pnt => { const dd = dist(u, pnt); return dd <= rng && dd >= minR && !g.dangerClose(T, pnt.x, pnt.y, (u.def.splash || 0) * 2.4); });
         if (known.length) { known.sort((a, b) => b.w - a.w || dist(u, a) - dist(u, b)); u.order = { kind: 'bombard', x: known[0].x, y: known[0].y, target: null }; }
       }
       recon.forEach((u, k) => { if (u.order.kind === 'idle') { const tx = fb.x + (k - 1) * 150, ty = fb.y + toward * 230; if (dist(u, { x: tx, y: ty }) > 60) u.order = MOVE(tx, ty); } });

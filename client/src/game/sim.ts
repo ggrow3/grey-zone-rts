@@ -45,7 +45,7 @@ export class Game {
     jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>],
     kabs: [0, 0], intercepted: [0, 0], refineries: 0, missiles: 0,
     /** points: kills and captures scaled by what the target cost, civilian harm taken away */
-    score: [0, 0] };
+    score: [0, 0], friendlyFire: [0, 0] };
   /** strikes from beyond the map: cooldowns, pending impacts, burning refineries (expiry times) */
   kabT = [0, 0]; missileT = 0; deepT = 0; strikes: PendingStrike[] = []; refineryHits: number[] = []; deepPending: { at: number; hit: boolean } | null = null;
   /** ids registered by a level scenario so objectives can find what it placed */
@@ -1051,15 +1051,16 @@ export class Game {
       }
       const src = p.srcId !== undefined ? this.find(p.srcId) : undefined;
       const sd = src && src.isUnit ? src.def : (p.srcType ? UNITS[p.srcType] : undefined);
-      this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, sd && sd.vsStruct ? sd.vsStruct : 1, sd && sd.vsVehicle ? sd.vsVehicle : 1, false, src && src.isUnit ? src : undefined, sd);
+      // artillery does not know whose troops are under the shell: friendly ground units in the splash take it too
+      this.damageArea(p.tx, p.ty, p.splash, p.dmg, p.team, null, sd && sd.vsStruct ? sd.vsStruct : 1, sd && sd.vsVehicle ? sd.vsVehicle : 1, false, src && src.isUnit ? src : undefined, sd, false, !!(sd && sd.indirect));
     }
   }
-  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit, srcDef?: UnitDef, heavy = false) {
+  damageArea(x: number, y: number, r: number, dmg: number, team: number, primary: Entity | null, vsStruct?: number, vsVehicle?: number, drone?: boolean, src?: Unit, srcDef?: UnitDef, heavy = false, friendly = false) {
     const vs = vsStruct || 1, vv = vsVehicle || 1;
     if (dmg >= 30) for (const rs of this.resources) if (rs.kind === 'wheat' && rs.burnT <= 0 && hyp(rs.x - x, rs.y - y) < rs.r) { rs.burnT = 60; if (rs.owner >= 0) this.notify(rs.owner, 'Wheat field burning'); }
     const sd = src ? src.def : srcDef, vi = heavy ? 1.6 : sd && sd.vsInf ? sd.vsInf : 1;
     for (const e of this.units) {
-      if (e.dead || e.team === team || e.def.air) continue;
+      if (e.dead || (e.team === team && !friendly) || e.def.air) continue;
       const dd = hyp(e.x - x, e.y - y) - e.def.r;
       if (dd <= r) this.applyDamage(e, (e === primary ? dmg : dmg * (1 - 0.6 * clamp(dd / r, 0, 1))) * (isVehicle(e) ? vv : e.def.troop ? vi : 1), team, drone, src, heavy);
     }
@@ -1105,7 +1106,8 @@ export class Game {
       this.credit(by, u);
       if (!u.def.auto) { const shouter = this.nearestTroop(byTeam, u.x, u.y, 260); if (shouter) this.bark('kill', shouter); }
       if (u.def.troop) { const friend = this.nearestTroop(u.team, u.x, u.y, 260); if (friend) this.bark('lost', friend); }
-    } else if (!u.def.auto && !silent) this.addLog(u.team, 'loss', TEAMS[u.team].name + ' lost a ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
+    } else if (byTeam === u.team && by && by.def.indirect && !u.def.auto) { this.stats.friendlyFire[u.team]++; this.addLog(u.team, 'loss', 'Friendly fire: ' + TEAMS[u.team].name + ' lost ' + (/^[aeiou]/i.test(u.def.label[u.team]) ? 'an ' : 'a ') + u.def.label[u.team].toLowerCase() + ' to its own ' + by.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y)); this.notify(u.team, 'Friendly fire! Your ' + by.def.label[u.team].toLowerCase() + ' destroyed your own ' + u.def.label[u.team].toLowerCase()); }
+    else if (!u.def.auto && !silent) this.addLog(u.team, 'loss', TEAMS[u.team].name + ' lost a ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
     if (u.def.troop) for (const o of this.units) if (!o.dead && o !== u && o.team === u.team && o.def.morale && dist(o, u) < 300) o.morale = clamp((o.morale === undefined ? 90 : o.morale) - 12, 0, 100);
     if (u.operator && u.operator.drones) u.operator.drones = u.operator.drones.filter(x => x !== u);
     if (u.drones) { for (const dr of u.drones) dr.operator = null; u.drones = []; }
@@ -1369,6 +1371,12 @@ export class Game {
     if (this.funds[team] < def.cost) return 'Not enough funds';
     return null;
   }
+  /** own ground units inside a shell's splash around a point */
+  dangerClose(team: number, x: number, y: number, r: number): number {
+    let n = 0;
+    for (const u of this.units) if (!u.dead && u.team === team && !u.def.air && !u.def.indirect && hyp(u.x - x, u.y - y) - u.def.r <= r) n++;
+    return n;
+  }
   /** a hull-down vehicle that is told to move leaves its scrape */
   private leaveHullDown(team: number, list: Unit[]) {
     let n = 0;
@@ -1437,6 +1445,7 @@ export class Game {
         for (const u of selUnits) u.waypoints = undefined;
         this.leaveHullDown(team, selUnits.filter(u => !this.canHitTarget(u, enemy) || dist(u, enemy) > this.rangeOf(u)));
         const shouter = selUnits.find(u => u.def.troop); if (shouter) this.bark('attack', shouter);
+        { const guns = selUnits.filter(u => u.def.indirect); if (guns.length) { const close = this.dangerClose(team, enemy.x, enemy.y, Math.max(...guns.map(a => a.def.splash || 0)) + 14); if (close) this.notify(team, 'DANGER CLOSE: ' + close + ' of your own unit' + (close > 1 ? 's are' : ' is') + ' next to that target. Shells splash friend and foe alike'); } }
         let warned = false;
         for (const u of selUnits) {
           if (u.landed) continue;
@@ -1450,6 +1459,8 @@ export class Game {
       case 'bombard': {
         const arty = this.ownUnits(team, cmd.ids).filter(e => e.def.indirect);
         if (!arty.length) return this.notify(team, 'Select artillery first');
+        const close = this.dangerClose(team, cmd.x, cmd.y, Math.max(...arty.map(a => a.def.splash || 0)) * (this.inVision(team, cmd.x, cmd.y) ? 1 : 2.4));
+        if (close) this.notify(team, 'DANGER CLOSE: ' + close + ' of your own unit' + (close > 1 ? 's are' : ' is') + ' inside the beaten zone. Shells do not know whose troops are under them');
         for (const u of arty) { u.order = { kind: 'bombard', x: cmd.x, y: cmd.y, target: null }; u.target = null; u.path = null; }
         this.bark('bombard', arty[0]);
         this.effects.push({ kind: 'mark', x: cmd.x, y: cmd.y, t: 0, dur: 0.8, red: true, team });
