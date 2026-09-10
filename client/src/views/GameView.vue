@@ -221,10 +221,11 @@ function advanceObjective() {
 function statsFor(): [string, string][] {
   const PL = team.value, EN = 1 - PL, civTotal = CIV_SITES.filter(c => c[1] === 0).length;
   const fmt = (t: number) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; };
-  return [[fmt(game.gameTime), 'Time'], [String(game.stats.lost[EN]), 'Enemy units destroyed'], [game.depots.filter(d => d.owner === PL).length + ' of ' + game.depots.length, 'Towns held'],
+  return [[String(Math.round(game.stats.score[PL])) + ' vs ' + Math.round(game.stats.score[EN]), 'Score'], [fmt(game.gameTime), 'Time'], [String(game.stats.kills[PL]), 'Enemy units destroyed'], [String(game.stats.lost[PL]), 'Your units lost'],
+    [String(game.stats.structsKilled[PL]), 'Enemy buildings destroyed'], [Math.floor(game.funds[PL]) + ' funds, ' + Math.floor(game.people[PL].total) + ' people', 'Resources at the end'], [game.depots.filter(d => d.owner === PL).length + ' of ' + game.depots.length, 'Towns held'],
     [(civTotal - game.civ.lost[0]) + ' of ' + civTotal, 'Ukrainian civilian sites standing'], [String(game.civ.harmedByUA + game.civ.carsKilled[0]), 'Russian civilian sites and vehicles hit by Ukraine'], [String(game.civ.defectors), 'Russian volunteers and defectors'],
     [PL === UA ? Math.round(game.support) + '%' : String(game.captured[PL]), PL === UA ? 'Support at the end' : 'Enemy trucks captured'], [game.resources.filter(r => r.owner === PL).length + ' of ' + game.resources.length, 'Gas and wheat sites held'], [String(game.tradeTotal[PL]), 'Funds from trade convoys'],
-    [String(game.stats.vets[PL]), 'Units that earned a rank'], [Object.entries(game.stats.killsOf[PL]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => n + ' ' + (UNITS[k] ? UNITS[k].label[EN].toLowerCase() : k)).join(', ') || 'none', 'Most destroyed'], [String(game.log.length), 'Battle log entries']];
+    [String(game.stats.vets[PL]), 'Units that earned a rank'], [Object.entries(game.stats.killsOf[PL]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => n + ' ' + (UNITS[k] ? UNITS[k].label[EN].toLowerCase() : k)).join(', ') || 'none', 'Most destroyed']];
 }
 function showResult(won: boolean, title: string, text: string) { result.value = { won, title, text, stats: statsFor() }; ctl.value!.view.placing = null; ctl.value!.view.bombardMode = false; }
 
@@ -244,7 +245,7 @@ function onMatchEnded(m: { winnerTeam: number; reason: string; winnerUsername?: 
 }
 function finishSolo(res: 'won' | 'lost' | 'abandoned') {
   if (isNet.value || finished) return; finished = true;
-  const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime) }).catch(() => {});
+  const send = () => api.post(`/api/games/${gameLogId}/finish`, { result: res, durationSeconds: Math.round(game.gameTime), score: Math.round(game.stats.score[team.value]), kills: game.stats.kills[team.value], losses: game.stats.lost[team.value] }).catch(() => {});
   if (gameLogId) send(); else setTimeout(() => { if (gameLogId) send(); }, 1500);
 }
 function togglePause() { if (!session.canPause || result.value || cut.value) return; session.paused = !session.paused; paused.value = session.paused; }
@@ -271,7 +272,7 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>
         <div id="paused" v-if="paused">Paused</div>
         <div id="netstatus" v-if="netStatus || (isNet && (session as any)?.waiting)">{{ netStatus || 'Waiting for the server…' }}</div>
-        <ObjectivesPanel v-if="level && objIdx < level.objectives.length && !cut" :level="level" :index="objIdx" @skip="advanceObjective" />
+        <ObjectivesPanel v-if="level && objIdx < level.objectives.length && !cut" :level="level" :index="objIdx" :game="game" :team="team" :tick="hudTick" @skip="advanceObjective" />
         <Cutscene v-if="cut" :title="cut.title" :side="team" :lines="cut.lines" :index="cut.index" @next="nextCutLine" @skip="endCutscene" />
         <LegendPanel v-if="showLegend" />
         <BattleLog v-if="showLog" :game="game" :team="team" :tick="hudTick" @close="showLog = false" />

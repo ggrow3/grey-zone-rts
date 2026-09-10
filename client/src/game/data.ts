@@ -21,6 +21,8 @@ export interface UnitDef {
   ammo?: number;
   /** damage multipliers by target class: troops, small drones (quads), large aircraft (fixed wing, bombers, Gerans) */
   vsInf?: number; vsAirSmall?: number; vsAirLarge?: number;
+  /** drawn this much larger again than UNIT_SCALE (visual only): the big vehicles read as big */
+  sizeMul?: number;
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -68,22 +70,22 @@ export const UNITS: Record<string, UnitDef> = {
   molniya: { label: ['Molniya fixed-wing FPV', 'Molniya fixed-wing FPV'], shape: 'plane', r: 7, hp: 55, evade: 0.3, speed: 150, kamikaze: true, dmg: 190, splash: 34,
     cost: 60, crew: 0, operated: true, endurance: 200, recharge: 60, electric: true, link: 1400, time: 0.4, factory: 'launchSite', vision: 160, air: true, jammable: true, targets: ['inf', 'veh', 'struct'], acquire: 500, side: 1,
     blurb: 'Plywood-and-foam fixed-wing drone with a few kilos of explosive and 40 km of reach. Cheap, jammable, not caught by nets.' },
-  tank: { label: ['Main battle tank', 'Main battle tank'], shape: 'rect', r: 13, hp: 420, speed: 52, roadMul: 1.25, range: 160, dmg: 60, splash: 44, rof: 2.4,
+  tank: { label: ['Main battle tank', 'Main battle tank'], shape: 'rect', r: 13, sizeMul: 1.45, hp: 420, speed: 52, roadMul: 1.25, range: 160, dmg: 60, splash: 44, rof: 2.4,
     cost: 900, crew: 3, time: 30, factory: 'armorPlant', vision: 190, targets: ['veh', 'struct'], vsVehicle: 1.4, vsStruct: 1.2, vsInf: 0.6,
     blurb: 'Main gun aims at vehicles and buildings only, but every round splashes, so troops near the target get hit. Cannot engage drones. Seven FPVs kill it. Buy cages first.' },
-  ifv: { label: ['IFV', 'IFV'], shape: 'rrect', r: 11, hp: 230, speed: 78, roadMul: 1.5, range: 140, dmg: 12, rof: 0.45,
+  ifv: { label: ['IFV', 'IFV'], shape: 'rrect', r: 11, sizeMul: 1.15, hp: 230, speed: 78, roadMul: 1.5, range: 140, dmg: 12, rof: 0.45,
     cost: 550, crew: 3, time: 22, factory: 'armorPlant', vision: 200, targets: ['inf', 'veh', 'air', 'struct'], vsStruct: 0.4, vsVehicle: 0.5, vsInf: 1.5, vsAirSmall: 1.0, vsAirLarge: 0.7,
     blurb: 'Fast autocannon carrier. The vehicle that shoots at troops, and it can reach low-flying drones.' },
-  aa: { label: ['Mobile air defense', 'Mobile air defense'], shape: 'cross', r: 11, hp: 190, speed: 58, roadMul: 1.5, range: 240, dmg: 28, rof: 0.6,
+  aa: { label: ['Mobile air defense', 'Mobile air defense'], shape: 'cross', r: 11, sizeMul: 1.15, hp: 190, speed: 58, roadMul: 1.5, range: 240, dmg: 28, rof: 0.6,
     cost: 450, crew: 2, time: 18, factory: 'armorPlant', vision: 260, targets: ['air'], vsAirLarge: 1.6, vsAirSmall: 0.9,
     blurb: 'Shoots down drones at range. Useless against ground targets.' },
   jammer: { label: ['EW jammer', 'EW jammer'], shape: 'ring', r: 10, hp: 130, speed: 48, roadMul: 1.5, dmg: 0, jam: 190,
     cost: 400, crew: 2, time: 18, factory: 'armorPlant', vision: 180,
     blurb: 'Disrupts radio-controlled drones inside its radius until they fall. Cannot stop fiber-optic FPVs.' },
-  howitzer: { label: ['Howitzer', 'Howitzer'], shape: 'pent', r: 11, hp: 160, speed: 34, roadMul: 1.4, range: 430, minRange: 110, dmg: 95, splash: 42, rof: 5.5,
+  howitzer: { label: ['Howitzer', 'Howitzer'], shape: 'pent', r: 11, sizeMul: 1.4, hp: 160, speed: 34, roadMul: 1.4, range: 430, minRange: 110, dmg: 95, splash: 42, rof: 5.5,
     cost: 700, crew: 4, time: 28, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 260, ammo: 12, vsStruct: 1.3, vsInf: 1.2,
     blurb: 'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it. Park it in a wood: in the open a gun is seen from far off, every shot shows it to radar for six seconds, and drones hit it 45% harder.' },
-  mlrs: { label: ['Rocket artillery', 'Rocket artillery'], shape: 'wedge', r: 12, hp: 170, speed: 50, roadMul: 1.4, range: 620, minRange: 220, dmg: 55, splash: 38, rof: 14, salvo: 6,
+  mlrs: { label: ['Rocket artillery', 'Rocket artillery'], shape: 'wedge', r: 12, sizeMul: 1.45, hp: 170, speed: 50, roadMul: 1.4, range: 620, minRange: 220, dmg: 55, splash: 38, rof: 14, salvo: 6,
     cost: 1200, crew: 3, time: 36, factory: 'artyDepot', vision: 130, targets: ['inf', 'veh', 'struct'], indirect: true, shellSpeed: 340, ammo: 18, vsInf: 1.3, vsStruct: 1.1,
     blurb: 'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more. Fire from a wood and move after every mission.' },
   truck: { label: ['Supply truck', 'Supply truck'], shape: 'truck', r: 9, hp: 80, speed: 70, roadMul: 1.8, dmg: 0, cost: 0, crew: 1, time: 0, factory: null, vision: 120, auto: true,
@@ -322,6 +324,13 @@ export const WEATHER_TEXT: Record<'clear' | 'rain' | 'fog' | 'snow', { label: st
 };
 /** units are drawn this much larger than their simulation radius (visual only) */
 export const UNIT_SCALE = 1.3;
+/** the radius a unit is drawn and clicked at */
+export function drawR(d: UnitDef): number { return d.r * UNIT_SCALE * (d.sizeMul || 1); }
+
+/** score: what destroying something is worth, scaled by what it cost (a tank is worth five squads); trucks and free units by their toughness */
+export function unitPoints(d: UnitDef): number { return Math.max(1, Math.round((d.cost || d.hp * 2.5) / 20)); }
+export function structPoints(d: StructDef): number { return d.trench ? 0 : d.cost ? Math.round(d.cost / 20) : 250; }
+export const SCORE = { capture: 25, civSite: -30, civCar: -10 };
 
 export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly.', launchSite: 'Fixed-wing aircraft: the Shark spotter and Liutyi strike drone for Ukraine; the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers. Each needs fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'Charging capacity for 15 more battery drones. Insurance against losing the substation.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
 

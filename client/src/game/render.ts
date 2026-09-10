@@ -1,5 +1,5 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, UNIT_SCALE, modesOf, PILOT } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
@@ -82,7 +82,7 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
 
 /** shovel, flying dirt, and a trench line growing under a squad that is digging in */
 function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
-  const r = u.def.r * UNIT_SCALE, k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
+  const r = drawR(u.def), k = clamp(1 - (u.digT ?? DIG_TIME) / DIG_TIME, 0, 1), TAU = Math.PI * 2;
   c.save(); c.translate(u.x, u.y);
   // the trench taking shape
   c.globalAlpha = 0.25 + 0.75 * k; c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round';
@@ -107,7 +107,7 @@ function drawDigging(c: CanvasRenderingContext2D, u: Unit, now: number) {
 }
 
 function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
-  const d = u.def, alt = altOf(u), r = d.r * UNIT_SCALE * (alt === 2 ? 1.15 : 1);
+  const d = u.def, alt = altOf(u), r = drawR(d) * (alt === 2 ? 1.15 : 1);
   if (u.order.kind === 'dig') drawDigging(c, u, now);
   const team = u.team < 0 ? { color: '#efeadf', stroke: '#5d584c' } : TEAMS[u.team];
   // shadow on the ground at the true position; aircraft cast it farther away the higher they fly
@@ -160,7 +160,7 @@ function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View) {
 function drawModeTag(c: CanvasRenderingContext2D, u: Unit, v: View) {
   const m = modesOf(u.type); if (!m || !u.mode || u.mode === m[0].key) return;
   const md = m.find(x => x.key === u.mode); if (!md || !md.short) return;
-  const r = u.def.r * UNIT_SCALE, sp = parallaxOf(u, v);
+  const r = drawR(u.def), sp = parallaxOf(u, v);
   c.save(); c.font = '600 9px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
   const y = sp.y + r + (u.def.air ? 8 : 6) + (rankOf(u) > 0 ? rankOf(u) * 3 + 4 : 0);
   c.strokeText(md.short, sp.x, y); c.fillStyle = md.key === 'ambush' || md.key === 'silent' || md.key === 'passive' ? '#c6e48b' : '#9fd6e8'; c.fillText(md.short, sp.x, y);
@@ -179,7 +179,7 @@ function drawPilotHud(c: CanvasRenderingContext2D, g: Game, v: View, now: number
   if (aim) {
     c.strokeStyle = tgt ? 'rgba(255,107,107,0.8)' : v.pilotDive ? 'rgba(255,160,60,0.8)' : 'rgba(255,214,10,0.55)'; c.lineWidth = 1.5; c.setLineDash([4, 5]);
     c.beginPath(); c.moveTo(sp.x, sp.y); c.lineTo(aim.x, aim.y); c.stroke(); c.setLineDash([]);
-    const rr = tgt ? (tgt.isUnit ? tgt.def.r * UNIT_SCALE : tgt.r) + 6 : 10, spin = now / 600;
+    const rr = tgt ? (tgt.isUnit ? drawR(tgt.def) : tgt.r) + 6 : 10, spin = now / 600;
     c.lineWidth = 2; c.beginPath(); c.arc(aim.x, aim.y, rr, 0, Math.PI * 2); c.stroke();
     for (let i = 0; i < 4; i++) { const a = spin + i * Math.PI / 2; c.beginPath(); c.moveTo(aim.x + Math.cos(a) * (rr + 3), aim.y + Math.sin(a) * (rr + 3)); c.lineTo(aim.x + Math.cos(a) * (rr + 9), aim.y + Math.sin(a) * (rr + 9)); c.stroke(); }
     if (v.pilotDive && u.def.kamikaze) { c.font = '600 10px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ffb060'; c.fillText('DIVE', aim.x, aim.y - rr - 6); }
@@ -448,7 +448,7 @@ export class Renderer {
     ctx.save(); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
     for (const e of v.selection) {
       if (e.dead) continue;
-      const r = (e.isUnit ? e.def.r * UNIT_SCALE : e.r) + 5;
+      const r = (e.isUnit ? drawR(e.def) : e.r) + 5;
       const sp = e.isUnit ? parallaxOf(e, v) : { x: e.x, y: e.y };
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2); ctx.stroke();
@@ -504,10 +504,10 @@ export class Renderer {
       ctx.fillStyle = 'rgba(232,228,212,0.85)'; ctx.font = '11px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('swarm ' + ms.length, cx, cy - rr - 4);
     }
     for (const u of g.units) if (u.team === PL && !u.dead && u.mode) drawModeTag(ctx, u, v);
-    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = '#000'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(sp.x - 8, sp.y + u.def.r * UNIT_SCALE + 4, 16 * k, 3); }
-    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - u.def.r * UNIT_SCALE - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
-    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
-    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - u.def.r * UNIT_SCALE - 9, 20, u.hp / u.def.hp); }
+    for (const u of g.units) if (u.team === PL && u.def.endurance && !u.landed && u.batt !== undefined && u.batt < u.def.endurance * 0.4) { const k = clamp(u.batt / u.def.endurance, 0, 1), sp = parallaxOf(u, v); ctx.fillStyle = '#000'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16, 3); ctx.fillStyle = k < 0.15 ? '#e04040' : '#e0a030'; ctx.fillRect(sp.x - 8, sp.y + drawR(u.def) + 4, 16 * k, 3); }
+    for (const u of g.units) if (u.team === PL && u.def.morale && u.morale !== undefined) { ctx.fillStyle = '#000'; ctx.fillRect(u.x - 10, u.y - drawR(u.def) - 4, 20, 3); ctx.fillStyle = u.morale < 30 ? '#e04040' : '#ffd60a'; ctx.fillRect(u.x - 10, u.y - u.def.r - 4, 20 * u.morale / 100, 3); }
+    for (const u of g.units) if (u.team === PL && u.hp < u.def.hp && !v.selection.includes(u)) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
+    for (const u of g.units) if (u.team === EN && u.seenBy[PL] && u.hp < u.def.hp) { const sp = parallaxOf(u, v); hpBar(ctx, sp.x - 10, sp.y - drawR(u.def) - 9, 20, u.hp / u.def.hp); }
     for (const s of g.structs) if (s.team === PL && s.def.jam && s.build >= 1) { ctx.strokeStyle = 'rgba(196,139,224,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(s.x, s.y, s.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const st of g.structs) if (!st.dead && st.def.heal && st.build >= 1 && (st.civ ? st.nation === PL : st.team === PL)) { ctx.strokeStyle = 'rgba(139,195,74,0.35)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(st.x, st.y, st.def.heal, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     for (const u of g.units) if (u.team === PL && u.def.jam) { ctx.strokeStyle = 'rgba(196,139,224,0.3)'; ctx.setLineDash([3, 7]); ctx.beginPath(); ctx.arc(u.x, u.y, u.def.jam, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }

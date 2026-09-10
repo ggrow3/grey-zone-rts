@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS, MODE_SETS, MODE_SET_OF } from '../../game/data';
+import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS, MODE_SETS, MODE_SET_OF, unitPoints, structPoints, SCORE } from '../../game/data';
 import type { UnitDef } from '../../game/data';
 import { BARK_GLOSS, COUNTERS } from '../../game/data';
 import { FACTION_FACTS } from '../../game/factions';
@@ -18,6 +18,7 @@ function unitStats(d: UnitDef) {
   if (d.evade) bits.push('dodges ' + Math.round(d.evade * 100) + '%'); if (d.jam) bits.push('jams within ' + d.jam); if (d.vision) bits.push('sees ' + d.vision);
   if (d.canCapture) bits.push('captures'); if (d.operator) bits.push('flies drones'); if (d.morale) bits.push('has morale'); if (d.upkeep) bits.push('wages ' + d.upkeep + '/s'); if (d.cap) bits.push('max ' + d.cap);
   if (d.side !== undefined) bits.push(d.side === UA ? 'Ukraine only' : 'Russia only');
+  if (!d.civ) bits.push('worth ' + unitPoints(d) + (unitPoints(d) === 1 ? ' point' : ' points'));
   return bits.filter(Boolean).join(' · ');
 }
 /** the postures, grouped for the manual: which units, which modes */
@@ -85,6 +86,8 @@ const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-cli
         <p>Both sides can call a glide bomb onto any point (Russia's KAB-500 for 350 funds every 40 seconds, Ukraine's F-16 bombs for 500 every 90): a 700-damage blast that erases trenches and does not care about cover, announced six seconds ahead with a red ring so squads can run. Mobile air defense within 260 of the point shoots down a third of them, two thirds with Patriot or S-400 coverage. Russia can also fire an Iskander ballistic missile at a chosen building (800 funds, two-minute reload, 900 damage, eight-second warning). Ukraine can send an idle Liutyi at a refinery inside Russia (600 funds): 60% get through, each burning refinery cuts Russian income 15% for four minutes and slows Russian aviation.</p>
         <h4>Weather and night</h4>
         <p>Fronts roll across the whole map every few minutes, announced 30 seconds ahead in the top bar. Rain: batteries drain half again as fast, drones dodge 10% less, and anything off the roads slows to 80% in the mud. Fog: everything sees less than half as far, drones hunt half as far, and the computer never launches Gerans into it. Snow: quadcopters are grounded until it stops, fixed wings drain twice as fast, and the fields are mud. Night comes three minutes of every eight: ground units see 60%, drones 85% (Thermal cameras remove that), radar posts see farther, and the Russian side moves. Bad weather and darkness are when the enemy attacks; keep the infantry dug in and the fire groups awake.</p>
+        <h4>Score</h4>
+        <p>Every kill and capture is worth points scaled by what the target cost, so the big things count for more: an infantry squad {{ unitPoints(UNITS.infantry) }}, a tank {{ unitPoints(UNITS.tank) }}, a rocket launcher {{ unitPoints(UNITS.mlrs) }}, an FPV {{ unitPoints(UNITS.fpv) }}, a Geran {{ unitPoints(UNITS.geran) }}, a barracks {{ structPoints(STRUCTS.barracks) }}, the headquarters {{ structPoints(STRUCTS.hq) }}, a town captured {{ SCORE.capture }}. Hitting a civilian site costs {{ -SCORE.civSite }} and a civilian vehicle {{ -SCORE.civCar }}. The top bar shows your score with units killed and lost; the level panel and the end screen show both sides' scores, your kills and losses, and the funds, people, towns, gas, and wheat you hold.</p>
         <h4>Winning</h4>
         <p>Destroy the enemy headquarters, or hold all six towns for three minutes.</p>
       </template>

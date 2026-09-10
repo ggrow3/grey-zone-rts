@@ -37,6 +37,7 @@ function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()
     <div class="stat"><span class="lbl">Gas</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'gas')" :key="i" :title="r.name" :class="gasClass(r)" /></span>
       <span class="val small" :style="{ color: game.pipelineIntact(team) ? '' : 'var(--ru)' }">{{ game.pipelineIntact(team) ? '+' + game.gasIncome(team).toFixed(0) + '/s' : 'pipeline cut' }}</span></div>
     <div class="stat"><span class="lbl">Wheat</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'wheat')" :key="i" :title="r.name" :class="r.burnT > 0 ? 'fire' : r.owner === UA ? 'ua' : r.owner === RU ? 'ru' : ''" /></span></div>
+    <div class="stat" :title="'Points for what you destroy and capture, scaled by what it cost (a tank is worth five squads, a headquarters 250); civilian harm takes points away. Enemy: ' + Math.round(game.stats.score[1 - team])"><span class="lbl">Score</span><span class="val">{{ Math.round(game.stats.score[team]) }}</span><span class="val small dim">{{ game.stats.kills[team] }} killed · {{ game.stats.lost[team] }} lost</span></div>
     <div class="stat"><span class="lbl">Forces</span><span class="val">{{ forces }}</span></div>
     <div class="stat"><span class="lbl">Personnel</span><span class="val small" :style="{ color: people.color }">{{ people.text }}</span></div>
     <div class="stat"><span class="lbl">Operators</span><span class="val small" :style="{ color: slots.color }">{{ slots.text }}</span></div>

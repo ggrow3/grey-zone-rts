@@ -2,7 +2,7 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
@@ -43,7 +43,9 @@ export class Game {
   upgrades: [Record<string, boolean>, Record<string, boolean>] = [{}, {}];
   stats = { built: [0, 0], lost: [0, 0], drones: [0, 0], deliveries: [0, 0], peopleLost: [0, 0], shotDown: [0, 0], kills: [0, 0],
     jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>],
-    kabs: [0, 0], intercepted: [0, 0], refineries: 0, missiles: 0 };
+    kabs: [0, 0], intercepted: [0, 0], refineries: 0, missiles: 0,
+    /** points: kills and captures scaled by what the target cost, civilian harm taken away */
+    score: [0, 0] };
   /** strikes from beyond the map: cooldowns, pending impacts, burning refineries (expiry times) */
   kabT = [0, 0]; missileT = 0; deepT = 0; strikes: PendingStrike[] = []; refineryHits: number[] = []; deepPending: { at: number; hit: boolean } | null = null;
   /** ids registered by a level scenario so objectives can find what it placed */
@@ -493,7 +495,7 @@ export class Game {
           const was = d.owner; d.owner = team; d.cap = 0; d.capTeam = -1; d.supplyT = 6;
           this.notify(team, d.name + ' captured');
           if (was >= 0) this.notify(was, d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : ''));
-          this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name);
+          this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name); this.stats.score[team] += SCORE.capture;
           const cap = first[team]; if (cap) { this.bark('capture', cap); const friend = this.units.find(o => o !== cap && !o.dead && o.team === team && o.def.troop && dist(o, cap) < 220); if (friend) this.bark('reply', friend, 0.9); }
         }
       } else { d.cap = Math.max(0, d.cap - dt); if (d.cap === 0) d.capTeam = -1; }
@@ -1090,13 +1092,14 @@ export class Game {
     if (u.team < 0) {
       if (byTeam === UA) { this.civ.carsKilled[0]++; this.supportHit(4, 'A civilian vehicle was hit by your strike.'); this.addLog(UA, 'loss', 'Ukrainian fire hit a civilian vehicle near ' + nearestPlace(u.x, u.y)); }
       else if (byTeam === RU) { this.civ.carsKilled[1]++; this.addLog(RU, 'loss', 'Russian fire hit a civilian vehicle near ' + nearestPlace(u.x, u.y)); }
+      if (byTeam !== undefined && byTeam >= 0) this.stats.score[byTeam] += SCORE.civCar;
       this.explosionFx(u.x, u.y, 12, false);
       return;
     }
     this.stats.lost[u.team]++;
     if (u.type === 'truck' && byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) this.stats.trucksKilled[byTeam]++;
     if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) {
-      this.stats.kills[byTeam]++; if (u.def.air) this.stats.shotDown[byTeam]++;
+      this.stats.kills[byTeam]++; if (u.def.air) this.stats.shotDown[byTeam]++; this.stats.score[byTeam] += unitPoints(u.def);
       const ko = this.stats.killsOf[byTeam]; ko[u.type] = (ko[u.type] || 0) + 1;
       this.addLog(byTeam, 'kill', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed a ' + ADJ[u.team] + ' ' + u.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y));
       this.credit(by, u);
@@ -1114,7 +1117,7 @@ export class Game {
     s.dead = true;
     this.explosionFx(s.x, s.y, s.r + 30, true);
     this.scorches.push({ x: s.x, y: s.y, r: s.r + 18 });
-    if (byTeam >= 0 && byTeam !== s.team) { if (!s.def.trench) this.stats.structsKilled[byTeam]++; this.credit(by, s); if (!s.def.trench) this.addLog(byTeam, 'struct', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed ' + (s.civ ? 'a ' + ADJ[s.nation!] + ' ' : 'the ' + ADJ[s.team] + ' ') + s.def.label.toLowerCase() + ' at ' + nearestPlace(s.x, s.y)); }
+    if (byTeam >= 0 && byTeam !== s.team) { if (!s.def.trench) this.stats.structsKilled[byTeam]++; this.stats.score[byTeam] += s.civ ? SCORE.civSite : structPoints(s.def); this.credit(by, s); if (!s.def.trench) this.addLog(byTeam, 'struct', (by ? by.def.label[byTeam] : TEAMS[byTeam].name) + ' destroyed ' + (s.civ ? 'a ' + ADJ[s.nation!] + ' ' : 'the ' + ADJ[s.team] + ' ') + s.def.label.toLowerCase() + ' at ' + nearestPlace(s.x, s.y)); }
     if (s.civ) {
       this.civ.lost[s.nation!]++;
       if (byTeam === UA) {
