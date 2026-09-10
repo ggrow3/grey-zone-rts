@@ -13,6 +13,8 @@ export interface TurnDto { turn: number; commands: { team: number; payload: stri
 export interface Session {
   game: Game; myTeam: number; readonly online: boolean;
   paused: boolean; canPause: boolean;
+  /** simulation speed for solo games (1, 2, or 3); ignored online */
+  speed: number;
   /** true while the client is stalled waiting for the next turn from the server */
   waiting: boolean;
   submit(cmd: Command): void;
@@ -21,19 +23,20 @@ export interface Session {
 }
 
 export class LocalSession implements Session {
-  online = false; paused = false; canPause = true; waiting = false;
+  online = false; paused = false; canPause = true; waiting = false; speed = 1;
   private pending: Command[] = []; private acc = 0;
   constructor(public game: Game, public myTeam: number) {}
   submit(cmd: Command) { this.pending.push(cmd); }
   advance(elapsed: number) {
     if (this.paused || this.game.gameOver) return;
     // up to 15 ticks a frame so a throttled tab (few frames a second) still runs close to real time
-    this.acc += Math.min(elapsed, 0.25); let steps = 0;
-    while (this.acc >= DT && steps < 15) {
+    this.acc += Math.min(elapsed, 0.25) * this.speed; let steps = 0;
+    const maxSteps = 15 * this.speed;
+    while (this.acc >= DT && steps < maxSteps) {
       if (this.pending.length) { for (const c of this.pending) this.game.apply(this.myTeam, c); this.pending = []; }
       this.game.tick(DT); this.acc -= DT; steps++;
     }
-    if (steps === 15) this.acc = 0;
+    if (steps === maxSteps) this.acc = 0;
   }
   destroy() {}
 }
@@ -44,7 +47,7 @@ export interface NetTransport {
 }
 
 export class NetSession implements Session {
-  online = true; paused = false; canPause = false; waiting = false;
+  online = true; paused = false; canPause = false; waiting = false; speed = 1;
   private turns = new Map<number, TurnDto>();
   /** last turn fully simulated */
   turnDone = 0; lastReceived = 0;

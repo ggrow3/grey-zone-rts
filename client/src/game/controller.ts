@@ -17,15 +17,19 @@ export class Controller {
   cmdTab: 'build' | 'procure' | 'market' = 'build';
   /** next left click on the map picks the strike point (glide bomb) or the enemy building (missile) */
   strikeMode: 'kab' | 'iskander' | null = null;
+  /** next left click is an attack-move destination (Q) */
+  get amoveMode(): boolean { return this.view.amoveMode; }
+  set amoveMode(v: boolean) { this.view.amoveMode = v; }
+  private idleIdx = 0;
   private pan: { mx: number; my: number; cx: number; cy: number } | null = null;
   /** stick input goes out once a turn while piloting; the zoom to restore when the sticks are handed back */
   private steerT = 0; private zoomBefore = 1;
   onMessage: (text: string) => void = () => {};
   onSelectionChange: () => void = () => {};
-  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend' | 'audio' | 'log') => void = () => {};
+  onToggle: (panel: 'tech' | 'manual' | 'pause' | 'legend' | 'audio' | 'log' | 'speed') => void = () => {};
 
   constructor(public session: Session, team: number) {
-    this.view = { team, cam: { x: 0, y: 0, z: 1 }, vw: 800, vh: 600, dpr: 1, selection: [], placing: null, mouse: { x: 0, y: 0, inside: false }, bombardMode: false, drag: null, marker: null, pilot: null, pilotTarget: null, pilotDive: null };
+    this.view = { team, cam: { x: 0, y: 0, z: 1 }, vw: 800, vh: 600, dpr: 1, selection: [], placing: null, mouse: { x: 0, y: 0, inside: false }, bombardMode: false, drag: null, marker: null, pilot: null, pilotTarget: null, pilotDive: null, amoveMode: false };
   }
   get pilot(): Unit | null { return this.view.pilot; }
   get game(): Game { return this.session.game; }
@@ -142,6 +146,7 @@ export class Controller {
       if (this.view.pilot) { this.pilotClick(w.x, w.y); return; }
       if (this.strikeMode) { const m = this.strikeMode; this.strikeMode = null; if (m === 'kab') this.submit({ kind: 'kab', x: w.x, y: w.y }); else { const t = this.findEnemyAt(w.x, w.y); if (t && t.isStruct) this.submit({ kind: 'iskander', targetId: t.id }); else this.onMessage('Missiles need an enemy building: click one'); } this.onSelectionChange(); return; }
       if (this.view.bombardMode) { this.view.bombardMode = false; this.bombardAt(w.x, w.y); return; }
+      if (this.amoveMode) { this.amoveMode = false; this.attackMove(w.x, w.y, shift); this.onSelectionChange(); return; }
       if (this.view.placing) { this.tryPlace(w.x, w.y, shift); return; }
       this.view.drag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
       (this.view.drag as { shift?: boolean }).shift = shift;
@@ -176,6 +181,7 @@ export class Controller {
   contextMenu(px: number, py: number, ctrl: boolean, shift = false) {
     if (this.view.pilot) { const v = this.view; if (v.pilotTarget || v.pilotDive) { v.pilotTarget = null; v.pilotDive = null; this.steerT = 0; this.onMessage('Let go: flying to the cursor'); } return; }
     if (this.strikeMode) { this.strikeMode = null; this.onSelectionChange(); return; }
+    if (this.amoveMode) { this.amoveMode = false; this.onSelectionChange(); return; }
     if (this.view.placing) { this.view.placing = null; this.onSelectionChange(); return; }
     const w = this.toWorld(px, py);
     if (this.view.bombardMode) { this.view.bombardMode = false; return this.bombardAt(w.x, w.y); }
@@ -262,6 +268,33 @@ export class Controller {
     if (sw) this.submit({ kind: 'swarmFormation', swarmId: sw.id, formation: f });
     this.onSelectionChange();
   }
+  /** Q: the next click is an attack-move: units fight whatever they meet on the way and then carry on */
+  startAttackMove() {
+    const units = this.selUnits().filter(u => u.def.dmg > 0 || u.def.kamikaze);
+    if (!units.length) return this.onMessage('Select units that can shoot first');
+    this.amoveMode = !this.amoveMode; this.view.bombardMode = false; this.strikeMode = null;
+    if (this.amoveMode) this.onMessage('Attack-move: click where to go. They will stop for anything they meet. Right-click or Esc to cancel.');
+    this.onSelectionChange();
+  }
+  attackMove(x: number, y: number, queue = false) {
+    const units = this.selUnits(); if (!units.length) return;
+    this.submit({ kind: 'move', ids: this.ids(units), x, y, formation: this.formationType, attackMove: true, queue });
+  }
+  /** cycle through squads (or drones) that have nothing to do, centring the camera on each */
+  selectIdle(air: boolean) {
+    const g = this.game, PL = this.team;
+    const idle = g.units.filter(u => u.team === PL && !u.dead && !u.def.auto && (air ? u.def.air : u.def.troop) && u.order.kind === 'idle' && !u.target && !u.landed && !u.grounded && !u.ambushed && !u.shaken);
+    if (!idle.length) return this.onMessage(air ? 'No idle drones' : 'No idle squads');
+    const u = idle[this.idleIdx++ % idle.length];
+    this.selection = g.expandSwarms([u]); this.centerOn(u.x, u.y);
+    this.onMessage((air ? 'Idle drone ' : 'Idle squad ') + ((this.idleIdx - 1) % idle.length + 1) + ' of ' + idle.length + ': ' + u.def.label[PL]);
+  }
+  /** Backspace: jump to the latest thing that happened to your side */
+  jumpToAlert() {
+    const list = this.game.alerts.filter(a => a.team === this.team);
+    if (!list.length) return this.onMessage('Nothing to jump to');
+    const a = list[list.length - 1]; this.centerOn(a.x, a.y); this.onMessage(a.text);
+  }
   startBombard() { if (this.selUnits().some(u => u.def.indirect)) { this.view.bombardMode = true; this.onMessage('Click where the guns should fire. Right-click or Esc to cancel.'); } }
   startPlacing(type: string | null) {
     if (type && this.game.funds[this.team] < STRUCTS[type].cost) return this.onMessage('Not enough funds');
@@ -276,7 +309,8 @@ export class Controller {
     this.submit({ kind: 'place', type, x, y });
     if (!keep) { this.view.placing = null; this.onSelectionChange(); }
   }
-  enqueue(fac: Struct, type: string) { this.submit({ kind: 'enqueue', facId: fac.id, type }); }
+  /** Shift-click queues up to five */
+  enqueue(fac: Struct, type: string, n = 1) { const room = Math.max(1, 5 - fac.queue.length); for (let i = 0; i < Math.min(n, room); i++) this.submit({ kind: 'enqueue', facId: fac.id, type }); }
   cancelQueued(fac: Struct, index: number) { this.submit({ kind: 'cancel', facId: fac.id, index }); }
   buyUpgrade(key: string) { this.submit({ kind: 'upgrade', key }); }
   geranWave() { this.submit({ kind: 'wave' }); }
@@ -294,8 +328,13 @@ export class Controller {
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return false;
     const v = this.view;
-    if (e.code === 'Escape') { if (v.pilot) this.releasePilot('Sticks handed back'); else if (this.strikeMode) this.strikeMode = null; else if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
+    if (e.code === 'Escape') { if (v.pilot) this.releasePilot('Sticks handed back'); else if (this.amoveMode) this.amoveMode = false; else if (this.strikeMode) this.strikeMode = null; else if (v.bombardMode) v.bombardMode = false; else if (v.placing) v.placing = null; else this.view.selection = []; this.onSelectionChange(); }
     else if (e.code === 'KeyP') this.onToggle('pause');
+    else if (e.code === 'KeyQ') this.startAttackMove();
+    else if (e.code === 'Period') this.selectIdle(false);
+    else if (e.code === 'Comma') this.selectIdle(true);
+    else if (e.code === 'Backspace') { this.jumpToAlert(); return true; }
+    else if (e.code === 'BracketRight') this.onToggle('speed');
     else if (e.code === 'KeyY') { this.togglePilot(); return true; }
     else if (e.code === 'KeyR') this.cycleMode();
     else if (e.code === 'Space') { if (v.pilot) return true; this.goHome(); return true; }

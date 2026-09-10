@@ -220,4 +220,5 @@ table.armies th.ua { color: var(--ua); } table.armies th.ru { color: #ff8a80; } 
 #selpanel .modeDesc { color: var(--ink-dim); font-size: 11px; line-height: 1.25; margin: 3px 0 4px; }
 #selpanel .modeLabel { color: var(--ink-dim); font-size: 11px; margin-top: 6px; }
 #selpanel .strike.on { border-color: var(--ua-accent); color: var(--ua-accent); }
+#selpanel .row.pick { cursor: pointer; } #selpanel .row.pick:hover b { color: var(--ua-accent); }
 #game.pilot { cursor: crosshair; }

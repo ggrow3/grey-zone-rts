@@ -15,6 +15,8 @@ export interface View {
   drag: { x0: number; y0: number; x1: number; y1: number } | null; marker: Marker | null;
   /** the drone whose sticks the player holds, and what the pilot has clicked */
   pilot: Unit | null; pilotTarget: Entity | null; pilotDive: { x: number; y: number } | null;
+  /** the next click is an attack-move destination */
+  amoveMode: boolean;
 }
 
 /** 0 ground, 1 low aircraft, 2 high-altitude aircraft (a Mavic switched to Low flies at 1) */
@@ -493,6 +495,7 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(e.order.x - 10, e.order.y); ctx.lineTo(e.order.x + 10, e.order.y); ctx.moveTo(e.order.x, e.order.y - 10); ctx.lineTo(e.order.x, e.order.y + 10); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.order.x, e.order.y); ctx.stroke(); ctx.setLineDash([]);
     }
+    if (v.amoveMode && v.mouse.inside) { const w = toWorld(v, v.mouse.x, v.mouse.y); ctx.strokeStyle = '#ff9a80'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(w.x, w.y, 14, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(w.x - 20, w.y); ctx.lineTo(w.x + 20, w.y); ctx.moveTo(w.x, w.y - 20); ctx.lineTo(w.x, w.y + 20); ctx.stroke(); ctx.setLineDash([]); }
     if (v.bombardMode && v.mouse.inside) { const w = toWorld(v, v.mouse.x, v.mouse.y); ctx.strokeStyle = '#ff6b6b'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(w.x, w.y, 40, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (v.marker) {
       const m = v.marker, pulse = 0.5 + 0.5 * Math.sin(now / 300);
@@ -605,6 +608,12 @@ export class Renderer {
     f.globalCompositeOperation = 'destination-out';
     for (const vs of g.vision[PL]) { f.beginPath(); f.arc(vs.x * sx, vs.y * sy, Math.max(2, vs.r * sx), 0, Math.PI * 2); f.fill(); }
     mmctx.drawImage(this.mmFog, 0, 0);
+    // pings: things that just happened to your side, fading over twelve seconds
+    for (const a of g.alerts) {
+      if (a.team !== PL) continue; const age = g.gameTime - a.at; if (age > 12) continue;
+      const k = age / 12, pulse = 0.5 + 0.5 * Math.sin(age * 9);
+      mmctx.strokeStyle = 'rgba(255,90,90,' + (0.9 - 0.7 * k) + ')'; mmctx.lineWidth = 1.5; mmctx.beginPath(); mmctx.arc(a.x * sx, a.y * sy, 4 + pulse * 3 + k * 4, 0, Math.PI * 2); mmctx.stroke();
+    }
     mmctx.strokeStyle = '#fff'; mmctx.lineWidth = 1;
     mmctx.strokeRect(v.cam.x * sx + 0.5, v.cam.y * sy + 0.5, v.vw / v.cam.z * sx, v.vh / v.cam.z * sy);
   }

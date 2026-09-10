@@ -32,9 +32,9 @@ function setTab(t: 'build' | 'procure') { props.ctl.cmdTab = t; props.ctl.onSele
             <span class="heat" :title="'Production heat ' + Math.round(fac.heat) + '%'"><i :style="{ width: Math.round(fac.heat) + '%', background: fac.overheated ? 'var(--ru)' : fac.heat > 70 ? 'var(--warn)' : 'var(--ok)' }" /></span>
             <span class="hint">{{ fac.overheated ? 'overheated' : 'heat ' + Math.round(fac.heat) + '%' }}</span>
           </template>
-          <span class="hint">{{ fac.queue.length ? fac.queue.length + ' in queue' : 'Queue empty' }}</span>
+          <span class="hint">{{ fac.queue.length ? fac.queue.length + ' in queue' : 'Queue empty' }} · Shift-click for 5</span>
         </div>
-        <button v-for="(type, i) in produces" :key="type" type="button" class="cmd" :class="[fac.type, { compact, locked: locked(type) }]" :title="(locked(type) ? 'Needs Launch rails (research, T). ' : '') + UNITS[type].blurb" @click="ctl.enqueue(fac!, type)">
+        <button v-for="(type, i) in produces" :key="type" type="button" class="cmd" :class="[fac.type, { compact, locked: locked(type) }]" :title="(locked(type) ? 'Needs Launch rails (research, T). ' : '') + UNITS[type].blurb" @click="ctl.enqueue(fac!, type, $event.shiftKey ? 5 : 1)">
           <div class="name">{{ UNITS[type].label[ctl.team] }}</div>
           <div class="meta"><span>{{ UNITS[type].cost }} funds</span><span>{{ crewText(type) }}</span><span v-if="UNITS[type].kamikaze" class="tag">kamikaze</span><span>{{ UNITS[type].time }}s</span></div>
           <span class="key">{{ HOTKEYS[i] }}</span>

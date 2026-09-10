@@ -3,7 +3,9 @@ import type { UnitDef, StructDef, FormationType } from './data';
 export interface Pt { x: number; y: number }
 
 export type OrderKind = 'idle' | 'move' | 'attack' | 'bombard' | 'dig';
-export interface Order { kind: OrderKind; x: number; y: number; target: Entity | null }
+export interface Order { kind: OrderKind; x: number; y: number; target: Entity | null;
+  /** attack-move: stop and fight anything met on the way, then carry on */
+  amove?: boolean }
 
 export interface Unit {
   id: number; isUnit: true; isStruct?: false; type: string; def: UnitDef; team: number; x: number; y: number; hp: number;
@@ -74,6 +76,8 @@ export type WeatherKind = 'clear' | 'rain' | 'fog' | 'snow';
 export interface Weather { kind: WeatherKind; until: number; next: WeatherKind; warned: boolean }
 /** battle log entry; team is the side the event is about (-1 = both) */
 export interface LogEntry { at: number; team: number; kind: LogKind; text: string }
+/** something that happened to a side somewhere on the map: pinged on the minimap, Backspace jumps to the latest */
+export interface Alert { team: number; x: number; y: number; at: number; text: string }
 
 export interface Swarm { id: number; team: number; members: Unit[]; leader: Unit; formation: FormationType; dead: boolean; t: number }
 
@@ -89,7 +93,7 @@ export interface Scorch { x: number; y: number; r: number }
 
 /** everything a player can ask the simulation to do; ids refer to units/structs owned by the issuing team */
 export type Command =
-  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType; queue?: boolean }
+  | { kind: 'move'; ids: number[]; x: number; y: number; formation: FormationType; queue?: boolean; attackMove?: boolean }
   | { kind: 'attack'; ids: number[]; targetId: number }
   | { kind: 'bombard'; ids: number[]; x: number; y: number }
   | { kind: 'dig'; ids: number[] }

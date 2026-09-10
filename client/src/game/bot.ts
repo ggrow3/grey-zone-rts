@@ -181,6 +181,6 @@ function botLaunch(g: Game, bot: Bot, group: Unit[]) {
     es.sort((a, b) => dist(a, bot.staging) - dist(b, bot.staging));
     target = es[0]; name = 'your base';
   }
-  for (const u of group) { u.order = MOVE(target.x + g.rand(-70, 70), target.y + g.rand(-70, 70)); u.target = null; g.planRoute(u, u.order.x, u.order.y); }
+  for (const u of group) { u.order = MOVE(target.x + g.rand(-70, 70), target.y + g.rand(-70, 70)); if (u.def.dmg > 0 || u.def.kamikaze) u.order.amove = true; u.target = null; g.planRoute(u, u.order.x, u.order.y); }
   bot.warnT = 6; bot.warnName = name;
 }

@@ -53,7 +53,9 @@ const offs: (() => void)[] = [];
 const cleanups: (() => void)[] = [];
 
 function msg(text: string) { msgText.value = text; msgShow.value = true; msgTimer = 2.6; }
-function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log') {
+const speed = ref(1);
+function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed') {
+  if (p === 'speed') { if (!session.canPause) return; speed.value = speed.value >= 3 ? 1 : speed.value + 1; session.speed = speed.value; msg('Speed ' + speed.value + 'x'); return; }
   if (p === 'tech') showTech.value = !showTech.value; else if (p === 'manual') showManual.value = !showManual.value; else if (p === 'legend') showLegend.value = !showLegend.value;
   else if (p === 'pause') togglePause(); else if (p === 'log') showLog.value = !showLog.value;
   else if (p === 'audio') { audio.cycle(); audioMode.value = audio.mode; msg('Sound: ' + (audio.mode === 'on' ? 'effects and voice' : audio.mode === 'sfx' ? 'effects only' : 'off')); }
@@ -266,7 +268,7 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
   <div id="game-root">
     <div v-if="error" class="page"><div class="card"><h2>Could not start the game</h2><p class="err">{{ error }}</p><router-link to="/"><button type="button">Back</button></router-link></div></div>
     <template v-else-if="ready">
-      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
+      <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :speed="speed" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
       <div id="stage" ref="stage">
         <canvas id="game" ref="canvas" :class="{ pilot: piloting }" />
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>

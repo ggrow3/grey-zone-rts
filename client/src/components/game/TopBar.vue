@@ -3,8 +3,8 @@ import { computed } from 'vue';
 import type { Game } from '../../game/sim';
 import { UA, RU, UNITS, CIV_SITES, FOOD_PER_FIELD, FOOD_BASE, FUEL_PER_NODE, FUEL_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, POWER_BASE, WEATHER_TEXT } from '../../game/data';
 
-const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; basemap: string; audio: string; opponent?: string }>();
-const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
+const props = defineProps<{ game: Game; team: number; tick: number; paused: boolean; canPause: boolean; speed: number; basemap: string; audio: string; opponent?: string }>();
+const emit = defineEmits<{ (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed'): void; (e: 'basemap'): void; (e: 'leave'): void }>();
 const sky = computed(() => { void props.tick; const w = g().weather; const left = Math.max(0, Math.ceil(w.until - g().gameTime)); return { label: WEATHER_TEXT[w.kind].label + (g().isNight() ? ', night' : ', day'), sub: (w.warned ? WEATHER_TEXT[w.next].label + ' in ' + left + ' s' : 'for ' + fmtTime(left)) + ' · ' + (g().isNight() ? 'dawn' : 'dusk') + ' in ' + fmtTime(g().phaseLeft()), title: WEATHER_TEXT[w.kind].effect, bad: w.kind !== 'clear' || g().isNight() }; });
 const hold = computed(() => { void props.tick; for (const T of [0, 1]) if (g().holdT[T] > 0) return { team: T, left: Math.max(0, Math.ceil(180 - g().holdT[T])) }; return null; });
 
@@ -56,6 +56,7 @@ function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()
     <button type="button" @click="emit('toggle', 'log')" title="Battle log (K)">Log</button>
     <button type="button" @click="emit('toggle', 'audio')" title="Sound effects and unit voices (N)">Sound: {{ audio === 'on' ? 'on' : audio === 'sfx' ? 'no voice' : 'off' }}</button>
     <button type="button" v-if="canPause" @click="emit('toggle', 'pause')">{{ paused ? 'Resume' : 'Pause' }}</button>
+    <button type="button" v-if="canPause" title="Simulation speed for solo games (])" @click="emit('toggle', 'speed')">{{ speed }}x</button>
     <button type="button" class="danger" @click="emit('leave')">Leave</button>
   </div>
 </template>

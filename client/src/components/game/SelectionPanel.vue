@@ -95,6 +95,7 @@ function structRows(e: Struct): [string, string][] {
         <button v-if="canPilot" type="button" class="strike" :class="{ on: piloting }" style="border-color:#7a6a1a" :title="'Fly this drone yourself: it follows your cursor, dodges 15% more' + ((one as Unit).def.kamikaze ? ', and hits 20% harder when you put it on a target' : '') + '. Left-click attacks; Y or Esc hands it back.'" @click="ctl.togglePilot()">{{ piloting ? 'Hand back the sticks (Y)' : 'Take the sticks (Y)' }}</button>
         <div class="row" v-for="(r, i) in unitRows(one as Unit).slice(0, modeGroups.length ? 6 : 8)" :key="i"><span>{{ r[0] }}</span><b>{{ r[1] }}</b></div>
         <div v-if="(one as Unit).def.operator" class="forms"><button type="button" @click="ctl.setOps(1)" title="One person from the pool joins as a drone operator (O)">+ operator (O)</button><button type="button" @click="ctl.setOps(-1)" title="Send one operator back to the pool (Shift+O)">− operator</button></div>
+        <button v-if="(one as Unit).def.dmg > 0 || (one as Unit).def.kamikaze" type="button" class="strike" :class="{ on: ctl.amoveMode }" style="border-color:#7a4a3a" title="Click a destination: the unit stops to fight anything it meets on the way, then carries on" @click="ctl.startAttackMove()">Attack-move (Q)</button>
         <button v-if="(one as Unit).def.troop" type="button" class="strike" style="border-color:#7a6a3a" @click="ctl.digIn()">Dig in (E)</button>
         <button v-if="(one as Unit).def.indirect" type="button" class="strike" @click="ctl.startBombard()">Fire on an area (B)</button>
         <button v-if="(one as Unit).def.kamikaze" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest target (F)</button>
@@ -114,7 +115,8 @@ function structRows(e: Struct): [string, string][] {
         <button type="button" class="strike" style="border-color:#3a5a7a" @click="ctl.formSwarm()">{{ swarmSel ? 'Disband swarm (G)' : 'Form swarm (G)' }}</button>
       </template>
       <button v-if="unitsSel.some(u => u.def.kamikaze)" type="button" class="strike" @click="ctl.strikeNearest()">Dive at nearest targets (F)</button>
-      <div class="row" v-for="[k, n] in counts" :key="k"><span>{{ UNITS[k].label[ctl.team] }}</span><b>{{ n }}</b></div>
+      <button v-if="unitsSel.some(u => u.def.dmg > 0 || u.def.kamikaze)" type="button" class="strike" :class="{ on: ctl.amoveMode }" style="border-color:#7a4a3a" title="Click a destination: units stop to fight anything they meet on the way, then carry on" @click="ctl.startAttackMove()">Attack-move (Q)</button>
+      <div class="row pick" v-for="[k, n] in counts" :key="k" title="Click to select only these" @click="ctl.selection = unitsSel.filter(u => u.type === k)"><span>{{ UNITS[k].label[ctl.team] }}</span><b>{{ n }}</b></div>
     </template>
   </div>
 </template>

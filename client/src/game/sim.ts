@@ -8,7 +8,7 @@ import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELG
 import { Rng } from './rng';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from './dmath';
 import { getTerrain, Terrain } from './terrain';
-import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike } from './types';
+import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike, Alert } from './types';
 import { updateBot, makeBot } from './bot';
 
 export const DT = 1 / 60;
@@ -56,6 +56,8 @@ export class Game {
   waveT = 0;
   ammoT = 0;
   log: LogEntry[] = [];
+  /** recent things that happened to each side, with a place: losses, buildings hit, towns lost */
+  alerts: Alert[] = [];
   private barkN = 0; private lastBark: Record<string, number> = {};
   support = 100;
   people = [{ total: 70 }, { total: 70 }];
@@ -116,6 +118,12 @@ export class Game {
     this.effects.push({ kind: 'bark', x: u.x, y: u.y, t: 0, dur: 2.6 + (delay || 0), team, text, delay, sub: kind });
   }
   addLog(team: number, kind: LogKind, text: string) { this.log.push({ at: this.gameTime, team, kind, text }); if (this.log.length > 200) this.log.shift(); }
+  /** ping a side about a place; pings within 120 of a recent one for the same side merge into it */
+  alert(team: number, x: number, y: number, text: string) {
+    if (team < 0) return;
+    for (const a of this.alerts) if (a.team === team && this.gameTime - a.at < 6 && hyp(a.x - x, a.y - y) < 120) { a.at = this.gameTime; a.text = text; return; }
+    this.alerts.push({ team, x, y, at: this.gameTime, text }); if (this.alerts.length > 30) this.alerts.shift();
+  }
   private nearestTroop(team: number, x: number, y: number, maxD: number): Unit | null {
     let best: Unit | null = null, bd = maxD;
     for (const o of this.units) { if (o.dead || o.team !== team || !o.def.troop) continue; const d = hyp(o.x - x, o.y - y); if (d < bd) { bd = d; best = o; } }
@@ -522,7 +530,7 @@ export class Game {
         if (d.cap >= 5) {
           const was = d.owner; d.owner = team; d.cap = 0; d.capTeam = -1; d.supplyT = 6;
           this.notify(team, d.name + ' captured');
-          if (was >= 0) this.notify(was, d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : ''));
+          if (was >= 0) { this.notify(was, d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : '')); this.alert(was, d.x, d.y, d.name + ' lost'); }
           this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name); this.stats.score[team] += SCORE.capture;
           const cap = first[team]; if (cap) { this.bark('capture', cap); const friend = this.units.find(o => o !== cap && !o.dead && o.team === team && o.def.troop && dist(o, cap) < 220); if (friend) this.bark('reply', friend, 0.9); }
         }
@@ -658,6 +666,18 @@ export class Game {
   }
 
   updateHealing(dt: number) {
+    // workshops: vehicles parked by the armor plant or headquarters are patched up; a quiet building mends itself slowly
+    for (const u of this.units) {
+      if (u.dead || u.team < 0 || u.def.air || u.def.troop || u.def.auto || u.hp >= u.def.hp) continue;
+      if (!this.structs.some(s => !s.dead && s.team === u.team && s.build >= 1 && (s.type === 'armorPlant' || s.type === 'hq') && dist(s, u) < s.r + 120)) continue;
+      u.hp = Math.min(u.def.hp, u.hp + u.def.hp * 0.02 * dt);
+      if (this.rng.next() < dt * 1.2) this.effects.push({ kind: 'heal', x: u.x + this.rand(-8, 8), y: u.y - 10, t: 0, dur: 0.8 });
+    }
+    for (const s of this.structs) {
+      if (s.dead || s.civ || s.team < 0 || s.build < 1 || s.def.trench || s.hp >= s.def.hp) continue;
+      if (this.units.some(e => !e.dead && e.team === 1 - s.team && !e.def.auto && dist(e, s) < 420)) continue;
+      s.hp = Math.min(s.def.hp, s.hp + s.def.hp * 0.004 * dt);
+    }
     for (const st of this.structs) {
       if (st.dead || !st.def.heal || st.build < 1) continue;
       const team = st.civ ? st.nation : st.team;
@@ -948,15 +968,20 @@ export class Game {
       if (mode === 'guard') hunt = Math.min(hunt, PILOT.guardReach);
       if (piloted) hunt = range;
       if (u.target && dist(u, u.target) <= Math.max(range, hunt) && this.canSee(u, u.target)) tgt = u.target;
-      else tgt = this.acquireFor(u, u.order.kind === 'idle' ? hunt : range, minR);
+      else tgt = this.acquireFor(u, u.order.kind === 'idle' || u.order.amove ? hunt : range, minR);
       if (tgt && mode === 'guard' && u.post && dist(tgt, u.post) > PILOT.guardReach + 60) tgt = null;
     }
     u.target = tgt;
 
-    if (u.order.kind === 'move') {
+    if (u.order.kind === 'move' && u.order.amove && tgt) {
+      // attack-move: stand and fight what is in reach, close a little on it, carry on when it is gone
+      const dd = dist(u, tgt) - (tgt.isStruct ? tgt.r * 0.5 : 0);
+      if (dd > range * 0.9 && d.acquire) this.moveToward(u, tgt.x, tgt.y, dt);
+      else if (minR && dd < minR) this.moveAway(u, tgt, dt);
+    } else if (u.order.kind === 'move') {
       const dd = dist(u, u.order);
       const last = this.stepMove(u, u.order.x, u.order.y, dt);
-      if ((last === true && dd < 6) || last === 'stalled') { u.order = IDLE(); u.path = null; this.nextWaypoint(u); }
+      if ((last === true && dd < 6) || last === 'stalled') { const am = u.order.amove; u.order = IDLE(); u.path = null; this.nextWaypoint(u, am); }
     } else if (u.order.kind === 'attack' && tgt) {
       const dd = dist(u, tgt) - (tgt.isStruct ? tgt.r * 0.5 : 0);
       if (dd > range * 0.9) this.moveToward(u, tgt.x, tgt.y, dt);
@@ -981,10 +1006,10 @@ export class Game {
     }
   }
   /** continue along queued waypoints after a move completes */
-  nextWaypoint(u: Unit) {
+  nextWaypoint(u: Unit, amove?: boolean) {
     if (!u.waypoints || !u.waypoints.length) { u.waypoints = undefined; return; }
     const w = u.waypoints.shift()!;
-    u.order = MOVE(w.x, w.y); u.target = null; this.planRoute(u, w.x, w.y);
+    u.order = MOVE(w.x, w.y); if (amove) u.order.amove = true; u.target = null; this.planRoute(u, w.x, w.y);
     if (!u.waypoints.length) u.waypoints = undefined;
   }
   hasAmmo(u: Unit): boolean {
@@ -1004,10 +1029,10 @@ export class Game {
         this.moveToward(u, u.order.x, u.order.y, dt);
         // a piloted drone flown into a point goes off there: a treeline, a trench, a suspected position
         if (u.diveAt && piloted && dist(u, u.diveAt) < 8) { this.detonate(u, null); return; }
-        if (dd < 6) { u.order = IDLE(); this.nextWaypoint(u); }
+        if (dd < 6) { const am = u.order.amove; u.order = IDLE(); this.nextWaypoint(u, am); }
       }
-      // Hunt mode (and every drone without modes) picks its own targets; Hold and Ambush wait for orders, and a pilot chooses
-      if (d.acquire! > 0 && (mode === 'hunt' || mode === '') && !piloted) {
+      // Hunt mode (and every drone without modes) picks its own targets; Hold and Ambush wait for orders unless attack-moving, and a pilot chooses
+      if (d.acquire! > 0 && (mode === 'hunt' || mode === '' || (u.order.kind === 'move' && u.order.amove)) && !piloted) {
         const reach = (d.acquire! + (this.upgrades[u.team].repeaters ? 120 : 0)) * this.huntMul();
         const t = (d.prefer && this.acquirePreferred(u, reach)) || this.acquireFor(u, reach, 0);
         if (t && this.inLink(u, t)) { u.target = t; u.order = ATTACK(t); }
@@ -1108,6 +1133,7 @@ export class Game {
     else if (t.isUnit && t.def.indirect && drone) amt *= COVER[t.cover || 'open'].drone;
     if (t.isUnit && t.def.morale) t.morale = clamp((t.morale === undefined ? 90 : t.morale) - amt * 0.25, 0, 100);
     t.hp -= amt; t.lastHitBy = team;
+    if (t.isStruct && !t.civ && t.team >= 0 && team !== t.team && !t.def.trench && t.hp > 0) this.alert(t.team, t.x, t.y, t.def.label + ' under attack');
     if (t.hp <= 0) { if (t.isUnit) this.killUnit(t, false, team, src); else this.destroyStruct(t, team, src); }
   }
   /** a confirmed kill for the unit that scored it: veterancy */
@@ -1128,6 +1154,7 @@ export class Game {
     }
     this.stats.lost[u.team]++;
     if (u.type === 'truck' && byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) this.stats.trucksKilled[byTeam]++;
+    if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team && !u.def.air) this.alert(u.team, u.x, u.y, u.def.label[u.team] + ' lost');
     if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) {
       this.stats.kills[byTeam]++; if (u.def.air) this.stats.shotDown[byTeam]++; this.stats.score[byTeam] += unitPoints(u.def);
       const ko = this.stats.killsOf[byTeam]; ko[u.type] = (ko[u.type] || 0) + 1;
@@ -1158,7 +1185,7 @@ export class Game {
       return;
     }
     if (s.type === 'pump') { const ps = this.pumpSites.find(x => x.struct === s); if (ps) ps.rebuildT = 120; this.notify(s.team, 'Pumping station destroyed: gas flow stopped'); }
-    else if (!s.def.trench) this.notify(s.team, s.def.label + ' destroyed');
+    else if (!s.def.trench) { this.notify(s.team, s.def.label + ' destroyed'); this.alert(s.team, s.x, s.y, s.def.label + ' destroyed'); }
     if (s.type === 'hq') this.endGame(1 - s.team);
   }
   supportHit(amount: number, text: string) { this.support = clamp(this.support - amount, 0, 100); this.notify(UA, text + ' Support ' + Math.round(this.support) + '%.'); }
@@ -1196,6 +1223,7 @@ export class Game {
     this.structs = this.structs.filter(s => !s.dead);
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.effects = this.effects.filter(e => e.t < e.dur);
+    if (this.alerts.length && this.gameTime - this.alerts[0].at > 40) this.alerts = this.alerts.filter(a => this.gameTime - a.at <= 40);
   }
   endGame(winner: number) {
     if (this.gameOver) return; this.gameOver = true; this.winner = winner;
@@ -1470,6 +1498,7 @@ export class Game {
           const seen = new Set<Swarm>();
           for (const u of airSel) { const sw = this.swarmOf(u); if (sw && !seen.has(sw)) { seen.add(sw); this.formationMove(sw.members, cmd.x, cmd.y, sw.formation); } }
           this.formationMove(airSel.filter(u => !this.swarmOf(u)), cmd.x, cmd.y, cmd.formation);
+          if (cmd.attackMove) for (const u of airSel) if (u.order.kind === 'move' && (u.def.dmg > 0 || u.def.kamikaze)) u.order.amove = true;
           // a guarding interceptor's post moves with it
           for (const u of airSel) if (this.modeOf(u) === 'guard' && u.order.kind === 'move') u.post = { x: u.order.x, y: u.order.y };
         }
@@ -1477,6 +1506,7 @@ export class Game {
         groundSel.forEach((u, i) => {
           const c = i % cols, r = Math.floor(i / cols);
           u.order = MOVE(clamp(cmd.x + (c - (cols - 1) / 2) * sp, 6, W - 6), clamp(cmd.y + (r - (rows - 1) / 2) * sp, 6, H_LAND - 6));
+          if (cmd.attackMove && (u.def.dmg > 0 || u.def.kamikaze)) u.order.amove = true;
           u.target = null; this.planRoute(u, u.order.x, u.order.y);
         });
         this.effects.push({ kind: 'mark', x: cmd.x, y: cmd.y, t: 0, dur: 0.5, team });
