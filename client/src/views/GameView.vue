@@ -12,7 +12,7 @@ import type { BasemapMode } from '../game/terrainCanvas';
 import { levelById } from '../game/levels';
 import type { Level } from '../game/levels';
 import { CIV_SITES, UA, TEAMS, UNITS } from '../game/data';
-import { MM_W, MM_H } from '../game/map';
+import { MM_W, MM_H, W, H } from '../game/map';
 import { hub } from '../net/hub';
 import type { MatchInfo, ChatMsg } from '../net/hub';
 import { api } from '../api';
@@ -59,6 +59,7 @@ function onToggle(p: 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log') {
   else if (p === 'audio') { audio.cycle(); audioMode.value = audio.mode; msg('Sound: ' + (audio.mode === 'on' ? 'effects and voice' : audio.mode === 'sfx' ? 'effects only' : 'off')); }
 }
 const isNet = computed(() => props.mode === 'multiplayer');
+const piloting = computed(() => { void hudTick.value; return !!ctl.value?.view.pilot; });
 
 onMounted(async () => {
   try {
@@ -183,7 +184,7 @@ function frame(now: number) {
 function startCutscene() {
   const l = level.value, hq = game.hq(team.value);
   const lines = l ? l.briefing : SKIRMISH_BRIEF[team.value];
-  cutShots = l ? l.shots(game) : [hq || { x: 1800, y: 1000 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: 1800, y: 1000 }];
+  cutShots = l ? l.shots(game) : [hq || { x: W / 2, y: H / 2 }, game.site(team.value === UA ? 'Lyptsi' : 'Zhuravlyovka'), game.hq(1 - team.value) || { x: W / 2, y: H / 2 }];
   cut.value = { title: l ? l.title : (team.value === UA ? 'Skirmish: the Kharkiv front' : 'Skirmish: the Belgorod front'), lines, index: 0 };
   session.paused = true; cutT = 0; cutDone = 0;
   if (cutShots[0]) ctl.value!.centerOn(cutShots[0].x, cutShots[0].y);
@@ -266,7 +267,7 @@ onUnmounted(() => { cancelAnimationFrame(raf); cleanups.forEach(f => f()); offs.
     <template v-else-if="ready">
       <TopBar :game="game" :team="team" :tick="hudTick" :paused="paused" :can-pause="!isNet" :basemap="basemap" :audio="audioMode" :opponent="opponent || undefined" @toggle="onToggle" @basemap="cycleBasemap" @leave="leave" />
       <div id="stage" ref="stage">
-        <canvas id="game" ref="canvas" />
+        <canvas id="game" ref="canvas" :class="{ pilot: piloting }" />
         <div id="msg" :class="{ show: msgShow }">{{ msgText }}</div>
         <div id="paused" v-if="paused">Paused</div>
         <div id="netstatus" v-if="netStatus || (isNet && (session as any)?.waiting)">{{ netStatus || 'Waiting for the server…' }}</div>

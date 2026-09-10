@@ -204,3 +204,10 @@ table.armies th.ua { color: var(--ua); } table.armies th.ru { color: #ff8a80; } 
 
 #nav .brand small { font-family: 'Barlow Condensed', sans-serif; font-weight: 500; font-size: 13px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-left: 6px; }
 .subtitle { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 2px 0 10px; }
+
+/* postures and the pilot button in the selection panel */
+#selpanel .forms.modes button.on { background: rgba(255, 214, 10, 0.08); }
+#selpanel .modeDesc { color: var(--ink-dim); font-size: 11px; line-height: 1.25; margin: 3px 0 4px; }
+#selpanel .modeLabel { color: var(--ink-dim); font-size: 11px; margin-top: 6px; }
+#selpanel .strike.on { border-color: var(--ua-accent); color: var(--ua-accent); }
+#game.pilot { cursor: crosshair; }

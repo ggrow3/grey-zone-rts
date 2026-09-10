@@ -71,6 +71,8 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       if (held.length && enemyHq) { held.sort((a, b) => dist(a, enemyHq) - dist(b, enemyHq)); fb = { x: held[0].x, y: held[0].y - toward * 90 }; }
       // guns belong in the trees: the firebase snaps to the nearest wood within 320
       { let best: Pt | null = null, bd = 320; for (const f of g.terrain.forestPx) { const d = dist(f, fb); if (d < bd) { bd = d; best = f; } } if (best) fb = { x: best.x, y: best.y }; }
+      // the computer's guns shoot and scoot once the enemy has radar to catch them
+      for (const u of arty) if (!u.mode && g.structs.some(s => !s.dead && s.team === E && s.type === 'radar')) u.mode = 'scoot';
       for (const u of arty) if (u.order.kind === 'idle' && dist(u, fb) > 90) { u.order = MOVE(fb.x + g.rand(-50, 50), fb.y + g.rand(-30, 30)); g.planRoute(u, u.order.x, u.order.y); }
       for (const u of arty) {
         if (u.order.kind !== 'idle' || u.target) continue;

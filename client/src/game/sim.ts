@@ -2,7 +2,7 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER_BASE, POWER_PER_SUBSTATION, POWER_PER_GENERATOR, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
@@ -59,7 +59,8 @@ export class Game {
   people = [{ total: 70 }, { total: 70 }];
   civ = { lost: [0, 0], harmedByUA: 0, defectors: 0, carsKilled: [0, 0] };
   defectT = 0; volunteerT = 0; carT = 0;
-  vision: { x: number; y: number; r: number }[][] = [[], []];
+  /** vision circles per team; a `deep` circle (a Mavic flying low) sees into woods and trenches out to its full radius */
+  vision: { x: number; y: number; r: number; deep?: boolean }[][] = [[], []];
   gameTime = 0; gameOver = false; winner = -1;
   /** the weather front over the whole map; fronts roll in on their own */
   weather: Weather = { kind: 'clear', until: 150, next: 'clear', warned: false };
@@ -123,7 +124,11 @@ export class Game {
   drainNotices(team: number): string[] { const out = this.notices.filter(n => n.team === team || n.team < 0).map(n => n.text); this.notices = []; return out; }
   find(id: number): Entity | undefined { const e = this.byId.get(id); return e && !e.dead ? e : undefined; }
   visMul(team: number): number { return this.upgrades[team].thermal ? 1.25 : 1; }
-  rangeOf(u: Unit): number { let r = u.def.range || 0; if (u.def.indirect && this.upgrades[u.team].shells) r += 90; if (!u.def.air && u.def.targets && u.def.targets.includes('air') && this.upgrades[u.team].aaRange) r += 40; return r; }
+  rangeOf(u: Unit): number {
+    let r = u.def.range || 0; if (u.def.indirect && this.upgrades[u.team].shells) r += 90; if (!u.def.air && u.def.targets && u.def.targets.includes('air') && this.upgrades[u.team].aaRange) r += 40;
+    const m = this.modeOf(u); if (m === 'passive') r *= 0.6; else if (m === 'hullDown') r *= 1.1;
+    return r;
+  }
   teamMul(team: number): number { return this.isBot[team] ? this.difficulty * (1 + this.gameTime / 1800) : 1; }
   pipelineIntact(team: number): boolean { return this.pumpSites.filter(ps => ps.team === team).every(ps => ps.struct && !ps.struct.dead && ps.struct.build >= 1); }
   gasIncome(team: number): number { return this.pipelineIntact(team) ? this.resources.filter(r => r.kind === 'gas' && r.owner === team).reduce((a, r) => a + (r.yieldRate || 0), 0) : 0; }
@@ -146,6 +151,22 @@ export class Game {
     return n;
   }
   moraleMul(u: Unit): number { return u.def.morale ? 0.5 + 0.5 * (u.morale === undefined ? 100 : u.morale) / 100 : 1; }
+  /** the unit's current posture: its chosen mode if the type has one, else the type's default, else '' */
+  modeOf(u: Unit): string { const m = modesOf(u.type); if (!m) return ''; return u.mode && m.some(x => x.key === u.mode) ? u.mode : m[0].key; }
+  /** a recon drone flying high is out of reach of machine guns; a Mavic in Low mode is not */
+  isHigh(u: Unit): boolean { return !!u.def.highAlt && this.modeOf(u) !== 'low'; }
+  /** a human has the sticks of this drone right now */
+  piloted(u: Unit): boolean { return (u.pilotT || 0) > 0; }
+  /** where a shoot-and-scoot gun displaces to after a fire mission: the nearest wood a little way off, else a random spot */
+  scootPoint(u: Unit): Pt {
+    let best: Pt | null = null, bd = Infinity;
+    for (const f of this.terrain.forestPx) { const dd = dist(f, u); if (dd > 70 && dd < 240 && dd < bd) { bd = dd; best = f; } }
+    const a = this.rand(0, Math.PI * 2), r = this.rand(90, 150);
+    const p = best ? { x: best.x + this.rand(-16, 16), y: best.y + this.rand(-16, 16) } : { x: u.x + dcos(a) * r, y: u.y + dsin(a) * r };
+    return { x: clamp(p.x, 20, W - 20), y: clamp(p.y, 20, H_LAND - 20) };
+  }
+  /** a jammer that is emitting or an air-defense radar that is switched on shows on enemy radar posts */
+  emitting(u: Unit): boolean { return (!!u.def.jam && this.modeOf(u) !== 'silent') || (u.type === 'aa' && this.modeOf(u) === 'active'); }
   /** Russian drones are automated from the start; Ukrainian drones need a squad until Full autonomy */
   needsOperator(def: UnitDef, team: number): boolean { if (def.tether) return true; return !!def.operated && team === UA && this.autoTier(UA) < 3; }
   operatorsOf(team: number): Unit[] { return this.units.filter(u => u.team === team && !u.dead && u.def.operator); }
@@ -192,7 +213,7 @@ export class Game {
   }
   inVisionClose(team: number, x: number, y: number, maxD: number): boolean {
     const list = this.vision[team];
-    for (let i = 0; i < list.length; i++) { const c = list[i]; if (hyp(c.x - x, c.y - y) <= Math.min(maxD, c.r)) return true; }
+    for (let i = 0; i < list.length; i++) { const c = list[i]; if (hyp(c.x - x, c.y - y) <= (c.deep ? c.r : Math.min(maxD, c.r))) return true; }
     return false;
   }
   canSee(src: Unit, t: Entity): boolean { return !!t.isStruct || t.seenBy[src.team]; }
@@ -353,7 +374,7 @@ export class Game {
       const p = s.kind === 'missile' && s.targetId !== undefined ? (this.find(s.targetId) || s) : s;
       const chance = this.upgrades[E].samNet ? spec.interceptUp : spec.intercept;
       let shot = false;
-      for (const a of this.units) { if (a.dead || a.team !== E || a.type !== 'aa') continue; if (dist(a, p) < 260 && this.rng.next() < chance) { shot = true; this.credit(a, a); a.kills = (a.kills || 0); break; } }
+      for (const a of this.units) { if (a.dead || a.team !== E || a.type !== 'aa' || this.modeOf(a) === 'passive') continue; if (dist(a, p) < 260 && this.rng.next() < chance) { shot = true; this.credit(a, a); a.kills = (a.kills || 0); break; } }
       if (shot) {
         this.stats.intercepted[E]++;
         this.effects.push({ kind: 'boom', x: p.x + this.rand(-60, 60), y: p.y - 90, r: 40, t: 0, dur: 0.9 });
@@ -419,17 +440,21 @@ export class Game {
 
   computeVision() {
     this.vision = [[], []];
-    for (const u of this.units) if (!u.dead && u.team >= 0) this.vision[u.team].push({ x: u.x, y: u.y, r: u.def.vision * this.visMul(u.team) * (u.def.air && this.upgrades[u.team].nightOps ? 1.3 : 1) * this.visionMul(u) });
+    for (const u of this.units) if (!u.dead && u.team >= 0) { const low = u.def.highAlt && !this.isHigh(u) && !u.landed && !u.grounded; this.vision[u.team].push({ x: u.x, y: u.y, r: u.def.vision * this.visMul(u.team) * (u.def.air && this.upgrades[u.team].nightOps ? 1.3 : 1) * this.visionMul(u) * (low ? 0.65 : 1), deep: low || undefined }); }
     for (const s of this.structs) if (!s.dead && s.build >= 1 && s.team >= 0) this.vision[s.team].push({ x: s.x, y: s.y, r: s.def.vision * this.visMul(s.team) * this.visionMul(null) * (this.isNight() && s.type === 'radar' ? 1.4 : 1) });
     for (const u of this.units) {
       if (u.dead) continue;
       u.cover = u.def.air ? 'open' : (u.def.troop && this.trenchAt(u.x, u.y)) ? 'trench' : this.terrain.coverOf(u.x, u.y);
       if (!u.def.air) u.onRoad = this.terrain.onRoadAt(u.x, u.y);
-      const hid = (u.def.troop || u.def.indirect) && u.cover !== 'open' ? COVER[u.cover].spot : 0;
+      let hid = (u.def.troop || u.def.indirect) && u.cover !== 'open' ? COVER[u.cover].spot : 0;
+      const mode = this.modeOf(u);
+      // creeping troops are hard to spot even in the open; an FPV sitting in ambush is a lump in a field
+      if (mode === 'creep') hid = hid ? Math.min(hid, 150) : 150;
+      if (u.ambushed) hid = 60;
       u.seenBy[UA] = u.team === UA || (hid ? this.inVisionClose(UA, u.x, u.y, hid) : this.inVision(UA, u.x, u.y));
       u.seenBy[RU] = u.team === RU || (hid ? this.inVisionClose(RU, u.x, u.y, hid) : this.inVision(RU, u.x, u.y));
-      // counter-battery: a gun that just fired is caught by any enemy radar post within 900
-      if (u.revealT && u.revealT > 0 && u.team >= 0) { const E = 1 - u.team; if (!u.seenBy[E] && this.structs.some(s => !s.dead && s.build >= 1 && s.type === 'radar' && s.team === E && dist(s, u) < 900)) u.seenBy[E] = true; }
+      // counter-battery: a gun that just fired, a jammer that is emitting, or a radar that is on is caught by any enemy radar post within 900
+      if (((u.revealT && u.revealT > 0) || this.emitting(u)) && u.team >= 0) { const E = 1 - u.team; if (!u.seenBy[E] && this.structs.some(s => !s.dead && s.build >= 1 && s.type === 'radar' && s.team === E && dist(s, u) < 900)) u.seenBy[E] = true; }
     }
   }
 
@@ -619,7 +644,7 @@ export class Game {
     for (const s of this.structs) if (!s.dead && s.build >= 1 && s.def.netR) nets.push(s);
     if (!nets.length) return;
     for (const u of this.units) {
-      if (u.dead || !u.def.netted || u.landed) continue;
+      if (u.dead || !u.def.netted || u.landed || u.ambushed) continue;
       for (const n of nets) {
         if (n.team === u.team || u.netsSeen.includes(n.id)) continue;
         if (dist(u, n) <= n.def.netR!) {
@@ -631,11 +656,11 @@ export class Game {
   }
   updateJamming(dt: number) {
     const src: { x: number; y: number; r: number; team: number }[] = [];
-    for (const u of this.units) if (!u.dead && u.def.jam) src.push({ x: u.x, y: u.y, r: u.def.jam, team: u.team });
+    for (const u of this.units) if (!u.dead && u.def.jam && this.modeOf(u) !== 'silent') src.push({ x: u.x, y: u.y, r: u.def.jam, team: u.team });
     for (const s of this.structs) if (!s.dead && s.build >= 1 && s.def.jam) src.push({ x: s.x, y: s.y, r: s.def.jam, team: s.team });
     if (!src.length) return;
     for (const u of this.units) {
-      if (u.dead || !u.def.air || !u.def.jammable || u.landed) continue;
+      if (u.dead || !u.def.air || !u.def.jammable || u.landed || u.ambushed) continue;
       for (const j of src) {
         if (j.team === u.team) continue;
         if (dist(u, j) <= j.r + (this.upgrades[j.team].ewPlus ? 60 : 0)) { u.hp -= 30 * (this.upgrades[u.team].freqHop ? 0.5 : 1) * dt; u.jamT = 0.2; if (u.hp <= 0) { this.stats.jammed[u.team]++; this.killUnit(u, false, j.team); break; } }
@@ -708,7 +733,7 @@ export class Game {
     if (!srcDef.targets) return false;
     const cls = this.targetClass(e);
     if (!srcDef.targets.includes(cls)) return false;
-    if (cls === 'air' && (e as Unit).def.highAlt && srcDef.lowAlt) return false;
+    if (cls === 'air' && srcDef.lowAlt && this.isHigh(e as Unit)) return false;
     return true;
   }
   canHitTarget(u: Unit, t: Entity): boolean { return (!!u.def.kamikaze || u.def.dmg > 0) && this.canEngage(u.def, t); }
@@ -751,7 +776,8 @@ export class Game {
     }
     const dx = tx - u.x, dy = ty - u.y, dd = hyp(dx, dy);
     if (dd < 0.5) return;
-    const step = Math.min(dd, u.def.speed * (u.onRoad ? (u.def.roadMul || 1.4) : 1) * (u.def.morale ? 0.7 + 0.3 * this.moraleMul(u) : 1) * this.fuelMul(u) * this.moveMul(u) * dt);
+    const mode = this.modeOf(u), postureMul = mode === 'creep' ? 0.55 : this.piloted(u) ? PILOT.speed : 1;
+    const step = Math.min(dd, u.def.speed * (u.onRoad ? (u.def.roadMul || 1.4) : 1) * (u.def.morale ? 0.7 + 0.3 * this.moraleMul(u) : 1) * this.fuelMul(u) * this.moveMul(u) * postureMul * dt);
     const nx = u.x + dx / dd * step, ny = u.y + dy / dd * step;
     if (!u.def.air) {
       const blk = this.terrain.waterBlock(u.x, u.y, nx, ny);
@@ -779,6 +805,7 @@ export class Game {
     if (u.dead) return;
     const d = u.def;
     u.cool -= dt; if (u.jamT > 0) u.jamT -= dt; if (u.revealT && u.revealT > 0) u.revealT -= dt;
+    if (u.pilotT && u.pilotT > 0) { u.pilotT -= dt; if (u.pilotT <= 0) { u.pilotT = 0; u.diveAt = null; } }
     if (u.target && u.target.dead) u.target = null;
     if (u.order.kind === 'attack' && (!u.order.target || u.order.target.dead)) u.order = IDLE();
     const range = this.rangeOf(u), minR = d.minRange || 0;
@@ -793,7 +820,7 @@ export class Game {
     if (d.endurance) {
       if (u.batt === undefined) u.batt = d.endurance;
       if (u.landed) { u.rechargeT! -= dt * (u.team >= 0 && this.supply[u.team].power < 1 ? 1 / 3 : 1); if (u.rechargeT! <= 0 && !(this.quadsGrounded() && d.electric && !d.large)) { u.landed = false; u.batt = d.endurance; u.grace = 0; } return; }
-      const diving = d.kamikaze && u.target && !u.target.dead;
+      const diving = (d.kamikaze && u.target && !u.target.dead) || u.ambushed;
       if (!diving) u.batt -= dt * (this.weather.kind === 'rain' ? 1.5 : this.weather.kind === 'snow' ? 2 : 1);
       if (!diving && u.batt < d.endurance * 0.25) {
         const spot = this.landingSpot(u);
@@ -823,6 +850,20 @@ export class Game {
         }
       }
     }
+    // an FPV in ambush sits with the motors off until something worth a warhead comes close
+    if (u.ambushed) {
+      if (this.modeOf(u) !== 'ambush' || this.piloted(u) || u.order.kind !== 'idle') u.ambushed = false;
+      else {
+        const t = this.acquireFor(u, PILOT.ambushReach, 0);
+        if (t && this.inLink(u, t)) {
+          u.ambushed = false; u.target = t; u.order = ATTACK(t);
+          this.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, red: true, team: u.team });
+          this.notify(u.team, 'Ambush sprung near ' + nearestPlace(u.x, u.y) + ': ' + d.label[u.team] + ' pouncing on a ' + (t.isStruct ? t.def.label.toLowerCase() : t.def.label[t.team].toLowerCase()));
+        } else return;
+      }
+    } else if (d.kamikaze && this.modeOf(u) === 'ambush' && !u.target && u.order.kind === 'idle' && !this.piloted(u)) {
+      u.ambushed = true; this.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, team: u.team }); return;
+    }
     if (d.kamikaze) { this.updateKamikaze(u, dt); return; }
 
     if (u.salvoLeft > 0) {
@@ -841,6 +882,14 @@ export class Game {
       return;
     }
     u.digT = undefined;
+    // shoot and scoot: after a fire mission the gun displaces before it fires again
+    if (d.indirect && this.modeOf(u) === 'scoot') {
+      if (u.scootPending && u.salvoLeft <= 0) { u.scootPending = false; u.scoot = this.scootPoint(u); this.effects.push({ kind: 'mark', x: u.scoot.x, y: u.scoot.y, t: 0, dur: 0.6, team: u.team }); }
+      if (u.scoot) {
+        if (dist(u, u.scoot) < 8) u.scoot = null;
+        else { this.moveToward(u, u.scoot.x, u.scoot.y, dt); u.target = null; return; }
+      }
+    } else { u.scoot = null; u.scootPending = false; }
     if (u.order.kind === 'bombard' && d.indirect) {
       const dd = dist(u, u.order);
       if (dd > range) this.moveToward(u, u.order.x, u.order.y, dt);
@@ -860,12 +909,17 @@ export class Game {
     }
     u.salvoAt = null;
 
+    const mode = this.modeOf(u), piloted = this.piloted(u);
     let tgt: Entity | null = null;
     if (u.order.kind === 'attack') tgt = u.order.target;
     else if (d.dmg > 0) {
-      const hunt = d.acquire ? (d.acquire + (this.upgrades[u.team].repeaters ? 120 : 0)) * (d.air ? this.huntMul() : 1) : range;
+      // a guarding interceptor only looks a short way out; a piloted drone shoots what its pilot brings it to
+      let hunt = d.acquire ? (d.acquire + (this.upgrades[u.team].repeaters ? 120 : 0)) * (d.air ? this.huntMul() : 1) : range;
+      if (mode === 'guard') hunt = Math.min(hunt, PILOT.guardReach);
+      if (piloted) hunt = range;
       if (u.target && dist(u, u.target) <= Math.max(range, hunt) && this.canSee(u, u.target)) tgt = u.target;
       else tgt = this.acquireFor(u, u.order.kind === 'idle' ? hunt : range, minR);
+      if (tgt && mode === 'guard' && u.post && dist(tgt, u.post) > PILOT.guardReach + 60) tgt = null;
     }
     u.target = tgt;
 
@@ -879,8 +933,16 @@ export class Game {
       else if (minR && dd < minR) this.moveAway(u, tgt, dt);
     } else if (u.order.kind === 'idle' && tgt) {
       const dd = dist(u, tgt) - (tgt.isStruct ? tgt.r * 0.5 : 0);
-      if (d.acquire && dd > range * 0.9) this.moveToward(u, tgt.x, tgt.y, dt);
+      if (d.acquire && dd > range * 0.9 && !piloted) this.moveToward(u, tgt.x, tgt.y, dt);
       else if (minR && dd < minR) this.moveAway(u, tgt, dt);
+    } else if (u.order.kind === 'idle') {
+      if (mode === 'guard' && u.post && dist(u, u.post) > 30) this.moveToward(u, u.post.x, u.post.y, dt);
+      else if (mode === 'escort') {
+        // a fire group on escort shadows the nearest friendly truck
+        let tr: Unit | null = null, bd = 700;
+        for (const o of this.units) { if (o.dead || o.team !== u.team || o.type !== 'truck') continue; const dd = dist(o, u); if (dd < bd) { bd = dd; tr = o; } }
+        if (tr && bd > 34) this.moveToward(u, tr.x, tr.y, dt);
+      }
     }
 
     if (tgt && d.dmg > 0 && u.cool <= 0 && this.hasAmmo(u)) {
@@ -905,13 +967,17 @@ export class Game {
   updateKamikaze(u: Unit, dt: number) {
     const d = u.def;
     if (u.order.kind === 'attack' && u.order.target && !u.order.target.dead) u.target = u.order.target;
+    const mode = this.modeOf(u), piloted = this.piloted(u);
     if (!u.target) {
       if (u.order.kind === 'move') {
         const dd = dist(u, u.order);
         this.moveToward(u, u.order.x, u.order.y, dt);
+        // a piloted drone flown into a point goes off there: a treeline, a trench, a suspected position
+        if (u.diveAt && piloted && dist(u, u.diveAt) < 8) { this.detonate(u, null); return; }
         if (dd < 6) { u.order = IDLE(); this.nextWaypoint(u); }
       }
-      if (d.acquire! > 0) {
+      // Hunt mode (and every drone without modes) picks its own targets; Hold and Ambush wait for orders, and a pilot chooses
+      if (d.acquire! > 0 && (mode === 'hunt' || mode === '') && !piloted) {
         const reach = (d.acquire! + (this.upgrades[u.team].repeaters ? 120 : 0)) * this.huntMul();
         const t = (d.prefer && this.acquirePreferred(u, reach)) || this.acquireFor(u, reach, 0);
         if (t && this.inLink(u, t)) { u.target = t; u.order = ATTACK(t); }
@@ -919,11 +985,17 @@ export class Game {
       return;
     }
     this.moveToward(u, u.target.x, u.target.y, dt);
-    if (dist(u, u.target) <= rOf(u.target) + 4) {
-      if (d.dmg > 0) { this.explosionFx(u.x, u.y, (d.splash || 0) + 14, true); this.damageArea(u.x, u.y, d.splash || 0, d.dmg, u.team, u.target, d.vsStruct || 1, d.vsVehicle || 1, true, u); }
-      else this.effects.push({ kind: 'caught', x: u.x, y: u.y, t: 0, dur: 0.4 });
-      this.killUnit(u, true);
-    }
+    if (dist(u, u.target) <= rOf(u.target) + 4) this.detonate(u, u.target);
+  }
+  /** a kamikaze drone goes off: on its target, or on the ground where its pilot flew it */
+  detonate(u: Unit, primary: Entity | null) {
+    const d = u.def, piloted = this.piloted(u);
+    if (d.dmg > 0) {
+      this.explosionFx(u.x, u.y, (d.splash || 0) + 14, true);
+      this.damageArea(u.x, u.y, d.splash || 0, d.dmg * (piloted ? PILOT.dmg : 1), u.team, primary, d.vsStruct || 1, d.vsVehicle || 1, true, u);
+      if (piloted) this.effects.push({ kind: 'text', x: u.x, y: u.y - 16, t: 0, dur: 1.4, team: u.team, text: primary ? 'DIRECT HIT +20%' : 'IMPACT' });
+    } else this.effects.push({ kind: 'caught', x: u.x, y: u.y, t: 0, dur: 0.4 });
+    this.killUnit(u, true);
   }
 
   fireAt(u: Unit, t: Entity) {
@@ -940,7 +1012,7 @@ export class Game {
   directHit(src: Unit, t: Entity, dmg: number, splash: number) {
     this.effects.push({ kind: 'tracer', x: src.x, y: src.y, tx: t.x, ty: t.y, t: 0, dur: 0.12, team: src.team });
     if (t.isUnit && t.def.air) {
-      const ev = clamp((t.def.evade || 0) + 0.04 * rankOf(t) + (src.def.air ? AIR_VS_AIR_EVADE : 0) - (this.weather.kind === 'rain' ? 0.1 : 0) + (t.team >= 0 && this.upgrades[t.team].evasion ? 0.15 : 0) - (src.team >= 0 && this.upgrades[src.team].gunnery ? 0.15 : 0), 0, 0.9);
+      const ev = clamp((t.def.evade || 0) + 0.04 * rankOf(t) + (src.def.air ? AIR_VS_AIR_EVADE : 0) + (this.piloted(t) ? PILOT.evade : 0) - (this.weather.kind === 'rain' ? 0.1 : 0) + (t.team >= 0 && this.upgrades[t.team].evasion ? 0.15 : 0) - (src.team >= 0 && this.upgrades[src.team].gunnery ? 0.15 : 0), 0, 0.9);
       if (this.rng.next() < ev) { this.effects.push({ kind: 'hit', x: t.x + this.rand(-14, 14), y: t.y + this.rand(-14, 14), t: 0, dur: 0.15 }); return; }
     }
     const vs = src.def.vsStruct || 1, vv = src.def.vsVehicle || 1;
@@ -954,6 +1026,7 @@ export class Game {
     const tx = px + this.rand(-spread, spread), ty = py + this.rand(-spread, spread);
     const dd = hyp(tx - u.x, ty - u.y);
     u.revealT = u.cover === 'forest' ? 2 : u.cover === 'open' ? 6 : 3;
+    u.scootPending = true;
     if (d.ammo) { if (u.ammo! <= 0) return; u.ammo!--; if (u.ammo === 0) this.notify(u.team, u.def.label[u.team] + ' fired its last shell'); }
     this.projectiles.push({ x: u.x, y: u.y, sx: u.x, sy: u.y, tx, ty, t: 0, dur: dd / (d.shellSpeed || 260), dmg: d.dmg * (this.upgrades[u.team].ammo ? 1.15 : 1) * (1 + 0.06 * rankOf(u)), splash: d.splash || 0, team: u.team,
       arc: Math.min(110, dd * 0.22), rocket: !!d.salvo, dead: false, srcId: u.id, srcType: u.type });
@@ -998,6 +1071,7 @@ export class Game {
     if (t.dead) return;
     if (drone && t.isUnit && isVehicle(t) && t.team >= 0 && this.upgrades[t.team].cages) amt *= 0.65;
     if (t.isUnit) amt *= 1 - 0.06 * rankOf(t);
+    if (t.isUnit) { const m = this.modeOf(t); if (m === 'hullDown' && !heavy) amt *= 0.7; else if (m === 'creep' && drone) amt *= 0.65; }
     if (t.isUnit && t.def.troop && !heavy) { const cv = COVER[t.cover || 'open']; amt *= cv.take; if (drone) { amt *= cv.drone; if (t.cover === 'trench' && this.terrain.coverOf(t.x, t.y) === 'forest') amt *= TRENCH_IN_FOREST; } }
     else if (t.isUnit && t.def.indirect && drone) amt *= COVER[t.cover || 'open'].drone;
     if (t.isUnit && t.def.morale) t.morale = clamp((t.morale === undefined ? 90 : t.morale) - amt * 0.25, 0, 100);
@@ -1257,7 +1331,7 @@ export class Game {
       sw.t -= dt; if (sw.t > 0) continue; sw.t = 0.5;
       const L = sw.leader, offs = this.formationOffsets(sw.members.length, sw.formation, 26);
       sw.members.forEach((m, i) => {
-        if (m === L || m.target || m.order.kind !== 'idle' || m.landed || L.landed) return;
+        if (m === L || m.target || m.order.kind !== 'idle' || m.landed || L.landed || m.ambushed || this.piloted(m)) return;
         const o = this.rotOff(offs[i], L.angle), sx = L.x + o.x, sy = L.y + o.y;
         if (hyp(m.x - sx, m.y - sy) > 28) m.order = MOVE(clamp(sx, 6, W - 6), clamp(sy, 6, H - 6));
       });
@@ -1291,6 +1365,12 @@ export class Game {
     if (!def.netR) for (const rs of this.resources) if (dist(rs, { x, y }) < rs.r + def.r + 8) return 'Overlaps ' + rs.name.toLowerCase();
     if (this.funds[team] < def.cost) return 'Not enough funds';
     return null;
+  }
+  /** a hull-down vehicle that is told to move leaves its scrape */
+  private leaveHullDown(team: number, list: Unit[]) {
+    let n = 0;
+    for (const u of list) if (this.modeOf(u) === 'hullDown') { u.mode = 'mobile'; n++; }
+    if (n) this.notify(team, n + ' vehicle' + (n > 1 ? 's' : '') + ' left hull-down to move');
   }
   private ownUnits(team: number, ids: number[]): Unit[] {
     const out: Unit[] = [];
@@ -1328,12 +1408,15 @@ export class Game {
           return;
         }
         for (const u of selUnits) u.waypoints = undefined;
+        this.leaveHullDown(team, selUnits);
         const airSel = selUnits.filter(u => u.def.air), groundSel = selUnits.filter(u => !u.def.air);
         const talker = groundSel.find(u => u.def.troop) || groundSel[0]; if (talker) this.bark('ack', talker);
         if (airSel.length) {
           const seen = new Set<Swarm>();
           for (const u of airSel) { const sw = this.swarmOf(u); if (sw && !seen.has(sw)) { seen.add(sw); this.formationMove(sw.members, cmd.x, cmd.y, sw.formation); } }
           this.formationMove(airSel.filter(u => !this.swarmOf(u)), cmd.x, cmd.y, cmd.formation);
+          // a guarding interceptor's post moves with it
+          for (const u of airSel) if (this.modeOf(u) === 'guard' && u.order.kind === 'move') u.post = { x: u.order.x, y: u.order.y };
         }
         const n = groundSel.length, cols = Math.ceil(Math.sqrt(Math.max(1, n))), sp = 28, rows = Math.ceil(n / cols);
         groundSel.forEach((u, i) => {
@@ -1349,6 +1432,7 @@ export class Game {
         if (!enemy) return;
         const selUnits = this.ownUnits(team, cmd.ids).filter(e => !e.shaken && !e.grounded);
         for (const u of selUnits) u.waypoints = undefined;
+        this.leaveHullDown(team, selUnits.filter(u => !this.canHitTarget(u, enemy) || dist(u, enemy) > this.rangeOf(u)));
         const shouter = selUnits.find(u => u.def.troop); if (shouter) this.bark('attack', shouter);
         let warned = false;
         for (const u of selUnits) {
@@ -1462,6 +1546,32 @@ export class Game {
         this.funds[RU] -= STRIKES.missile.cost; this.missileT = STRIKES.missile.cooldown; this.stats.missiles++;
         this.scheduleStrike(RU, 'missile', t.x, t.y, t.id);
         this.notify(RU, 'Iskander launched: ' + STRIKES.missile.warn + ' seconds to impact');
+        return;
+      }
+      case 'mode': {
+        const sel = this.ownUnits(team, cmd.ids).filter(u => { const m = modesOf(u.type); return !!m && m.some(x => x.key === cmd.mode); });
+        if (!sel.length) return;
+        let n = 0, label = '';
+        for (const u of sel) {
+          if (this.modeOf(u) === cmd.mode) continue;
+          u.mode = cmd.mode; n++; label = modesOf(u.type)!.find(x => x.key === cmd.mode)!.label;
+          if (cmd.mode === 'hullDown') { u.order = IDLE(); u.path = null; u.waypoints = undefined; }
+          if (cmd.mode === 'guard') u.post = { x: u.x, y: u.y };
+          if (cmd.mode === 'hunt' || cmd.mode === 'hold') u.ambushed = false;
+          if (cmd.mode !== 'scoot') { u.scoot = null; u.scootPending = false; }
+        }
+        if (n) this.notify(team, n + ' unit' + (n > 1 ? 's' : '') + ' switched to ' + label);
+        return;
+      }
+      case 'steer': {
+        const u = this.find(cmd.id);
+        if (!u || !u.isUnit || u.team !== team || !u.def.air || u.def.auto || u.grounded || u.landed) return;
+        u.pilotT = PILOT.hold; u.ambushed = false; u.waypoints = undefined;
+        const enemy = cmd.targetId !== undefined ? this.findEnemy(team, cmd.targetId) : null;
+        if (enemy && this.canHitTarget(u, enemy) && this.inLink(u, enemy)) { u.order = ATTACK(enemy); u.target = enemy; u.diveAt = null; return; }
+        const lp = this.leashPoint(u, clamp(cmd.x, 6, W - 6), clamp(cmd.y, 6, H - 6));
+        u.order = MOVE(lp.x, lp.y); u.target = null;
+        u.diveAt = cmd.dive && u.def.kamikaze ? { x: lp.x, y: lp.y } : null;
         return;
       }
       case 'wave': {

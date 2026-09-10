@@ -228,7 +228,7 @@ export const LEVELS: Level[] = [
       'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road, halfway up and out of sight of the city, and take it, cargo and all.',
       'Then the motorcycles go in. Grab the town before the trenches react. Za Rodinu, commander.',
     ],
-    shots: g => [BELGOROD, g.site('Zhuravlyovka'), { x: 1498, y: 995 }, g.site('Kozacha Lopan')],
+    shots: g => [BELGOROD, g.site('Zhuravlyovka'), geo(50.2377, 36.2651), g.site('Kozacha Lopan')],
     sideNote: 'Russia: drones need no squads, North Koreans cost no personnel, and your troops shout "Ura!" But morale breaks when you hold fewer towns than the enemy.',
     scenario: g => {
       g.capture('Zhuravlyovka', RU); const Z = g.site('Zhuravlyovka'); squads(g, RU, 'infantry', Z.x, Z.y + 40, 3); g.funds[RU] = 900;
@@ -240,7 +240,7 @@ export const LEVELS: Level[] = [
       { title: 'Pyongyang\'s men', text: 'Queue two North Korean squads at the barracks (B): 100 funds, no draw on your personnel, ten at most. They are tough, and they have morale.',
         done: has(RU, 'dprk', 2), marker: own('barracks', RU) },
       { title: 'Highway robbery', text: 'A Ukrainian supply truck drives from Kharkiv to Kozacha Lopan every 40 seconds. Ambush it halfway up the highway, at the marker. The road south from Hoptivka passes east of Kozacha Lopan, out of range of the trenches on its west side; closer to Kharkiv the IFV and the squads at the headquarters would see you. Park a squad right on the road, press E to dig in, and wait. A squad within 45 of an unescorted truck takes it and its 100 funds.',
-        done: g => g.captured[RU] >= 1, marker: () => ({ x: 1498, y: 995, r: 90 }) },
+        done: g => g.captured[RU] >= 1, marker: () => ({ ...geo(50.2377, 36.2651), r: 90 }) },
       { title: 'Motorcycle rush', text: 'Queue two motorcycle groups (C at the barracks): speed 105, 80% faster on roads. Rush Kozacha Lopan before the trench squads react, and bring the drones.',
         done: g => g.typeCount(RU, 'moto') >= 2 && townOwned('Kozacha Lopan', RU)(g), marker: town('Kozacha Lopan') },
       { title: 'Keep them steady', text: 'Morale falls while Russia holds fewer towns than Ukraine, when a friend dies nearby, and with hunger. Hold two towns and keep every Korean squad above 50%.',

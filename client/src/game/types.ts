@@ -23,6 +23,18 @@ export interface Unit {
   revealT?: number;
   /** queued move destinations (Shift+right-click) taken in order after the current move */
   waypoints?: Pt[];
+  /** posture chosen by the player (see MODE_SETS); undefined means the type's default */
+  mode?: string;
+  /** seconds a human pilot's last steer input stays in force */
+  pilotT?: number;
+  /** a piloted kamikaze drone flying into this point explodes there */
+  diveAt?: Pt | null;
+  /** an FPV sitting on the ground in ambush, motors off */
+  ambushed?: boolean;
+  /** the spot a guarding interceptor returns to */
+  post?: Pt | null;
+  /** shoot-and-scoot: a fire mission was just completed; the point the gun is moving to before it fires again */
+  scootPending?: boolean; scoot?: Pt | null;
 }
 
 export interface Struct {
@@ -93,4 +105,8 @@ export type Command =
   | { kind: 'ops'; ids: number[]; delta: 1 | -1 }
   | { kind: 'kab'; x: number; y: number }
   | { kind: 'deep' }
-  | { kind: 'iskander'; targetId: number };
+  | { kind: 'iskander'; targetId: number }
+  /** switch the posture of units that have that mode */
+  | { kind: 'mode'; ids: number[]; mode: string }
+  /** a human pilot's stick input for one drone: fly toward (x, y), attack targetId, or (kamikaze) dive into the point */
+  | { kind: 'steer'; id: number; x: number; y: number; targetId?: number; dive?: boolean };

@@ -1,6 +1,6 @@
 // Passable terrain derived from the map data: rivers and reservoirs (crossed only at bridges), the road graph
 // ground units route along, and forest/urban cover. Pure and deterministic, built once and shared.
-import { geo, RIVERS, RESERVOIRS, ROADS, RAILWAYS, PLACES, FORESTS } from './map';
+import { geo, px, RIVERS, RESERVOIRS, ROADS, RAILWAYS, PLACES, FORESTS } from './map';
 import type { Pt } from './map';
 import { hyp, clamp } from './dmath';
 
@@ -49,9 +49,9 @@ export class Terrain {
       const P = pts.map(([la, lo]) => geo(la, lo));
       for (let i = 0; i < P.length - 1; i++) for (const [a, b] of this.waterSegs) { const h = segHit(P[i], P[i + 1], a, b); if (h) this.bridges.push(h); }
     }
-    for (const [, la, lo] of PLACES) { const c = geo(la, lo); if (this.waterSegs.some(([a, b]) => distToSeg(c, a, b) < 60)) this.bridges.push({ x: c.x, y: c.y }); }
-    for (const [la, lo, rad] of FORESTS) { const c = geo(la, lo); this.forestPx.push({ x: c.x, y: c.y, r: rad }); }
-    for (const [, la, lo, size] of PLACES) if (size >= 8) { const c = geo(la, lo); this.urbanPx.push({ x: c.x, y: c.y, r: size * 1.15 + 10 }); }
+    for (const [, la, lo] of PLACES) { const c = geo(la, lo); if (this.waterSegs.some(([a, b]) => distToSeg(c, a, b) < px(60))) this.bridges.push({ x: c.x, y: c.y }); }
+    for (const [la, lo, rad] of FORESTS) { const c = geo(la, lo); this.forestPx.push({ x: c.x, y: c.y, r: px(rad) }); }
+    for (const [, la, lo, size] of PLACES) if (size >= 8) { const c = geo(la, lo); this.urbanPx.push({ x: c.x, y: c.y, r: px(size) * 1.15 + 10 }); }
   }
 
   private buildRoads() {

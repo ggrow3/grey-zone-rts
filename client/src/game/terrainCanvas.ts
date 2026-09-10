@@ -1,6 +1,6 @@
 // The painted map (fields, forests, rivers, roads, towns, border) and the optional real map tiles under it.
 // Visual only: uses its own seeded random so it never touches the simulation's RNG.
-import { W, H, H_LAND, MM_W, MM_H, geo, PLACES, RIVERS, RESERVOIRS, BORDER, ROADS, RAILWAYS, FORESTS, PIPELINES, LON0, LON1, LAT0, LAT1 } from './map';
+import { W, H, H_LAND, MM_W, MM_H, MAP_SCALE, geo, px, PLACES, RIVERS, RESERVOIRS, BORDER, ROADS, RAILWAYS, FORESTS, PIPELINES, LON0, LON1, LAT0, LAT1 } from './map';
 import type { LatLon } from './map';
 import { getTerrain } from './terrain';
 import { Rng } from './rng';
@@ -51,8 +51,8 @@ export class TerrainCanvas {
     const R = new Rng(20220224);
     t.fillStyle = '#4e5b3c'; t.fillRect(0, 0, W, H);
     const fields = ['#56643f', '#5f6a41', '#6b6242', '#495837', '#7a7048', '#5a5f3a', '#66603d'];
-    for (let i = 0; i < 230; i++) {
-      const w = 120 + R.next() * 320, h = 90 + R.next() * 260;
+    for (let i = 0; i < Math.round(230 * MAP_SCALE * MAP_SCALE); i++) {
+      const w = px(120 + R.next() * 320), h = px(90 + R.next() * 260);
       const x = R.next() * W - w / 2, y = R.next() * H - h / 2;
       t.fillStyle = fields[Math.floor(R.next() * fields.length)];
       t.globalAlpha = 0.85; t.fillRect(x, y, w, h);
@@ -65,9 +65,9 @@ export class TerrainCanvas {
       }
       t.globalAlpha = 1;
     }
-    for (const [lat, lon, rad] of FORESTS) {
-      const c = geo(lat, lon);
-      for (let k = 0; k < rad * 1.6; k++) {
+    for (const [lat, lon, rad0] of FORESTS) {
+      const c = geo(lat, lon), rad = px(rad0);
+      for (let k = 0; k < rad * 1.6 * MAP_SCALE; k++) {
         const a = R.next() * Math.PI * 2, d = Math.sqrt(R.next()) * rad;
         t.fillStyle = R.next() < 0.5 ? '#2f4a2a' : '#385a30';
         t.beginPath(); t.arc(c.x + Math.cos(a) * d * 1.3, c.y + Math.sin(a) * d, 6 + R.next() * 6, 0, Math.PI * 2); t.fill();
@@ -75,9 +75,9 @@ export class TerrainCanvas {
     }
     t.lineCap = 'round'; t.lineJoin = 'round';
     for (const [, pts] of RESERVOIRS) { poly(t, pts, true); t.fillStyle = '#3d6f8f'; t.fill(); t.strokeStyle = '#6fa3c4'; t.lineWidth = 1.5; t.stroke(); }
-    for (const [, pts, w] of RIVERS) { poly(t, pts, false); t.strokeStyle = '#3d6f8f'; t.lineWidth = w + 2; t.stroke(); t.strokeStyle = '#6fa3c4'; t.lineWidth = w; t.stroke(); }
+    for (const [, pts, w0] of RIVERS) { const w = px(w0); poly(t, pts, false); t.strokeStyle = '#3d6f8f'; t.lineWidth = w + 2; t.stroke(); t.strokeStyle = '#6fa3c4'; t.lineWidth = w; t.stroke(); }
     for (const r of ROADS) {
-      poly(t, r.pts, false); t.strokeStyle = '#75705f'; t.lineWidth = r.w; t.stroke();
+      poly(t, r.pts, false); t.strokeStyle = '#75705f'; t.lineWidth = px(r.w); t.stroke();
       if (r.w >= 8) { t.strokeStyle = '#a89f86'; t.lineWidth = 1; t.setLineDash([12, 12]); t.stroke(); t.setLineDash([]); }
     }
     for (const pts of RAILWAYS) {
@@ -85,12 +85,12 @@ export class TerrainCanvas {
       t.strokeStyle = '#c8c2ae'; t.lineWidth = 1.2; t.setLineDash([7, 7]); t.stroke(); t.setLineDash([]);
     }
     for (const b of T.bridges) { t.fillStyle = '#8a7a5a'; t.strokeStyle = '#2a2621'; t.lineWidth = 1.5; t.fillRect(b.x - 9, b.y - 5, 18, 10); t.strokeRect(b.x - 9, b.y - 5, 18, 10); }
-    for (const [, lat, lon, size] of PLACES) {
-      const c = geo(lat, lon);
+    for (const [, lat, lon, size0] of PLACES) {
+      const c = geo(lat, lon), size = px(size0);
       t.beginPath();
       for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, rr = size * (0.7 + R.next() * 0.5); const px = c.x + Math.cos(a) * rr * 1.15, py = c.y + Math.sin(a) * rr; if (i) t.lineTo(px, py); else t.moveTo(px, py); }
       t.closePath(); t.fillStyle = '#7d7969'; t.fill(); t.strokeStyle = '#4f4c43'; t.lineWidth = 1.5; t.stroke();
-      if (size >= 14) {
+      if (size0 >= 14) {
         t.save(); t.clip(); t.strokeStyle = 'rgba(60,58,50,0.5)'; t.lineWidth = 1;
         for (let k = -size * 1.3; k < size * 1.3; k += 9) { t.beginPath(); t.moveTo(c.x + k, c.y - size * 1.2); t.lineTo(c.x + k, c.y + size * 1.2); t.stroke(); t.beginPath(); t.moveTo(c.x - size * 1.4, c.y + k); t.lineTo(c.x + size * 1.4, c.y + k); t.stroke(); }
         t.restore();
@@ -99,12 +99,12 @@ export class TerrainCanvas {
     poly(t, BORDER, false); t.strokeStyle = '#1a1712'; t.lineWidth = 4; t.stroke();
     t.strokeStyle = '#efe8d2'; t.lineWidth = 2; t.setLineDash([10, 10]); t.stroke(); t.setLineDash([]);
     t.strokeStyle = 'rgba(193,18,31,0.35)'; t.lineWidth = 14; t.stroke();
-    for (let i = 0; i < 110; i++) {
+    for (let i = 0; i < Math.round(110 * MAP_SCALE); i++) {
       const seg = BORDER[Math.floor(R.next() * (BORDER.length - 1))]; const c = geo(seg[0], seg[1]);
-      scorch(t, c.x + (R.next() - 0.5) * 260, c.y + (R.next() - 0.5) * 160, 6 + R.next() * 14);
+      scorch(t, c.x + (R.next() - 0.5) * px(260), c.y + (R.next() - 0.5) * px(160), 6 + R.next() * 14);
     }
     drawPipelines(t);
-    for (const [name, lat, lon, size, font] of PLACES) { const c = geo(lat, lon); outlinedText(t, name, c.x, c.y - size - 9, font, size >= 40 ? '#fff6dc' : '#efe8d2'); }
+    for (const [name, lat, lon, size, font] of PLACES) { const c = geo(lat, lon); outlinedText(t, name, c.x, c.y - px(size) - 9, font, size >= 40 ? '#fff6dc' : '#efe8d2'); }
     for (const [name, pts, , at] of RIVERS) { const c = geo(pts[at][0], pts[at][1]); outlinedText(t, name, c.x + 26, c.y - 10, 11, '#a9d1ea', true); }
     for (const [name, pts] of RESERVOIRS) { const c = geo(pts[0][0], pts[0][1]); outlinedText(t, name, c.x + 60, c.y + 22, 11, '#a9d1ea', true); }
     const bl = geo(BORDER[6][0], BORDER[6][1]); outlinedText(t, 'State border', bl.x + 150, bl.y - 14, 11, '#efe8d2', true);

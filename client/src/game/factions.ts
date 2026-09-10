@@ -1,6 +1,7 @@
 // How the two armies differ, with the numbers taken from the rules in data.ts and sim.ts.
 import { UNITS, UPGRADES, GAS_YIELD, FUEL_BASE, FUEL_PER_NODE, WAVE_COST, WAVE_COOLDOWN, BARKS } from './data';
-import { RESOURCES, PIPELINES } from './map';
+import { RESOURCES, PIPELINES, KHARKIV, BELGOROD, placePos } from './map';
+import { dist } from './dmath';
 
 export interface FactionFact { topic: string; ua: string; ru: string; source: string }
 
@@ -22,7 +23,7 @@ export const FACTION_FACTS: FactionFact[] = [
   { topic: 'Defections', ua: 'Cut-off wounded Russian squads near your lines surrender while support is 70 or more; holding Shebekino or Zhuravlyovka brings a volunteer squad every 75 s', ru: 'Loses them', source: 'updateCivilians()' },
   { topic: 'Morale', ua: 'International Legion squads have morale and wages', ru: 'North Koreans and mercenaries have morale; Koreans lose 0.8 a second while Russia holds fewer towns', source: 'updateMorale()' },
   { topic: 'Trade convoys', ua: 'West to the NATO border, first at 0:30 then every 75 s', ru: 'East into the interior, first at 0:45 then every 75 s', source: 'tradeEdge(), tradeT' },
-  { topic: 'Nearest town', ua: 'Lyptsi, 487 px north-east of Kharkiv', ru: 'Zhuravlyovka, 448 px south of Belgorod', source: 'TOWNS' },
+  { topic: 'Nearest town', ua: 'Lyptsi, ' + Math.round(dist(KHARKIV, placePos('Lyptsi'))) + ' px north-east of Kharkiv', ru: 'Zhuravlyovka, ' + Math.round(dist(BELGOROD, placePos('Zhuravlyovka'))) + ' px south of Belgorod', source: 'TOWNS' },
   { topic: 'Starting forces', ua: '5 squads, an IFV, air defense, 2 fire groups, 9 buildings', ru: 'The same', source: 'Game.setup()' },
   { topic: 'Aviation', ua: 'F-16 glide bombs: 500 funds, 90 s reload', ru: 'KAB-500 glide bombs: 350 funds, 40 s reload, plus Iskander missiles on buildings (800, 120 s)', source: 'STRIKES, apply(kab), apply(iskander)' },
   { topic: 'Deep strike', ua: 'A Liutyi and 600 funds sent at a refinery: 60% get through, each burning refinery cuts Russian income 15% for four minutes', ru: 'Refineries burn; no equivalent on this map (the grid takes it from Gerans and missiles)', source: 'apply(deep), refineriesBurning()' },

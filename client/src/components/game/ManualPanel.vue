@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS } from '../../game/data';
+import { UNITS, STRUCTS, CIV_TYPES, STRATEGY, BUILDING_NOTES, UA, TARGET_WORDS, MODE_SETS, MODE_SET_OF } from '../../game/data';
 import type { UnitDef } from '../../game/data';
 import { BARK_GLOSS, COUNTERS } from '../../game/data';
 import { FACTION_FACTS } from '../../game/factions';
@@ -20,7 +20,11 @@ function unitStats(d: UnitDef) {
   if (d.side !== undefined) bits.push(d.side === UA ? 'Ukraine only' : 'Russia only');
   return bits.filter(Boolean).join(' · ');
 }
+/** the postures, grouped for the manual: which units, which modes */
+const POSTURES = Object.entries(MODE_SETS).map(([set, defs]) => ({ units: Object.keys(MODE_SET_OF).filter(k => MODE_SET_OF[k] === set).map(k => UNITS[k].label[0] === UNITS[k].label[1] ? UNITS[k].label[0] : UNITS[k].label[0] + ' / ' + UNITS[k].label[1]).join(', '), defs }));
 const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-click', 'move, attack, or set a factory rally point'], ['Shift+right-click', 'queue a waypoint: units go there after finishing their current move, as many as you like'], ['Z X C V B', 'produce from the selected factory'],
+  ['Y', 'take the sticks of the selected drone: it flies to your cursor, left-click attacks a target (or dives a kamikaze drone onto a point), right-click lets go, Y or Esc hands the drone back'],
+  ['R', 'cycle the posture of the selected units: hunt, hold, or ambush for FPVs; patrol or guard for interceptors; high or low for Mavics; shoot and scoot for guns; hull down for armor; creep for infantry; silent jammers, passive air defense, truck escort for fire groups'],
   ['F', 'selected kamikaze drones dive at the nearest target they can see; a swarm spreads its dives'], ['Ctrl+right-click, or B then click', 'artillery fires on a map point, seen or unseen'], ['E', 'selected troops dig a trench where they stand'],
   ['O / Shift+O', 'add a person to the selected squad as a drone operator, or send one back'], ['M', 'this manual'], ['T', 'research tree'], ['L', 'unit shape legend'], ['K', 'battle log'], ['N', 'sound: effects and voice, effects only, off'], ['Double-click', 'select every drone on screen; double-click a drone to select all of that type'], ['G', 'form the selected drones into a swarm, or disband one'],
   ['Ctrl+1 to 5', 'assign a group, digit to recall'], ['W A S D, arrows, screen edge, minimap', 'move the camera'], ['Mouse wheel, + and -', 'zoom'], ['Space', 'jump to headquarters'], ['P', 'pause (solo games)'], ['Enter', 'chat (multiplayer)'], ['Esc', 'cancel or deselect']];
@@ -67,6 +71,11 @@ const CONTROLS: [string, string][] = [['Left-drag', 'select units'], ['Right-cli
         <p>Every two confirmed kills raise a unit one rank (Trained, Veteran, Elite): 6% more damage dealt and 6% less taken per rank, and drones dodge a little better. Chevrons under a unit show its rank. Howitzers carry 12 shells and rocket launchers three salvos; guns beside the artillery depot or headquarters refill slowly, and an ammunition truck leaves the headquarters for any gun below half. Trucks are captured and killed like any other. A gun that fires is shown to enemy radar for three seconds: expect counter-battery fire.</p>
         <h4>Operators</h4>
         <p>Ukrainian drones are flown by infantry squads. A squad starts with one operator and can take up to four (press O with the squad selected; each one is a person from your pool). Every operator flies three drones, six after Drone swarm control, so a squad of four flies a dozen. Drones link to the nearest squad with a free slot within 900 and must stay inside its control range.</p>
+        <h4>Flying a drone yourself</h4>
+        <p>Select one airborne drone and press Y to take the sticks. The camera rides with it and it flies toward your cursor; left-click an enemy to put it on target, or, with a kamikaze drone, left-click the ground to dive onto that spot (a treeline, a trench, a road where a truck is about to be). A human on the sticks dodges 15% more of what is fired at it, flies 15% faster, and a piloted FPV hits 20% harder. The squad's control range still applies: the leash is drawn while you fly. Right-click lets go of a target; Y or Esc hands the drone back to its squad.</p>
+        <h4>Postures (R)</h4>
+        <p>Many units have two or three postures; the selection panel shows the buttons and R steps through them. The first is the default.</p>
+        <div class="uentry" v-for="p in POSTURES" :key="p.units"><div class="un">{{ p.units }}</div><div><span v-for="m in p.defs" :key="m.key" style="display:block;margin-bottom:3px"><b>{{ m.label }}</b> <span class="dim">{{ m.desc }}</span></span></div></div>
         <h4>Rock, paper, scissors</h4>
         <p>Every weapon has things it is built to kill and things it only scratches. The selection panel shows a unit's strong and weak matchups; the short version:</p>
         <div class="uentry" v-for="[u, t] in COUNTERS" :key="u"><div class="un">{{ u }}</div><div>{{ t }}</div></div>
