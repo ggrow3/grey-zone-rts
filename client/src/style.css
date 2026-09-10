@@ -112,7 +112,7 @@ table.log th { color: var(--ink-dim); font-weight: 500; }
 .cmd.owned { border-color: var(--ok); border-left-color: var(--ok); }
 .cmd.barracks { border-left-color: var(--c-barracks); } .cmd.droneWorks { border-left-color: var(--c-drone); } .cmd.armorPlant { border-left-color: var(--c-armor); }
 .cmd.artyDepot { border-left-color: var(--c-arty); } .cmd.launchSite { border-left-color: #9fd6e8; } .cmd.aidPost { border-left-color: #8bc34a; }
-.cmd.generator, .cmd.pylon, .cmd.powerPlant { border-left-color: #ffd60a; } .cmd.radar { border-left-color: var(--c-aa); } .cmd.ewStation { border-left-color: var(--c-ew); } .cmd.net { border-left-color: #e6e2cd; }
+.cmd.generator, .cmd.pylon, .cmd.powerPlant { border-left-color: #ffd60a; } .cmd.derrick { border-left-color: #a58a5a; } .cmd.silo { border-left-color: #d6b04a; } .cmd.radar { border-left-color: var(--c-aa); } .cmd.ewStation { border-left-color: var(--c-ew); } .cmd.net { border-left-color: #e6e2cd; }
 #queue { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; min-height: 26px; width: 100%; }
 #queue .q { width: 30px; height: 24px; background: #2f3527; border: 1px solid #4a5140; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; }
 #queue .q i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--ua-accent); }

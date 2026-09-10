@@ -57,7 +57,11 @@ export type Entity = Unit | Struct;
 export interface Site {
   name: string; x: number; y: number; r: number; owner: number; capTeam: number; cap: number; supplyT: number;
   kind?: 'gas' | 'wheat'; burnT: number; yieldRate?: number; isRes?: boolean;
+  /** a town's warehouse and how long the current owner has held it unbroken */
+  stock: number; heldT: number;
 }
+/** what a destroyed vehicle leaves behind: funds for whoever reaches it first */
+export interface Wreck { x: number; y: number; value: number; t: number; label: string; team: number }
 
 export interface PumpSite { team: number; x: number; y: number; struct: Struct | null; rebuildT: number }
 

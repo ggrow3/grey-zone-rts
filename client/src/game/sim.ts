@@ -2,13 +2,13 @@
 // The same Game, fed the same seed and the same per-turn commands, produces the same state on every client.
 import { UA, RU, UNITS, STRUCTS, CIV_TYPES, CIV_SITES, UPGRADES, COVER, FUEL_USERS, TRUCK_LOAD, TRUCK_PERIOD, TOWN_BUILD_RADIUS, BUILD_RADIUS,
   AUTO_SMALL, AUTO_LARGE, SWARM_CAP, GAS_YIELD, FOOD_BASE, FOOD_PER_FIELD, FUEL_BASE, FUEL_PER_NODE, POWER, upgLabel,
-  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE, KILLZONE, NET_LINE, CALLSIGNS, MISSIONS, MISSION_SCORE } from './data';
+  BARKS, WAVE_COST, WAVE_COOLDOWN, TEAMS, OPS_MAX, DRONES_PER_OP, TRENCH_IN_FOREST, AIR_VS_AIR_EVADE, DIG_TIME, WEATHER_TEXT, STRIKES, modesOf, PILOT, unitPoints, structPoints, SCORE, KILLZONE, NET_LINE, CALLSIGNS, MISSIONS, MISSION_SCORE, TOWN, SALVAGE, SITE_BOOST } from './data';
 import type { UnitDef, FormationType, TargetClass, BarkKind } from './data';
 import { W, H, H_LAND, geo, TOWNS, RESOURCES, PIPELINES, placePos, KHARKIV, BELGOROD, nearestPlace } from './map';
 import { Rng } from './rng';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from './dmath';
 import { getTerrain, Terrain } from './terrain';
-import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike, Alert, Incoming, Mission } from './types';
+import type { Unit, Struct, Entity, Site, PumpSite, Projectile, Effect, Swarm, Supply, Bot, Notice, Scorch, Command, Order, Pt, LogEntry, LogKind, Weather, WeatherKind, PendingStrike, Alert, Incoming, Mission, Wreck } from './types';
 import { updateBot, makeBot } from './bot';
 
 export const DT = 1 / 60;
@@ -47,7 +47,9 @@ export class Game {
     jammed: [0, 0], waves: [0, 0], structsKilled: [0, 0], trucksKilled: [0, 0], vets: [0, 0], killsOf: [{}, {}] as [Record<string, number>, Record<string, number>],
     kabs: [0, 0], intercepted: [0, 0], refineries: 0, missiles: 0,
     /** points: kills and captures scaled by what the target cost, civilian harm taken away */
-    score: [0, 0], friendlyFire: [0, 0] };
+    score: [0, 0], friendlyFire: [0, 0], salvage: [0, 0], looted: [0, 0] };
+  /** wrecks on the field, worth funds to whoever reaches them */
+  wrecks: Wreck[] = []; wreckT = 0;
   /** strikes from beyond the map: cooldowns, pending impacts, burning refineries (expiry times) */
   kabT = [0, 0]; missileT = 0; deepT = 0; strikes: PendingStrike[] = []; refineryHits: number[] = []; deepPending: { at: number; hit: boolean } | null = null;
   /** ids registered by a level scenario so objectives can find what it placed */
@@ -165,13 +167,17 @@ export class Game {
   }
   teamMul(team: number): number { return this.isBot[team] ? this.difficulty * (1 + this.gameTime / 1800) : 1; }
   pipelineIntact(team: number): boolean { return this.pumpSites.filter(ps => ps.team === team).every(ps => ps.struct && !ps.struct.dead && ps.struct.build >= 1); }
-  gasIncome(team: number): number { return this.pipelineIntact(team) ? this.resources.filter(r => r.kind === 'gas' && r.owner === team).reduce((a, r) => a + (r.yieldRate || 0), 0) : 0; }
+  gasIncome(team: number): number { return this.pipelineIntact(team) ? this.resources.filter(r => r.kind === 'gas' && r.owner === team).reduce((a, r) => a + (r.yieldRate || 0) * (this.siteBoost(r, team) ? SITE_BOOST.gasYield : 1), 0) : 0; }
+  /** a finished derrick or silo of this team stands beside the site */
+  siteBoost(rs: Site, team: number): boolean { return this.structs.some(st => !st.dead && st.build >= 1 && st.team === team && st.def.site === rs.kind && dist(st, rs) <= rs.r + 40); }
+  /** what a held town puts in its warehouse each second: more the longer it is held */
+  townRate(d: Site): number { return TOWN.rate + TOWN.bonus * Math.min(1, d.heldT / TOWN.ripen); }
   wheatHeld(team: number): number { return this.resources.filter(r => r.kind === 'wheat' && r.owner === team && r.burnT <= 0).length; }
   income(team: number): number {
     if (team === RU) return (12 + this.gasIncome(RU)) * this.teamMul(RU) * Math.pow(STRIKES.deep.incomeMul, this.refineriesBurning());
     return Math.max(4, 12 * (0.4 + 0.6 * this.support / 100) - Math.min(6, this.civ.lost[0] * 0.5) + (this.upgrades[UA].aid ? 8 : 0)) + this.gasIncome(UA);
   }
-  expectedIncome(team: number): number { return this.income(team) + this.depots.filter(d => d.owner === team).length * TRUCK_LOAD / TRUCK_PERIOD * this.teamMul(team); }
+  expectedIncome(team: number): number { return this.income(team) + this.depots.filter(d => d.owner === team).reduce((a, d) => a + this.townRate(d), 0) * this.teamMul(team); }
   upgAvailable(team: number, key: string): boolean { const u = UPGRADES[key]; return !this.upgrades[team][key] && (!u.requires || !!this.upgrades[team][u.requires]); }
   logiMul(team: number): number { return this.upgrades[team].logistics ? 1.5 : 1; }
   autoTier(team: number): number { return this.upgrades[team].auto3 ? 3 : this.upgrades[team].auto2 ? 2 : this.upgrades[team].auto1 ? 1 : 0; }
@@ -290,8 +296,8 @@ export class Game {
 
   // ---------------------------------------------------------------- setup
   private setup() {
-    this.depots = TOWNS.map(([name, lat, lon]) => { const p = geo(lat, lon); return { name, x: p.x, y: p.y, r: 45, owner: -1, capTeam: -1, cap: 0, supplyT: this.rand(8, 20), burnT: 0 }; });
-    this.resources = RESOURCES.map(([kind, name, lat, lon, owner]) => { const p = geo(lat, lon); return { kind, name, x: p.x, y: p.y, r: kind === 'wheat' ? 58 : 40, owner, capTeam: -1, cap: 0, burnT: 0, supplyT: this.rand(10, 40), yieldRate: name.includes('depot') ? GAS_YIELD * 2.4 : GAS_YIELD, isRes: true }; });
+    this.depots = TOWNS.map(([name, lat, lon]) => { const p = geo(lat, lon); return { name, x: p.x, y: p.y, r: 45, owner: -1, capTeam: -1, cap: 0, supplyT: this.rand(8, 20), burnT: 0, stock: 0, heldT: 0 }; });
+    this.resources = RESOURCES.map(([kind, name, lat, lon, owner]) => { const p = geo(lat, lon); return { kind, name, x: p.x, y: p.y, r: kind === 'wheat' ? 58 : 40, owner, capTeam: -1, cap: 0, burnT: 0, supplyT: this.rand(10, 40), yieldRate: name.includes('depot') ? GAS_YIELD * 2.4 : GAS_YIELD, isRes: true, stock: 0, heldT: 0 }; });
     for (const pl of PIPELINES) for (const idx of pl.pumps) { const p = geo(pl.pts[idx][0], pl.pts[idx][1]); this.pumpSites.push({ team: pl.team, x: p.x, y: p.y, struct: null, rebuildT: 0 }); }
     for (const ps of this.pumpSites) { ps.struct = this.makeStruct('pump', ps.team, ps.x, ps.y, true); this.structs.push(ps.struct); }
 
@@ -343,6 +349,7 @@ export class Game {
     this.updateMorale(dt);
     this.updateKillZone(dt);
     this.updateMissions(dt);
+    this.updateWrecks(dt);
     this.historyT -= dt; if (this.historyT <= 0) { this.historyT = 10; this.history.push({ t: this.gameTime, score: [this.stats.score[0], this.stats.score[1]] }); }
     for (const s of this.structs) this.updateStruct(s, dt);
     for (const u of this.units) this.updateUnit(u, dt);
@@ -522,6 +529,21 @@ export class Game {
     }
     for (const T of [UA, RU]) if (hit[T] && this.kzWarnT[T] <= 0) { this.kzWarnT[T] = 25; this.notify(T, 'Kill zone: ' + hit[T] + ' of your ' + (hit[T] > 1 ? 'units are' : 'units is') + ' in the open under enemy drones and bleeding. Get into cover or under a net'); }
   }
+  /** wrecks rust away; a squad or robot standing over one takes the salvage for its side */
+  updateWrecks(dt: number) {
+    this.wreckT -= dt; if (this.wreckT > 0) return; this.wreckT = 0.5;
+    for (const w of this.wrecks) {
+      w.t += 0.5;
+      let taker: Unit | null = null;
+      for (const u of this.units) { if (u.dead || u.team < 0 || !(u.def.troop || u.def.robot) || u.def.relay) continue; if (hyp(u.x - w.x, u.y - w.y) <= SALVAGE.reach) { taker = u; break; } }
+      if (taker) {
+        w.t = 1e9; this.funds[taker.team] += w.value; this.stats.salvage[taker.team]++;
+        this.effects.push({ kind: 'text', x: w.x, y: w.y - 14, t: 0, dur: 1.4, team: taker.team, text: 'salvage +' + w.value });
+        this.addLog(taker.team, 'truck', TEAMS[taker.team].name + ' salvaged ' + w.value + ' from a ' + (w.team === taker.team ? 'friendly ' : 'wrecked enemy ') + w.label.toLowerCase() + ' near ' + nearestPlace(w.x, w.y));
+      }
+    }
+    this.wrecks = this.wrecks.filter(w => w.t <= SALVAGE.ttl);
+  }
   /** optional goals: one at a time per side, a new one a while after the last is done */
   updateMissions(dt: number) {
     this.missionT -= dt; if (this.missionT > 0) return; this.missionT = 1;
@@ -556,6 +578,7 @@ export class Game {
       case 'killGun': { const ko = this.stats.killsOf[T]; return (ko.howitzer || 0) + (ko.mlrs || 0) + (ko.aa || 0); }
       case 'capture': return this.capturesN[T];
       case 'trucks': return this.stats.deliveries[T];
+      case 'salvage': return this.stats.salvage[T];
     }
     return 0;
   }
@@ -591,7 +614,7 @@ export class Game {
       const sp = this.supply[T];
       let foodUsed = 0, fuelUsed = 0, powerUsed = 0;
       for (const u of this.units) { if (u.dead || u.team !== T) continue; if (u.def.troop) foodUsed++; if (FUEL_USERS.has(u.type)) fuelUsed++; if (u.def.electric) powerUsed++; }
-      const foodCap = FOOD_BASE + FOOD_PER_FIELD * this.wheatHeld(T), fuelCap = FUEL_BASE + Math.round(FUEL_PER_NODE * this.gasIncome(T) / GAS_YIELD);
+      const foodCap = FOOD_BASE + FOOD_PER_FIELD * this.wheatHeld(T) + SITE_BOOST.food * this.resources.filter(r => r.kind === 'wheat' && r.owner === T && r.burnT <= 0 && this.siteBoost(r, T)).length, fuelCap = FUEL_BASE + Math.round(FUEL_PER_NODE * this.gasIncome(T) / GAS_YIELD);
       const powerCap = this.powerCapGrid[T];
       const food = foodUsed > foodCap ? foodCap / foodUsed : 1, fuel = fuelUsed > fuelCap ? fuelCap / fuelUsed : 1, power = powerUsed > powerCap ? powerCap / powerUsed : 1;
       if (food < 1 && sp.food >= 1) this.notify(T, 'Food shortage: ' + foodUsed + ' squads, ' + foodCap + ' fed. Hungry troops fight at ' + Math.round((0.6 + 0.4 * food) * 100) + '%. Hold more wheat fields.');
@@ -619,6 +642,7 @@ export class Game {
         d.cap += dt;
         if (d.cap >= 5) {
           const was = d.owner; d.owner = team; d.cap = 0; d.capTeam = -1; d.supplyT = 6;
+          if (!d.isRes) { const loot = Math.floor(d.stock * TOWN.loot); d.stock = 0; d.heldT = 0; if (loot > 0) { this.funds[team] += loot; this.stats.looted[team] += loot; this.notify(team, 'Looted ' + loot + ' from the ' + d.name + ' warehouse'); this.effects.push({ kind: 'text', x: d.x, y: d.y - 20, t: 0, dur: 1.5, team, text: 'looted +' + loot }); } }
           this.notify(team, d.name + ' captured');
           if (was >= 0) { this.notify(was, d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : '')); this.alert(was, d.x, d.y, d.name + ' lost'); }
           this.addLog(team, 'capture', TEAMS[team].name + ' captured ' + d.name); this.stats.score[team] += SCORE.capture; this.capturesN[team]++;
@@ -626,8 +650,9 @@ export class Game {
         }
       } else { d.cap = Math.max(0, d.cap - dt); if (d.cap === 0) d.capTeam = -1; }
       if (d.owner >= 0 && (!d.isRes || d.burnT <= 0)) {
+        if (!d.isRes) { d.heldT += dt; d.stock = Math.min(TOWN.cap, d.stock + this.townRate(d) * dt); }
         d.supplyT -= dt;
-        if (d.supplyT <= 0) { d.supplyT = TRUCK_PERIOD; this.spawnTruck(d.owner, d); }
+        if (d.supplyT <= 0) { d.supplyT = TRUCK_PERIOD; if (d.isRes || d.stock >= TOWN.minLoad) this.spawnTruck(d.owner, d); }
       }
     }
     for (const ps of this.pumpSites) {
@@ -652,8 +677,9 @@ export class Game {
       this.units.push(u);
       return;
     }
-    const u = this.makeUnit('truck', team, hq.x + this.rand(-20, 20), hq.y + (team === UA ? -(hq.r + 22) : hq.r + 22));
-    u.cargo = 'supply'; u.dest = d; u.order = MOVE(d.x + this.rand(-20, 20), d.y + this.rand(-20, 20));
+    const u = this.makeUnit('truck', team, d.x + this.rand(-20, 20), d.y + this.rand(-20, 20));
+    u.cargo = 'supply'; u.value = Math.floor(d.stock); d.stock = 0; u.src = d; u.dest = hq;
+    u.order = MOVE(hq.x + this.rand(-30, 30), hq.y + (team === UA ? -(hq.r + 24) : hq.r + 24));
     this.planRoute(u, u.order.x, u.order.y);
     this.units.push(u);
   }
@@ -735,22 +761,23 @@ export class Game {
       if (stuckCheck()) return;
       if (dist(u, dest) < (dest.r || 0) + 40) {
         const mul = this.teamMul(u.team);
-        if (u.cargo === 'grain') { this.people[u.team].total = Math.min(200, this.people[u.team].total + 3); if (u.team === UA) this.support = Math.min(100, this.support + 2); this.funds[u.team] += 30 * mul * this.logiMul(u.team); }
+        if (u.cargo === 'grain') { const k = u.src && this.siteBoost(u.src, u.team) ? SITE_BOOST.grain : 1; this.people[u.team].total = Math.min(200, this.people[u.team].total + 3 * k); if (u.team === UA) this.support = Math.min(100, this.support + 2); this.funds[u.team] += 30 * k * mul * this.logiMul(u.team); }
         else this.funds[u.team] += 120 * mul * this.logiMul(u.team);
         this.stats.deliveries[u.team]++;
         this.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, green: true });
-        this.effects.push({ kind: 'text', x: u.x, y: u.y - 14, t: 0, dur: 1.2, team: u.team, text: u.cargo === 'grain' ? 'grain: +3 recruits' : 'oil: +120' });
+        this.effects.push({ kind: 'text', x: u.x, y: u.y - 14, t: 0, dur: 1.2, team: u.team, text: u.cargo === 'grain' ? 'grain: +' + (u.src && this.siteBoost(u.src, u.team) ? 6 : 3) + ' recruits' : 'oil: +120' });
         this.killUnit(u, true);
       }
       return;
     }
-    if (!dest || dest.owner !== u.team) { this.killUnit(u, true); return; }
+    if (!dest || dest.dead) { this.killUnit(u, true); return; }
     this.stepMove(u, u.order.x, u.order.y, dt);
     if (stuckCheck()) return;
-    if (dist(u, dest) < 40) {
-      this.funds[u.team] += TRUCK_LOAD * this.teamMul(u.team) * this.logiMul(u.team); this.stats.deliveries[u.team]++;
+    if (dist(u, dest) < (dest.r || 0) + 40) {
+      const load = u.value ?? TRUCK_LOAD;
+      this.funds[u.team] += load * this.teamMul(u.team) * this.logiMul(u.team); this.stats.deliveries[u.team]++;
       this.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, green: true });
-      this.effects.push({ kind: 'text', x: u.x, y: u.y - 14, t: 0, dur: 1.2, team: u.team, text: '+' + TRUCK_LOAD });
+      this.effects.push({ kind: 'text', x: u.x, y: u.y - 14, t: 0, dur: 1.2, team: u.team, text: '+' + Math.round(load * this.logiMul(u.team)) });
       this.killUnit(u, true);
     }
   }
@@ -1252,6 +1279,7 @@ export class Game {
       // a veteran squad lost shakes the squads around it
       if (u.def.troop && rankOf(u) >= 2) { let n = 0; for (const o of this.units) if (!o.dead && o !== u && o.team === u.team && o.def.troop && dist(o, u) < 400) { o.grief = 10; if (o.def.morale) o.morale = clamp((o.morale === undefined ? 90 : o.morale) - 20, 0, 100); n++; } if (n) this.notify(u.team, (u.callsign || u.def.label[u.team]) + ', a ' + ['', '', 'veteran', 'elite'][rankOf(u)] + ' squad, is gone: ' + n + ' squad' + (n > 1 ? 's' : '') + ' nearby shaken for ten seconds'); }
       this.credit(by, u);
+      if (!u.def.troop && !u.def.auto && !u.def.civ && u.def.cost >= SALVAGE.minCost && (!u.def.air || u.def.large || u.def.structuresOnly)) this.wrecks.push({ x: u.x, y: u.y, value: Math.round(u.def.cost * (u.def.air ? SALVAGE.airFrac : SALVAGE.frac)), t: 0, label: u.def.label[u.team], team: u.team });
       if (!u.def.auto) { const shouter = this.nearestTroop(byTeam, u.x, u.y, 260); if (shouter) this.bark('kill', shouter); }
       if (u.def.troop) { const friend = this.nearestTroop(u.team, u.x, u.y, 260); if (friend) this.bark('lost', friend); }
     } else if (byTeam === u.team && by && by.def.indirect && !u.def.auto) { this.stats.friendlyFire[u.team]++; this.addLog(u.team, 'loss', 'Friendly fire: ' + TEAMS[u.team].name + ' lost ' + (/^[aeiou]/i.test(u.def.label[u.team]) ? 'an ' : 'a ') + u.def.label[u.team].toLowerCase() + ' to its own ' + by.def.label[u.team].toLowerCase() + ' near ' + nearestPlace(u.x, u.y)); this.notify(u.team, 'Friendly fire! Your ' + by.def.label[u.team].toLowerCase() + ' destroyed your own ' + u.def.label[u.team].toLowerCase()); this.effects.push({ kind: 'text', x: u.x, y: u.y - 16, t: 0, dur: 1.4, team: u.team, text: 'FRIENDLY FIRE', sub: 'ff' }); }
@@ -1515,11 +1543,12 @@ export class Game {
     if (!hq) return 'No headquarters';
     const nearTown = this.depots.some(d => d.owner === team && dist(d, { x, y }) <= TOWN_BUILD_RADIUS);
     if (def.pylon) { if (!this.powerReach(team, x, y, def.r)) return 'A pylon must stand within reach of your grid: a building, another pylon, or a generator set'; }
+    else if (def.site) { const rs = this.resources.find(r => r.kind === def.site && dist(r, { x, y }) <= r.r + 40); if (!rs) return 'Build it beside a ' + (def.site === 'gas' ? 'gas site' : 'wheat field'); if (rs.owner !== team) return 'You do not hold that ' + (def.site === 'gas' ? 'gas site' : 'wheat field'); if (this.siteBoost(rs, team) || this.structs.some(st => !st.dead && st.team === team && st.def.site === def.site && dist(st, rs) <= rs.r + 40)) return 'That site already has one'; }
     else if (dist(hq, { x, y }) > BUILD_RADIUS && !nearTown) return 'Build near headquarters or a town you hold';
     if (x < def.r + 10 || y < def.r + 10 || x > W - def.r - 10) return 'Too close to the map edge';
     for (const s of this.structs) if (!s.dead && dist(s, { x, y }) < s.r + def.r + 12) return 'Overlaps another building';
     if (!def.netR) for (const d of this.depots) if (dist(d, { x, y }) < d.r + def.r + 12) return 'Overlaps a town';
-    if (!def.netR) for (const rs of this.resources) if (dist(rs, { x, y }) < rs.r + def.r + 8) return 'Overlaps ' + rs.name.toLowerCase();
+    if (!def.netR && !def.site) for (const rs of this.resources) if (dist(rs, { x, y }) < rs.r + def.r + 8) return 'Overlaps ' + rs.name.toLowerCase();
     if (this.funds[team] < def.cost) return 'Not enough funds';
     return null;
   }

@@ -130,6 +130,8 @@ export interface StructDef {
   demand?: number;
   /** a pylon: conducts farther than a building and needs no headquarters or town nearby */
   pylon?: boolean;
+  /** built beside a resource site you hold: a derrick on gas, a silo on wheat */
+  site?: 'gas' | 'wheat';
 }
 export const STRUCTS: Record<string, StructDef> = {
   hq: { label: 'Headquarters', hp: 4500, r: 38, cost: 0, time: 0, vision: 260, power: 30 },
@@ -146,9 +148,11 @@ export const STRUCTS: Record<string, StructDef> = {
   generator: { label: 'Generator set', hp: 300, r: 12, cost: 300, time: 8, vision: 60, power: 20 },
   powerPlant: { label: 'Power plant', hp: 900, r: 26, cost: 900, time: 20, vision: 120, power: 90 },
   pylon: { label: 'Pylon', hp: 120, r: 6, cost: 40, time: 3, vision: 40, pylon: true },
+  derrick: { label: 'Gas derrick', hp: 400, r: 12, cost: 400, time: 12, vision: 60, site: 'gas' },
+  silo: { label: 'Grain silo', hp: 350, r: 12, cost: 300, time: 10, vision: 60, site: 'wheat' },
   trench: { label: 'Trench', hp: 300, r: 10, cost: 0, time: 0, vision: 0, trench: true },
 };
-export const BUILDABLE = ['pylon', 'generator', 'powerPlant', 'net', 'netLine', 'aidPost', 'radar', 'ewStation', 'barracks', 'droneWorks', 'armorPlant', 'artyDepot'];
+export const BUILDABLE = ['pylon', 'generator', 'powerPlant', 'net', 'netLine', 'derrick', 'silo', 'aidPost', 'radar', 'ewStation', 'barracks', 'droneWorks', 'armorPlant', 'artyDepot'];
 export const CIV_TYPES: Record<string, StructDef> = {
   apartments: { label: 'Apartments', hp: 600, r: 18, cost: 0, time: 0, vision: 0 },
   hospital: { label: 'Hospital', hp: 500, r: 16, cost: 0, time: 0, vision: 0, heal: 140, healRate: 0.06 },
@@ -203,6 +207,12 @@ export const AUTO_SMALL = [1, 2, 4, 8], AUTO_LARGE = [1, 1, 2, 4];
 export const OPS_MAX = 4, DRONES_PER_OP = 3;
 export const HOTKEYS = ['Z', 'X', 'C', 'V', 'B', 'H', 'J', 'U', 'I'];
 export const TRUCK_LOAD = 100, TRUCK_PERIOD = 40, TOWN_BUILD_RADIUS = 200, BUILD_RADIUS = 500;
+/** a held town fills its warehouse at rate, rising by bonus over ripen seconds of unbroken holding, to cap; a truck leaves with the lot once minLoad is in; a captor loots this share on the spot */
+export const TOWN = { rate: 2, bonus: 1.5, ripen: 180, cap: 400, minLoad: 40, loot: 0.5 };
+/** a destroyed vehicle, gun, or large aircraft worth minCost leaves a wreck; troops or robots within reach collect the share; it rusts away after ttl seconds */
+export const SALVAGE = { frac: 0.25, airFrac: 0.2, minCost: 300, reach: 34, ttl: 120 };
+/** a derrick or silo beside a site you hold */
+export const SITE_BOOST = { gasYield: 1.5, grain: 2, food: 3 };
 export const FORMATIONS = ['wedge', 'line', 'column', 'ring'] as const;
 export type FormationType = typeof FORMATIONS[number];
 export const SWARM_CAP = [6, 12, 24, 48];
@@ -375,6 +385,7 @@ export const MISSIONS: Record<string, MissionDef> = {
   killGun: { text: 'Destroy an enemy gun or air defense vehicle', goal: 1, reward: 250 },
   capture: { text: 'Capture a town', goal: 1, reward: 200 },
   trucks: { text: 'Bring five truck loads home', goal: 5, reward: 150 },
+  salvage: { text: 'Collect three wrecks', goal: 3, reward: 200 },
 };
 export const MISSION_SCORE = 20;
 /** skirmish starting conditions */
@@ -389,7 +400,7 @@ export const KILLZONE = { troop: 1.5, truck: 2.2, tick: 0.5 };
 /** nets laid along a road by one Road net tunnel order: how many and how far apart */
 export const NET_LINE = { count: 5, spacing: 150, snap: 70 };
 
-export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly. With Launch rails researched it also builds the fixed-wing aircraft: the Shark spotter and Liutyi for Ukraine, the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers, and for Ukraine assault robots and relay carriers. Vehicles need fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', netLine: 'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'A diesel source of 20 power. Put it beside a forward barracks or radar and that building runs with no line to the grid at all; at home it is insurance against losing the substation.', powerPlant: 'A 90-power thermal plant: the biggest source you can build, and the biggest target after the headquarters. Gerans and missiles come for it.', pylon: 'Forty funds of steel that carries the grid 190 farther. A line of them powers a forward base; two FPVs or one shell break one, and a broken line stalls everything past it. Pylons mend themselves when nothing hostile is near.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
+export const BUILDING_NOTES: Record<string, string> = { hq: 'Lose it and the game ends. Rally point for trucks and convoys. Squads recover morale near it.', barracks: 'Troops: infantry, fire groups, motorcycle groups, foreign fighters, and for Russia North Koreans. Slow to build.', droneWorks: 'Quadcopters in a fraction of a second each, as many as you can pay for and fly. With Launch rails researched it also builds the fixed-wing aircraft: the Shark spotter and Liutyi for Ukraine, the Orlan spotter, Lancet, and Molniya for Russia.', armorPlant: 'Tanks, IFVs, mobile air defense, jammers, and for Ukraine assault robots and relay carriers. Vehicles need fuel from the gas supply.', artyDepot: 'Howitzers and rocket launchers. Fuel users too.', radar: 'Sees far and shoots nothing. Put your shooters under it.', ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.', net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over.', netLine: 'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.', aidPost: 'Heals troops within its radius. Place it in a wood behind the line.', generator: 'A diesel source of 20 power. Put it beside a forward barracks or radar and that building runs with no line to the grid at all; at home it is insurance against losing the substation.', powerPlant: 'A 90-power thermal plant: the biggest source you can build, and the biggest target after the headquarters. Gerans and missiles come for it.', derrick: 'Built beside a gas site you hold: the site pays 50% more and fuels three more vehicles. Lost with the site, or to a Lancet.', silo: 'Built beside a wheat field you hold: grain trucks carry twice the grain (six recruits and 60 funds a load) and the field feeds three more squads.', pylon: 'Forty funds of steel that carries the grid 190 farther. A line of them powers a forward base; two FPVs or one shell break one, and a broken line stalls everything past it. Pylons mend themselves when nothing hostile is near.', pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.', trench: 'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.' };
 
 export const STRATEGY: [string, string][] = [
   ['The shape of the war', 'Everything on this map is either a drone, something that feeds and flies drones, or something drones are hunting. Nothing on the ground survives in the open for long, so the game is about who sees whom first, who has squads to fly, who has power to charge, and who keeps the roads and pipelines running. Wins come from grinding the enemy economy down and then walking artillery and fiber FPVs onto the headquarters, not from a single charge.'],
@@ -400,7 +411,7 @@ export const STRATEGY: [string, string][] = [
   ['Air defense', 'Drones dodge bullets, so guns need volume and research. Jammers and EW stations do not miss: radio drones inside the bubble fall unless they are fiber-optic. Nets catch FPVs over a spot. Stings hunt on their own. Layer them.'],
   ['Ground and cover', 'Drones kill troops in the open: a squad in a field takes 45% extra from every drone strike. Get them into a town (55% less from drones), a wood (65% less, and hidden beyond 140), or a trench (75% less), and dig the trench inside a wood for the best of all (85% less). Infantry in forest also hit 50% harder. Tanks only shoot vehicles and buildings, IFVs are what shoot at troops.'],
   ['Artillery', 'Howitzers reach 430, rockets 620; both need a spotter to be accurate but will fire on a map point blind (Ctrl+right-click or B) with wide scatter. Guns belong in the trees: a battery in a wood is unseen beyond 140, shows on enemy radar for only two seconds after a shot, and takes 65% less from drones. In the open it is seen from anywhere, exposed for six seconds a shot, and drones hit it 45% harder. Lancets exist to kill your guns: keep a Sting and a fire group with the battery. Shells do not know whose troops are under them: your own ground units inside the splash take full damage, and unobserved fire scatters wide, so shift fire or hold it before your infantry goes in. The game warns DANGER CLOSE when an order puts your own units in the beaten zone.'],
-  ['Logistics and trade', 'Supply trucks pay when they reach a town, grain and oil trucks carry from the fields and wells, and every 75 seconds a trade convoy goes to the border and comes back with aid. A squad standing over an unescorted truck takes it and its cargo.'],
+  ['Logistics and trade', 'A town you hold fills its warehouse, 2 funds a second rising to 3.5 after three minutes of unbroken holding, up to 400; every 40 seconds a truck leaves the town with the lot and pays when it reaches your headquarters. Kill the truck and the money is gone; capture it and it is yours; take the town and you loot half the warehouse on the spot, which is why the number under a town name matters to both sides. Grain and oil trucks carry from the fields and wells, a derrick or a silo beside a site you hold makes it pay more, and every 75 seconds a trade convoy goes to the border and comes back with aid. A destroyed vehicle, gun, or large aircraft leaves a wreck worth a quarter of its cost for two minutes: whichever side walks a squad or a robot over it takes the salvage.'],
   ['Civilians, morale, defectors', 'As Ukraine, every Russian civilian site or vehicle you hit costs support, and support scales your income. Keep support above 70 and hold Shebekino or Zhuravlyovka and Russian volunteers join you. Mercenaries fight well while paid and winning; North Koreans break when Russia is losing.'],
   ['Playing Russia', 'Your drones are autonomous from the start, your Lancets hunt artillery, Molniyas are cheap long reach, and Geran waves cost you nothing. Your weakness is people: defections bleed you, North Koreans break when you lose towns. Take the wheat and gas early, keep the pipeline from Kursk intact.'],
 ];

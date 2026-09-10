@@ -1,10 +1,10 @@
 // Canvas rendering of a Game from one player's point of view (fog of war, selection, ghosts).
-import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT, POWER } from './data';
+import { UA, RU, TEAMS, UNITS, STRUCTS, BUILD_RADIUS, TOWN_BUILD_RADIUS, DIG_TIME, drawR, modesOf, PILOT, POWER, SALVAGE } from './data';
 import { rankOf } from './sim';
 import { W, H, H_LAND, MM_W, MM_H, BORDER, PX_PER_KM } from './map';
 import { clamp } from './dmath';
 import type { Game } from './sim';
-import type { Unit, Struct, Entity, Site, Effect, Projectile } from './types';
+import type { Unit, Struct, Entity, Site, Effect, Projectile, Wreck } from './types';
 import { TerrainCanvas, poly, drawPipelines } from './terrainCanvas';
 import type { Marker } from './levels';
 
@@ -286,6 +286,8 @@ function drawStruct(c: CanvasRenderingContext2D, s: Struct) {
       c.beginPath(); c.arc(0, 0, r * 0.55, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(0, 0, r * 0.2, 0, Math.PI * 2); c.stroke(); break;
     case 'trench': c.strokeStyle = '#3a2f1e'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(-20, -4); c.lineTo(-10, 4); c.lineTo(0, -4); c.lineTo(10, 4); c.lineTo(20, -4); c.stroke();
       c.strokeStyle = '#8a7a58'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-20, -8); c.lineTo(-10, 0); c.lineTo(0, -8); c.lineTo(10, 0); c.lineTo(20, -8); c.stroke(); break;
+    case 'derrick': c.strokeStyle = team.color; c.lineWidth = 2; c.beginPath(); c.moveTo(-r * 0.8, r); c.lineTo(0, -r * 1.3); c.lineTo(r * 0.8, r); c.moveTo(-r * 0.5, r * 0.2); c.lineTo(r * 0.5, r * 0.2); c.moveTo(-r * 0.25, -r * 0.5); c.lineTo(r * 0.25, -r * 0.5); c.stroke(); c.fillStyle = team.dark; c.fillRect(-r, r * 0.6, r * 2, r * 0.5); c.strokeRect(-r, r * 0.6, r * 2, r * 0.5); break;
+    case 'silo': c.fillStyle = '#c9b06a'; c.beginPath(); c.ellipse(0, 0, r * 0.7, r, 0, 0, Math.PI * 2); c.fill(); c.stroke(); c.fillStyle = '#8a7a58'; c.beginPath(); c.ellipse(0, -r * 0.8, r * 0.7, r * 0.3, 0, 0, Math.PI * 2); c.fill(); c.stroke(); break;
     case 'pylon': c.strokeStyle = team.color; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-7, 9); c.lineTo(0, -11); c.lineTo(7, 9); c.moveTo(-8, -4); c.lineTo(8, -4); c.moveTo(-5, 3); c.lineTo(5, 3); c.stroke(); c.fillStyle = team.stroke; c.beginPath(); c.arc(0, -11, 2, 0, Math.PI * 2); c.fill(); break;
     case 'powerPlant': c.fillRect(-r, -r * 0.75, r * 2, r * 1.5); c.strokeRect(-r, -r * 0.75, r * 2, r * 1.5);
       c.fillStyle = '#8a8a80'; for (const x of [-r * 0.55, -r * 0.15]) { c.beginPath(); c.arc(x, -r * 0.2, r * 0.2, 0, Math.PI * 2); c.fill(); c.stroke(); }
@@ -328,6 +330,19 @@ function drawDepot(c: CanvasRenderingContext2D, d: Site) {
   if (d.cap > 0 && d.capTeam >= 0) { c.strokeStyle = TEAMS[d.capTeam].color; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, d.r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (d.cap / 5)); c.stroke(); }
   c.fillStyle = 'rgba(232,228,212,0.9)'; c.font = '11px Barlow, sans-serif'; c.textAlign = 'center';
   c.fillText(d.name, 0, d.r + 15);
+  // the warehouse: what a truck will carry out, and what a captor loots half of
+  if (d.owner >= 0 && d.stock >= 1) { c.font = '600 11px "Barlow Condensed", sans-serif'; c.fillStyle = '#ffd60a'; c.fillText('warehouse ' + Math.floor(d.stock), 0, d.r + 28); }
+  c.restore();
+}
+
+/** a wreck: dark hulk with the salvage it is worth */
+function drawWreck(c: CanvasRenderingContext2D, w: Wreck, ttl: number) {
+  const k = Math.min(1, w.t / ttl);
+  c.save(); c.translate(w.x, w.y); c.globalAlpha = 0.9 - 0.5 * k;
+  c.strokeStyle = '#2a2621'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(-8, -6); c.lineTo(8, 6); c.moveTo(-8, 6); c.lineTo(8, -6); c.stroke();
+  c.strokeStyle = '#8a7a58'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-8, -6); c.lineTo(8, 6); c.moveTo(-8, 6); c.lineTo(8, -6); c.stroke();
+  c.font = '600 10px "Barlow Condensed", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(12,14,10,0.9)';
+  c.strokeText('salvage ' + w.value, 0, 9); c.fillStyle = '#e0c9a0'; c.fillText('salvage ' + w.value, 0, 9);
   c.restore();
 }
 
@@ -459,6 +474,7 @@ export class Renderer {
     }
     for (const rs of g.resources) drawResource(ctx, rs, this.localFx);
     for (const d of g.depots) drawDepot(ctx, d);
+    for (const w of g.wrecks) if (g.inVision(PL, w.x, w.y)) drawWreck(ctx, w, SALVAGE.ttl);
     // the grids: own lines in yellow, the enemy's in red, drawn under the buildings
     for (const T of [PL, EN]) { const ed = g.powerEdges[T]; if (!ed.length) continue; ctx.strokeStyle = T === PL ? 'rgba(255,214,10,0.32)' : 'rgba(255,107,107,0.22)'; ctx.lineWidth = 1.5; ctx.beginPath(); for (const e of ed) { ctx.moveTo(e[0], e[1]); ctx.lineTo(e[2], e[3]); } ctx.stroke(); }
     for (const s of g.structs) drawStruct(ctx, s);

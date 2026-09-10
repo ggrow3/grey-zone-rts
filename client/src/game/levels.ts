@@ -239,7 +239,7 @@ export const LEVELS: Level[] = [
         done: g => g.stats.drones[RU] >= 3, marker: own('droneWorks', RU) },
       { title: 'Pyongyang\'s men', text: 'Queue two North Korean squads at the barracks (B): 100 funds, no draw on your personnel, ten at most. They are tough, and they have morale.',
         done: has(RU, 'dprk', 2), marker: own('barracks', RU) },
-      { title: 'Highway robbery', text: 'A Ukrainian supply truck drives from Kharkiv to Kozacha Lopan every 40 seconds. Ambush it halfway up the highway, at the marker. The road south from Hoptivka passes east of Kozacha Lopan, out of range of the trenches on its west side; closer to Kharkiv the IFV and the squads at the headquarters would see you. Park a squad right on the road, press E to dig in, and wait. A squad within 45 of an unescorted truck takes it and its 100 funds.',
+      { title: 'Highway robbery', text: 'A Ukrainian supply truck leaves Kozacha Lopan for Kharkiv every 40 seconds with the town warehouse aboard. Ambush it halfway up the highway, at the marker. The road south from Hoptivka passes east of Kozacha Lopan, out of range of the trenches on its west side; closer to Kharkiv the IFV and the squads at the headquarters would see you. Park a squad right on the road, press E to dig in, and wait. A squad within 45 of an unescorted truck takes it and its 100 funds.',
         done: g => g.captured[RU] >= 1, marker: () => ({ ...geo(50.2377, 36.2651), r: 90 }) },
       { title: 'Motorcycle rush', text: 'Queue two motorcycle groups (C at the barracks): speed 105, 80% faster on roads. Rush Kozacha Lopan before the trench squads react, and bring the drones.',
         done: g => g.typeCount(RU, 'moto') >= 2 && townOwned('Kozacha Lopan', RU)(g), marker: town('Kozacha Lopan') },

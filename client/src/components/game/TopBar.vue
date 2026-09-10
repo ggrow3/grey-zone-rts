@@ -34,7 +34,7 @@ function gasClass(r: { owner: number }) { const intact = g().pipelineIntact(PL()
   <div id="top" :key="tick">
     <div class="stat"><span class="lbl">Funds</span><span class="val">{{ Math.floor(game.funds[team]) }}</span></div>
     <div class="stat"><span class="lbl">Income</span><span class="val">+{{ game.expectedIncome(team).toFixed(0) }}/s</span></div>
-    <div class="stat"><span class="lbl">Towns</span><span class="sq"><i v-for="d in game.depots" :key="d.name" :title="d.name" :class="d.owner === UA ? 'ua' : d.owner === RU ? 'ru' : ''" /></span></div>
+    <div class="stat"><span class="lbl">Towns</span><span class="sq"><i v-for="d in game.depots" :key="d.name" :title="d.name + (d.owner >= 0 ? ': ' + Math.floor(d.stock) + ' in the warehouse, ' + game.townRate(d).toFixed(1) + '/s' : ': unheld')" :class="d.owner === UA ? 'ua' : d.owner === RU ? 'ru' : ''" /></span></div>
     <div class="stat"><span class="lbl">Gas</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'gas')" :key="i" :title="r.name" :class="gasClass(r)" /></span>
       <span class="val small" :style="{ color: game.pipelineIntact(team) ? '' : 'var(--ru)' }">{{ game.pipelineIntact(team) ? '+' + game.gasIncome(team).toFixed(0) + '/s' : 'pipeline cut' }}</span></div>
     <div class="stat"><span class="lbl">Wheat</span><span class="sq"><i v-for="(r, i) in game.resources.filter(x => x.kind === 'wheat')" :key="i" :title="r.name" :class="r.burnT > 0 ? 'fire' : r.owner === UA ? 'ua' : r.owner === RU ? 'ru' : ''" /></span></div>
