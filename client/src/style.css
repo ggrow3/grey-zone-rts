@@ -292,8 +292,10 @@ table.log th {
   font-size: 12px;
   background: var(--hud);
   border-bottom: 1px solid var(--hud-edge);
-  overflow: hidden;
   white-space: nowrap;
+  /* above the stage, so the Menu dropdown is not painted over or clipped */
+  position: relative;
+  z-index: 40;
 }
 .stat {
   display: flex;
