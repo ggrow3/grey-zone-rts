@@ -67,6 +67,8 @@ function unitRows(e: Unit): [string, string][] {
     G = g(),
     PL = props.ctl.team,
     rows: [string, string][] = [];
+  // kills first: the tally people look for
+  if (!d.kamikaze) rows.push(['Kills', (e.kills || 0) + (d.auto ? '' : ', ' + RANK_NAMES[rankOf(e)])]);
   if (d.kamikaze) {
     rows.push(['Warhead', String(d.dmg)], ['Attack', 'one-way dive, dies on impact']);
   } else if (d.dmg) {
@@ -117,8 +119,6 @@ function unitRows(e: Unit): [string, string][] {
   }
   if (e.callsign)
     rows.push(['Callsign', e.callsign + (e.grief && e.grief > 0 ? ', shaken ' + Math.ceil(e.grief) + ' s' : '')]);
-  if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)]]);
-  if (!d.kamikaze) rows.push(['Kills', String(e.kills || 0)]);
   if (d.crew)
     rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul)
