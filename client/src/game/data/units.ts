@@ -296,7 +296,7 @@ export const UNITS: Record<string, UnitDef> = {
   // ------------------------------------------------------------ Quadcopters: built at the drone works in a fraction of a second
   fpv: {
     label: ['FPV quadcopter', 'FPV quadcopter'],
-    shape: 'tri',
+    shape: 'quad',
     r: 6,
     factory: 'droneWorks',
     cost: 25,
@@ -326,7 +326,7 @@ export const UNITS: Record<string, UnitDef> = {
   },
   fiberFpv: {
     label: ['Fiber-optic FPV', 'Knyaz Vandal fiber FPV'],
-    shape: 'tritail',
+    shape: 'quadtail',
     r: 6,
     factory: 'droneWorks',
     cost: 45,
@@ -356,7 +356,7 @@ export const UNITS: Record<string, UnitDef> = {
   },
   mavic: {
     label: ['Mavic recon quad', 'Mavic recon quad'],
-    shape: 'diamond',
+    shape: 'mavic',
     r: 6,
     factory: 'droneWorks',
     cost: 40,
@@ -381,7 +381,7 @@ export const UNITS: Record<string, UnitDef> = {
   },
   interceptor: {
     label: ['Sting interceptor', 'Yolka interceptor'],
-    shape: 'star',
+    shape: 'quadnose',
     r: 7,
     factory: 'droneWorks',
     cost: 35,
@@ -410,7 +410,7 @@ export const UNITS: Record<string, UnitDef> = {
   },
   bomber: {
     label: ['Vampire heavy bomber (Baba Yaga)', 'Heavy bomber hexacopter'],
-    shape: 'hex',
+    shape: 'hexa',
     r: 9,
     factory: 'droneWorks',
     cost: 120,

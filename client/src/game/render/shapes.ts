@@ -26,7 +26,51 @@ export const SHAPES = [
   'car',
   'ugv',
   'relay',
+  // multirotor drones: rotor discs on an X frame (the unit faces +x)
+  'quad',
+  'quadtail',
+  'quadnose',
+  'mavic',
+  'hexa',
 ];
+
+/** rotor centres of a multirotor: four on the diagonals, or six around the body */
+function rotors(shape: string, r: number): [number, number][] {
+  if (shape === 'hexa') {
+    const out: [number, number][] = [];
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + (i * Math.PI) / 3;
+      out.push([Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95]);
+    }
+    return out;
+  }
+  const dx = shape === 'mavic' ? 0.62 : 0.72,
+    dy = shape === 'mavic' ? 0.72 : 0.72;
+  return [
+    [r * dx, -r * dy],
+    [r * dx, r * dy],
+    [-r * dx, r * dy],
+    [-r * dx, -r * dy],
+  ];
+}
+
+/** a multirotor silhouette: the body, plus a disc for every rotor */
+function multirotorPath(c: CanvasRenderingContext2D, shape: string, r: number) {
+  const rr = shape === 'hexa' ? r * 0.34 : shape === 'mavic' ? r * 0.34 : r * 0.42;
+  if (shape === 'mavic') c.roundRect(-r * 0.95, -r * 0.3, r * 1.9, r * 0.6, 3);
+  else if (shape === 'hexa') c.arc(0, 0, r * 0.5, 0, Math.PI * 2);
+  else c.roundRect(-r * 0.5, -r * 0.32, r, r * 0.64, 2);
+  if (shape === 'quadnose') {
+    c.moveTo(r * 0.45, -r * 0.22);
+    c.lineTo(r * 1.35, 0);
+    c.lineTo(r * 0.45, r * 0.22);
+    c.closePath();
+  }
+  for (const [x, y] of rotors(shape, r)) {
+    c.moveTo(x + rr, y);
+    c.arc(x, y, rr, 0, Math.PI * 2);
+  }
+}
 
 export function shapePath(c: CanvasRenderingContext2D, shape: string, r: number) {
   c.beginPath();
@@ -133,6 +177,13 @@ export function shapePath(c: CanvasRenderingContext2D, shape: string, r: number)
       break;
     case 'relay':
       c.rect(-r, -r * 0.6, r * 2, r * 1.2);
+      break;
+    case 'quad':
+    case 'quadtail':
+    case 'quadnose':
+    case 'mavic':
+    case 'hexa':
+      multirotorPath(c, shape, r);
       break;
     default:
       c.arc(0, 0, r, 0, Math.PI * 2);
@@ -323,6 +374,43 @@ export function shapeDetail(c: CanvasRenderingContext2D, shape: string, r: numbe
       c.arc(r * 0.5, r * 0.6, r * 0.2, 0, Math.PI * 2);
       c.fill();
       break;
+    case 'quad':
+    case 'quadtail':
+    case 'quadnose':
+    case 'mavic':
+    case 'hexa': {
+      // the arms from the body to each rotor, a hub on every rotor, and the camera or warhead at the nose
+      c.lineWidth = shape === 'hexa' ? 2 : 1.5;
+      for (const [x, y] of rotors(shape, r)) {
+        c.beginPath();
+        c.moveTo(x * 0.3, y * 0.3);
+        c.lineTo(x, y);
+        c.stroke();
+        c.beginPath();
+        c.arc(x, y, r * 0.1, 0, Math.PI * 2);
+        c.fill();
+      }
+      if (shape === 'mavic') {
+        c.beginPath();
+        c.arc(r * 0.72, 0, r * 0.16, 0, Math.PI * 2);
+        c.stroke();
+      } else if (shape !== 'quadnose') {
+        c.beginPath();
+        c.arc(shape === 'hexa' ? 0 : r * 0.28, 0, r * 0.13, 0, Math.PI * 2);
+        c.fill();
+      }
+      if (shape === 'quadtail') {
+        // the fiber-optic spool paying out behind
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(-r * 0.7, 0);
+        c.lineTo(-r * 1.6, r * 0.4);
+        c.lineTo(-r * 2.4, -r * 0.3);
+        c.lineTo(-r * 3.2, r * 0.2);
+        c.stroke();
+      }
+      break;
+    }
     case 'truck':
       c.fillRect(r * 0.45, -r * 0.45, r * 0.55, r * 0.9);
       if (cargo === 'oil') {
