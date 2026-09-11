@@ -3,7 +3,7 @@
 A browser real-time strategy game on the Kharkiv to Belgorod border: drones, jammers, trucks, trenches, and two headquarters.
 Play fourteen teaching levels on both sides of the border and on two fronts (Kharkiv and Sumy), fight the computer on either map, or match against another commander over the network and talk to them while you play.
 
-What makes it feel like the real front: the two armies are not mirrors (Ukrainian drones are flown by squads, Russian ones fly themselves; Geran waves, Lancets, North Koreans, defections, civilian support), squads shout "Slava Ukraini!" and "Ura!" (text bubbles, plus spoken voice through the browser's speech synthesis), units earn veteran ranks, squads carry rations that supply trucks and wheat fields keep filled (a squad out of food fights and walks worse), artillery runs on shells that trucks bring up, radar spots guns that fire, every kill and capture goes into a battle log, and a squad can take on up to four drone operators, each flying three drones (six after Drone swarm control). Holding every town for three minutes wins outright.
+What makes it feel like the real front: the two armies are not mirrors (drones on both sides are flown by squads until Full autonomy, and North Koreans do not fly; Geran waves, Lancets, North Koreans, defections, civilian support), squads shout "Slava Ukraini!" and "Ura!" (text bubbles, plus spoken voice through the browser's speech synthesis), units earn veteran ranks, squads carry rations that supply trucks and wheat fields keep filled (a squad out of food fights and walks worse), artillery runs on shells that trucks bring up, radar spots guns that fire, every kill and capture goes into a battle log, and a squad can take on up to four drone operators, each flying three drones (six after Drone swarm control). Holding every town for three minutes wins outright.
 
 You can also fly a drone yourself: select one and press Y to take the sticks. The camera rides with it, it flies toward your cursor, and a click puts it on a target or dives it onto a treeline; a human on the sticks dodges more and hits harder. Many units have postures (R cycles them): FPVs hunt, hold, or land in ambush with the motors off; interceptors patrol or guard a post; Mavics fly high or drop low to see into woods; guns shoot and scoot; armor goes hull down; infantry creeps across open ground; jammers and air defense go silent to hide from radar; fire groups escort trucks.
 
@@ -13,6 +13,19 @@ The 2026 front is in here too: a kill zone where anything in the open under an a
 - **Server**: C# ASP.NET Core (.NET 10) minimal API + SignalR. Accounts (JWT), lobby, matchmaking, chat, the authoritative match turn clock, level progress, and a log of every game played. SQLite via EF Core.
 
 The game was called Grey Zone in its first version; the original single-file prototype is kept as `docs/prototype/grey-zone-rts.html`, and internal names (`GreyZone.Server`, the Azure app `greyzone-rts`) still use it.
+
+## What the game is about
+
+Since 2022 the war in Ukraine has become the first war decided by small drones. A quadcopter that costs a few hundred dollars finds a tank, a truck, or a squad, and a second one kills it; most of what dies on the front now dies to drones, not to guns. Both sides have rebuilt their armies around that fact: squads of infantry who are really drone crews, jammers that cut a drone's radio, fiber-optic drones that trail a spool of glass so no jammer can touch them, nets over the roads, long-range Shahed and Geran waves against the power grid, Lancets hunting artillery, interceptor drones hunting other drones, and the trucks, wheat, fuel, and electricity that keep all of it flying.
+
+This game is a real-time strategy game about that front, on the Kharkiv and Sumy borders. Its purpose is to teach, by playing, what the conflict has turned into and why the decisions are hard:
+
+- **Seeing is everything.** Guns and kamikaze drones can only hit what your side has spotted, so the first fight is for eyes: Mavics high over the woods, radar that catches a howitzer the moment it fires, jammers that blind the enemy's drones, and a kill zone where anything in the open under an armed drone bleeds.
+- **Drones are cheap, pilots and power are not.** A drone works turns out an FPV in a fraction of a second, but every drone needs an operator in a squad, a slot on the grid to charge, and a battery that lasts a minute. Losing your substation, your squads, or your control range grounds a fleet that cost almost nothing.
+- **Logistics is the front line.** Squads eat rations that supply trucks bring, guns fire shells that ammunition trucks bring, vehicles run on gas that a pipeline pumps, and every truck is prey. Holding wheat fields, gas wells, towns, and pylons matters more than any single battle.
+- **The sides are not mirrors.** Ukraine has people, public support, civilians to protect, and Western aid; Russia has Geran waves, glide bombs, Iskanders, North Korean infantry, and defections to worry about. Each side's strategy is different because its constraints are.
+
+Fourteen teaching levels walk through it one idea at a time: moving in column, capturing towns, flying and recharging drones, postures like ambush and hull-down, artillery and counter-battery fire, jamming, the pipeline, the power grid, night fighting, and the deep strikes that end a game. Skirmishes against the computer and matches against another commander put it all together. The units, their prices, their ranges, and the wider rules are simplified for play, but every mechanic stands for something that is really being used on that front.
 
 ## Run it locally
 

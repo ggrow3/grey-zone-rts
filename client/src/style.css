@@ -1245,3 +1245,16 @@ table.armies td:first-child {
 #game.pilot {
   cursor: crosshair;
 }
+details.about {
+  margin: 6px 0 12px;
+}
+details.about summary {
+  cursor: pointer;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+details.about p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}

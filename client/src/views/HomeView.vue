@@ -32,6 +32,26 @@ onMounted(() => auth.refresh());
           the pipeline pumping, and destroy the enemy headquarters, or hold every town for three minutes. Start with the
           levels if this is your first game.
         </p>
+        <details class="about">
+          <summary>What this game is about</summary>
+          <p class="dim">
+            Since 2022 the war in Ukraine has become the first war decided by small drones: a quadcopter costing a few
+            hundred dollars finds a tank, a truck, or a squad, and a second one kills it. Both armies have rebuilt
+            themselves around that: infantry squads that are really drone crews, jammers that cut a drone's radio,
+            fiber-optic drones no jammer can touch, nets over the roads, Geran waves against the power grid, Lancets
+            hunting artillery, interceptors hunting drones, and the trucks, wheat, fuel, and electricity that keep it
+            all flying.
+          </p>
+          <p class="dim">
+            This game is a real-time strategy game about that front, on the Kharkiv and Sumy borders, meant to teach by
+            playing why the decisions are hard. Seeing is everything: guns and kamikaze drones only hit what your side
+            has spotted. Drones are cheap but pilots, batteries, and grid power are not. Logistics is the front line:
+            squads eat what trucks bring, guns fire what trucks bring, and every truck is prey. And the sides are not
+            mirrors: Ukraine has people, public support, and civilians to protect; Russia has Geran waves, glide bombs,
+            North Korean infantry, and defections. The numbers are simplified for play, but every mechanic stands for
+            something really being used on that front.
+          </p>
+        </details>
       </div>
 
       <div class="card">
