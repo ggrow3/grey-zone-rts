@@ -1,9 +1,9 @@
 # Slava Ukraine: Drone Wars
 
 A browser real-time strategy game on the Kharkiv to Belgorod border: drones, jammers, trucks, trenches, and two headquarters.
-Play ten short teaching levels on both sides of the border, fight the computer, or match against another commander over the network and talk to them while you play.
+Play fourteen teaching levels on both sides of the border and on two fronts (Kharkiv and Sumy), fight the computer on either map, or match against another commander over the network and talk to them while you play.
 
-What makes it feel like the real front: the two armies are not mirrors (Ukrainian drones are flown by squads, Russian ones fly themselves; Geran waves, Lancets, North Koreans, defections, civilian support), squads shout "Slava Ukraini!" and "Ura!" (text bubbles, plus spoken voice through the browser's speech synthesis), units earn veteran ranks, artillery runs on shells that trucks bring up, radar spots guns that fire, every kill and capture goes into a battle log, and a squad can take on up to four drone operators, each flying three drones (six after Drone swarm control). Holding every town for three minutes wins outright.
+What makes it feel like the real front: the two armies are not mirrors (Ukrainian drones are flown by squads, Russian ones fly themselves; Geran waves, Lancets, North Koreans, defections, civilian support), squads shout "Slava Ukraini!" and "Ura!" (text bubbles, plus spoken voice through the browser's speech synthesis), units earn veteran ranks, squads carry rations that supply trucks and wheat fields keep filled (a squad out of food fights and walks worse), artillery runs on shells that trucks bring up, radar spots guns that fire, every kill and capture goes into a battle log, and a squad can take on up to four drone operators, each flying three drones (six after Drone swarm control). Holding every town for three minutes wins outright.
 
 You can also fly a drone yourself: select one and press Y to take the sticks. The camera rides with it, it flies toward your cursor, and a click puts it on a target or dives it onto a treeline; a human on the sticks dodges more and hits harder. Many units have postures (R cycles them): FPVs hunt, hold, or land in ambush with the motors off; interceptors patrol or guard a post; Mavics fly high or drop low to see into woods; guns shoot and scoot; armor goes hull down; infantry creeps across open ground; jammers and air defense go silent to hide from radar; fire groups escort trucks.
 
@@ -12,7 +12,7 @@ The 2026 front is in here too: a kill zone where anything in the open under an a
 - **Client**: Vue 3 + TypeScript (Vite). The whole game simulation runs in the browser as a deterministic lockstep engine.
 - **Server**: C# ASP.NET Core (.NET 10) minimal API + SignalR. Accounts (JWT), lobby, matchmaking, chat, the authoritative match turn clock, level progress, and a log of every game played. SQLite via EF Core.
 
-The game was called Grey Zone in its first version; the original single-file prototype is kept as `grey-zone-rts.html`, and internal names (`GreyZone.Server`, the Azure app `greyzone-rts`) still use it.
+The game was called Grey Zone in its first version; the original single-file prototype is kept as `docs/prototype/grey-zone-rts.html`, and internal names (`GreyZone.Server`, the Azure app `greyzone-rts`) still use it.
 
 ## Run it locally
 
@@ -28,11 +28,29 @@ cd client && npm install && npm run dev
 
 Open http://localhost:5173, create an account, and play. For a two-player test open a second browser tab (the login token is per tab, so each tab can be a different player), create a second account, and have both tabs join the queue in the lobby.
 
+## Where things are, and how to change them
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the layout of the code and how the simulation, the frame, and the server fit together.
+- [docs/MODDING.md](docs/MODDING.md): step by step, how to add a troop, a building, a level, or a map, and how to test it from the terminal.
+- [docs/PROTOCOL.md](docs/PROTOCOL.md): the REST and SignalR contract between client and server.
+
+The short version: the tables are in `client/src/game/data/` (units, buildings, research, postures, rules), the maps are `client/src/game/maps/`, the levels are one file each in `client/src/game/levels/`, and the rules are the files in `client/src/game/sim/`.
+
+Developer commands, all in `client/`:
+
+```bash
+npm run check                          # type-check, validate the tables and levels, and check determinism
+npm run validate                       # just the tables and levels
+npm run sim:play -- unit fpv           # drop one unit against a few enemies and see it fight
+npm run sim:play -- level jam          # play a level headless for three minutes
+npm run sim:play -- skirmish --minutes 5 --map sumy
+npm run sim:check                      # the simulation must be deterministic for multiplayer
+npm run format                         # prettier
+```
+
 ## How multiplayer works
 
 Both players run the same simulation from the same seed. The server never simulates: every 100 ms it closes a turn, orders the commands it received from both players, and broadcasts them. Each client applies that turn's commands and advances the simulation six ticks. Clients hash their state every 50 turns and the server flags a desync if they differ. A disconnected player has 60 s to reconnect; the server replays the missed turns on rejoin.
-
-The rules are in `client/src/game/sim.ts`; the protocol is in `docs/PROTOCOL.md`.
 
 ## Production build
 

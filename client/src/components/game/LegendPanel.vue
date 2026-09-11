@@ -2,7 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { drawLegend } from '../../game/render';
 const cv = ref<HTMLCanvasElement | null>(null);
-onMounted(() => { if (cv.value) drawLegend(cv.value); });
+onMounted(() => {
+  if (cv.value) drawLegend(cv.value);
+});
 </script>
 
 <template>
