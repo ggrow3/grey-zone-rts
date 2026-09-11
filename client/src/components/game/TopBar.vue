@@ -2,18 +2,7 @@
 import { computed } from 'vue';
 import { fmtTime } from '../../game/summary';
 import type { Game } from '../../game/sim';
-import {
-  UA,
-  RU,
-  UNITS,
-  FOOD_PER_FIELD,
-  FOOD_BASE,
-  FUEL_PER_NODE,
-  FUEL_BASE,
-  POWER,
-  WEATHER_TEXT,
-  MISSIONS,
-} from '../../game/data';
+import { UA, RU, UNITS, FOOD, FUEL_PER_NODE, FUEL_BASE, POWER, WEATHER_TEXT, MISSIONS } from '../../game/data';
 
 const props = defineProps<{
   game: Game;
@@ -96,10 +85,13 @@ const supply = computed(() => {
   const sp = g().supply[PL()];
   return {
     text:
-      'food ' +
-      sp.foodUsed +
-      '/' +
-      sp.foodCap +
+      'rations ' +
+      Math.floor(sp.foodStock) +
+      ' (' +
+      (sp.foodRate >= 0 ? '+' : '') +
+      sp.foodRate.toFixed(1) +
+      '/s)' +
+      (sp.hungry ? ', ' + sp.hungry + ' hungry' : '') +
       ', fuel ' +
       sp.fuelUsed +
       '/' +
@@ -109,19 +101,27 @@ const supply = computed(() => {
       '/' +
       sp.powerCap,
     color:
-      sp.food < 1 || sp.fuel < 1 || sp.power < 1
+      sp.hungry > 0 || sp.fuel < 1 || sp.power < 1
         ? 'var(--ru)'
-        : sp.foodUsed >= sp.foodCap - 1 || sp.fuelUsed >= sp.fuelCap - 1 || sp.powerUsed >= sp.powerCap - 2
+        : sp.foodStock < FOOD.rations || sp.fuelUsed >= sp.fuelCap - 1 || sp.powerUsed >= sp.powerCap - 2
           ? 'var(--warn)'
           : '',
   };
 });
 const supplyTitle =
-  'Each wheat field held feeds ' +
-  FOOD_PER_FIELD +
-  ' squads (plus ' +
-  FOOD_BASE +
-  ' from stores); each gas site with a working pipeline fuels ' +
+  'Rations: the headquarters larder feeds squads within ' +
+  FOOD.hqRange +
+  ' of it and fills the supply trucks (' +
+  FOOD.truckLoad +
+  ' each) that stock your towns; squads within ' +
+  FOOD.townRange +
+  ' of a town ring eat from its stores. Each wheat field sends a grain truck with ' +
+  FOOD.grainLoad +
+  ' rations every ' +
+  FOOD.grainPeriod +
+  ' s, the kitchens add ' +
+  FOOD.kitchens +
+  ' a second, a squad eats a third a second. Each gas site with a working pipeline fuels ' +
   FUEL_PER_NODE +
   ' vehicles (plus ' +
   FUEL_BASE +

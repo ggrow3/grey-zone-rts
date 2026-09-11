@@ -59,9 +59,28 @@ export const TRUCK_LOAD = 100;
 export const TRUCK_PERIOD = 40;
 /** funds per second from a gas site (the Belgorod depot pays 2.4 times this) */
 export const GAS_YIELD = 5;
-/** squads fed with no wheat, and per wheat field held */
-export const FOOD_BASE = 4;
-export const FOOD_PER_FIELD = 6;
+/** rations: what squads eat, where it comes from, and how it gets to them */
+export const FOOD = {
+  /** rations a squad carries; it eats `eat` a second, so a full squad lasts five minutes in the field */
+  rations: 100,
+  eat: 1 / 3,
+  /** the headquarters larder at the start, and what its kitchens add a second */
+  start: 300,
+  kitchens: 1.5,
+  /** rations a grain truck brings from a wheat field (one every grainPeriod seconds), and a supply truck carries to a town */
+  grainLoad: 100,
+  grainPeriod: 40,
+  truckLoad: 100,
+  /** the most rations a town's stores hold; trucks only bring what fits */
+  townCap: 300,
+  /** how fast a squad restocks, and how close it must be to the headquarters, or to a town's ring, to eat */
+  resupply: 25,
+  hqRange: 300,
+  townRange: 120,
+  /** fire and speed of a squad whose rations have run out */
+  hungryFire: 0.6,
+  hungrySpeed: 0.8,
+};
 /** vehicles fuelled with no gas, and per gas site on an intact pipeline */
 export const FUEL_BASE = 3;
 export const FUEL_PER_NODE = 6;

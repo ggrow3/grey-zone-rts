@@ -47,7 +47,7 @@ export const level04: Level = {
     },
     {
       title: 'Logistics',
-      text: 'Watch the trucks. Supply trucks pay when they reach a town, grain and oil trucks carry from the fields and wells, trade convoys go west to the NATO border. All of it is prey for drones, and an enemy squad standing over a truck takes it. Keep three deliveries coming in.',
+      text: 'Watch the trucks. Supply trucks bring funds and rations to each town you hold, grain trucks carry rations from the wheat fields to the larder, oil trucks carry funds from the wells, trade convoys go west to the NATO border. All of it is prey for drones, and an enemy squad standing over a truck takes it. Squads at the front eat what the trucks bring; keep three deliveries coming in.',
       done: g => g.stats.deliveries[UA] >= 3,
     },
     {

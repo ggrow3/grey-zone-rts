@@ -31,6 +31,7 @@ import {
   modesOf,
   NET_LINE,
   CALLSIGNS,
+  FOOD,
 } from '../data';
 import type { UnitDef, TargetClass, BarkKind } from '../data';
 import { W, H_LAND } from '../map';
@@ -72,6 +73,7 @@ import { updateWeather } from './weather';
 import { computeVision, updateKillZone } from './vision';
 import { powerReach, updatePower, updateSupply } from './economy';
 import { updateHold, updateMissions } from './goals';
+import { updateFood } from './food';
 import { updateAmmo, updateDepots, updateTrade } from './logistics';
 import { updateStruct, updateHealing, updateNets, updateJamming } from './structures';
 import { updateStrikes } from './strikes';
@@ -134,9 +136,35 @@ export class Game {
   /** the personnel pool: crews, operators, and squads all draw on it */
   people = [{ total: 70 }, { total: 70 }];
   supply: Supply[] = [
-    { food: 1, fuel: 1, power: 1, foodUsed: 0, foodCap: 0, fuelUsed: 0, fuelCap: 0, powerUsed: 0, powerCap: 0 },
-    { food: 1, fuel: 1, power: 1, foodUsed: 0, foodCap: 0, fuelUsed: 0, fuelCap: 0, powerUsed: 0, powerCap: 0 },
+    {
+      food: 1,
+      fuel: 1,
+      power: 1,
+      foodStock: FOOD.start,
+      foodRate: 0,
+      hungry: 0,
+      fuelUsed: 0,
+      fuelCap: 0,
+      powerUsed: 0,
+      powerCap: 0,
+    },
+    {
+      food: 1,
+      fuel: 1,
+      power: 1,
+      foodStock: FOOD.start,
+      foodRate: 0,
+      hungry: 0,
+      fuelUsed: 0,
+      fuelCap: 0,
+      powerUsed: 0,
+      powerCap: 0,
+    },
   ];
+  /** rations in each headquarters larder; grain trucks fill it, supply trucks and the squads nearby draw on it */
+  food = [FOOD.start, FOOD.start];
+  foodWarnT = [0, 0];
+  foodWasHungry = [false, false];
   /** international support for Ukraine (0 to 100): scales its income, falls when civilians are hit */
   support = 100;
   civ = { lost: [0, 0], harmedByUA: 0, defectors: 0, carsKilled: [0, 0] };
@@ -306,6 +334,7 @@ export class Game {
       this.powerT = 0.5;
       updatePower(this);
     }
+    updateFood(this, dt);
     updateSupply(this);
     updateDepots(this, dt);
     updateJamming(this, dt);
@@ -386,6 +415,8 @@ export class Game {
     mix(Math.floor(this.gameTime * 10));
     mix(Math.floor(this.funds[0]));
     mix(Math.floor(this.funds[1]));
+    mix(Math.floor(this.food[0]));
+    mix(Math.floor(this.food[1]));
     mix(this.nextId);
     mix(this.units.length);
     mix(this.structs.length);
@@ -649,8 +680,9 @@ export class Game {
   logiMul(team: number): number {
     return this.upgrades[team].logistics ? 1.5 : 1;
   }
-  foodMul(team: number): number {
-    return team >= 0 ? 0.6 + 0.4 * this.supply[team].food : 1;
+  /** a squad out of rations fights at a fraction of its fire */
+  rationMul(u: Unit): number {
+    return u.def.troop && (u.rations ?? FOOD.rations) <= 0 ? FOOD.hungryFire : 1;
   }
   fuelMul(u: Unit): number {
     return u.team >= 0 && FUEL_USERS.has(u.type) ? 0.35 + 0.65 * this.supply[u.team].fuel : 1;

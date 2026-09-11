@@ -54,6 +54,9 @@ export interface Unit {
   grace?: number;
   digT?: number;
   morale?: number;
+  /** rations carried by a squad (0 to FOOD.rations); food carried by a supply truck */
+  rations?: number;
+  food?: number;
   shaken?: boolean;
   swarm?: Swarm | null;
   cargo?: string;
@@ -140,6 +143,8 @@ export interface Site {
   burnT: number;
   yieldRate?: number;
   isRes?: boolean;
+  /** rations stocked in a town by the supply trucks; squads nearby eat from them */
+  food?: number;
 }
 
 export interface PumpSite {
@@ -252,11 +257,14 @@ export interface Swarm {
 }
 
 export interface Supply {
+  /** the share of squads that still have rations (0 to 1) */
   food: number;
   fuel: number;
   power: number;
-  foodUsed: number;
-  foodCap: number;
+  /** the headquarters larder, its change per second, and the squads out of rations */
+  foodStock: number;
+  foodRate: number;
+  hungry: number;
   fuelUsed: number;
   fuelCap: number;
   powerUsed: number;

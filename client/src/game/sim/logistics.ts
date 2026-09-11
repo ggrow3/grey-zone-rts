@@ -1,6 +1,6 @@
 // Trucks: supply runs to held towns, grain and oil from the sites, trade convoys to the border and back,
 // ammunition trucks for the guns, capture of unescorted trucks, and the pumping stations' repair crews.
-import { UA, RU, UNITS, TRUCK_LOAD, TRUCK_PERIOD, TEAMS, SCORE } from '../data';
+import { UA, RU, UNITS, TRUCK_LOAD, TRUCK_PERIOD, TEAMS, SCORE, FOOD } from '../data';
 import { W } from '../map';
 import { hyp, dist } from '../dmath';
 import type { Unit, Struct, Site, Pt } from '../types';
@@ -90,7 +90,9 @@ export function updateDepots(g: Game, dt: number) {
         if (was >= 0) {
           g.notify(
             was,
-            d.name + ' lost' + (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': fewer recruits' : '')
+            d.name +
+              ' lost' +
+              (d.kind === 'gas' ? ': gas income falls' : d.kind === 'wheat' ? ': less grain for the larder' : '')
           );
           g.alert(was, d.x, d.y, d.name + ' lost');
         }
@@ -147,6 +149,9 @@ export function spawnTruck(g: Game, team: number, d: Site) {
   }
   const u = g.makeUnit('truck', team, hq.x + g.rand(-20, 20), hq.y + (team === UA ? -(hq.r + 22) : hq.r + 22));
   u.cargo = 'supply';
+  // the truck takes rations from the larder for the town's stores
+  u.food = Math.max(0, Math.min(g.food[team], FOOD.truckLoad, FOOD.townCap - (d.food || 0)));
+  g.food[team] -= u.food;
   u.dest = d;
   u.order = MOVE(d.x + g.rand(-20, 20), d.y + g.rand(-20, 20));
   planRoute(g, u, u.order.x, u.order.y);
@@ -337,9 +342,8 @@ export function updateTruck(g: Game, u: Unit, dt: number) {
     if (dist(u, dest) < (dest.r || 0) + 40) {
       const mul = g.teamMul(u.team);
       if (u.cargo === 'grain') {
-        g.people[u.team].total = Math.min(200, g.people[u.team].total + 3);
+        g.food[u.team] += FOOD.grainLoad * g.logiMul(u.team);
         if (u.team === UA) g.support = Math.min(100, g.support + 2);
-        g.funds[u.team] += 30 * mul * g.logiMul(u.team);
       } else g.funds[u.team] += 120 * mul * g.logiMul(u.team);
       g.stats.deliveries[u.team]++;
       g.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, green: true });
@@ -350,7 +354,8 @@ export function updateTruck(g: Game, u: Unit, dt: number) {
         t: 0,
         dur: 1.2,
         team: u.team,
-        text: u.cargo === 'grain' ? 'grain: +3 recruits' : 'oil: +120',
+        text:
+          u.cargo === 'grain' ? 'grain: +' + Math.round(FOOD.grainLoad * g.logiMul(u.team)) + ' rations' : 'oil: +120',
       });
       killUnit(g, u, true);
     }
@@ -364,9 +369,19 @@ export function updateTruck(g: Game, u: Unit, dt: number) {
   if (stuckCheck()) return;
   if (dist(u, dest) < 40) {
     g.funds[u.team] += TRUCK_LOAD * g.teamMul(u.team) * g.logiMul(u.team);
+    const rations = Math.round((u.food || 0) * g.logiMul(u.team));
+    (dest as Site).food = ((dest as Site).food || 0) + rations;
     g.stats.deliveries[u.team]++;
     g.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, green: true });
-    g.effects.push({ kind: 'text', x: u.x, y: u.y - 14, t: 0, dur: 1.2, team: u.team, text: '+' + TRUCK_LOAD });
+    g.effects.push({
+      kind: 'text',
+      x: u.x,
+      y: u.y - 14,
+      t: 0,
+      dur: 1.2,
+      team: u.team,
+      text: '+' + TRUCK_LOAD + (rations ? ', ' + rations + ' rations' : ''),
+    });
     killUnit(g, u, true);
   }
 }

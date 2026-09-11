@@ -109,7 +109,7 @@ export const STRATEGY: [string, string][] = [
   ],
   [
     'Power, fuel, food',
-    'Every building except nets and trenches draws power from the grid it stands on: the headquarters gives 30, the city substation 60, a power plant 90, a generator set 20; a barracks draws 5, the works 10, the armor plant 8, the depot 6, radar 4, an EW station 8, a hospital 3. Buildings link to neighbours within 150; pylons carry the line 190 at a time. A grid short of supply runs every building on it at the ratio, and a grid with no source runs nothing: factories stop, radar sees 30%, jammers go quiet. Whatever supply is left after the buildings charges battery drones, one point each. The enemy cuts pylons and hits the substation first; a generator set beside a forward building is the cheap island. Gasoline aircraft and vehicles draw on gas flowing through an intact pipeline. Squads eat: past the wheat line your infantry fight at 60%.',
+    'Every building except nets and trenches draws power from the grid it stands on: the headquarters gives 30, the city substation 60, a power plant 90, a generator set 20; a barracks draws 5, the works 10, the armor plant 8, the depot 6, radar 4, an EW station 8, a hospital 3. Buildings link to neighbours within 150; pylons carry the line 190 at a time. A grid short of supply runs every building on it at the ratio, and a grid with no source runs nothing: factories stop, radar sees 30%, jammers go quiet. Whatever supply is left after the buildings charges battery drones, one point each. The enemy cuts pylons and hits the substation first; a generator set beside a forward building is the cheap island. Gasoline aircraft and vehicles draw on gas flowing through an intact pipeline. Squads eat: recruiting one takes 100 rations from the larder, each carries five minutes of rations, refills them within 300 of the headquarters or within 120 of a held town the supply trucks have stocked, and out of rations fights at 60% and walks at 80%. The larder at the headquarters is filled by the kitchens (1.5 a second) and by the grain trucks from your wheat fields (100 each): hold the fields, keep the trucks alive, and keep the squads near a stocked town.',
   ],
   [
     'The kill zone',
@@ -129,7 +129,7 @@ export const STRATEGY: [string, string][] = [
   ],
   [
     'Logistics and trade',
-    'Supply trucks pay when they reach a town, grain and oil trucks carry from the fields and wells, and every 75 seconds a trade convoy goes to the border and comes back with aid. A squad standing over an unescorted truck takes it and its cargo.',
+    'Supply trucks bring 100 funds and 100 rations to each town you hold, grain trucks carry rations from the fields to the larder and oil trucks funds from the wells, and every 75 seconds a trade convoy goes to the border and comes back with aid. A squad standing over an unescorted truck takes it and its cargo.',
   ],
   [
     'Civilians, morale, defectors',

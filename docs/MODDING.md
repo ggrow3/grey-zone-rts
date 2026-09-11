@@ -186,6 +186,8 @@ kill zone, score) and the research items in [data/upgrades.ts](../client/src/gam
 rules themselves are the files in `client/src/game/sim/`; each file's header says what it covers, and
 `Game.tick()` in [sim/game.ts](../client/src/game/sim/game.ts) lists the order they run in.
 
+Two knobs people reach for first: `PACE` in [sim/constants.ts](../client/src/game/sim/constants.ts) is game seconds per real second (5/6 now; the sim itself never sees it, so the digest does not change), and `FOOD` in `rules.ts` is the rations system: what a squad carries and eats, what the kitchens and a grain truck add to the larder, what a supply truck carries to a town, how close a squad must be to eat, and the fire and speed of a hungry one. The larder is `g.food[team]`, a town's stores `site.food`, a squad's pack `unit.rations`; [sim/food.ts](../client/src/game/sim/food.ts) moves them.
+
 Two things every change to the simulation must respect, because both players in a multiplayer match run
 it independently and compare checksums:
 

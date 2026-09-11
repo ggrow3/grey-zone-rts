@@ -56,6 +56,10 @@ function status(g: Game) {
       ' funds ' +
       String(n).padStart(3) +
       ' units ' +
+      Math.floor(g.food[T]) +
+      ' food ' +
+      g.supply[T].hungry +
+      ' hungry ' +
       towns +
       ' towns ' +
       g.stats.kills[T] +

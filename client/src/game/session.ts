@@ -1,11 +1,11 @@
 // Drives a Game forward in time and delivers commands to it.
 // LocalSession: solo play, commands apply on the next tick.
 // NetSession: lockstep multiplayer, commands go to the server and come back ordered inside 100 ms turns.
-import { Game, DT } from './sim';
+import { Game, DT, PACE } from './sim';
 import type { Command } from './types';
 
 export const TURN_MS = 100;
-export const TICKS_PER_TURN = Math.round(TURN_MS / 1000 / DT); // 6
+export const TICKS_PER_TURN = Math.round((TURN_MS / 1000 / DT) * PACE); // 5
 const HASH_EVERY = 50;
 
 export interface TurnDto {
@@ -55,7 +55,7 @@ export class LocalSession implements Session {
   advance(elapsed: number) {
     if (this.paused || this.game.gameOver) return;
     // up to 15 ticks a frame so a throttled tab (few frames a second) still runs close to real time
-    this.acc += Math.min(elapsed, 0.25) * this.speed;
+    this.acc += Math.min(elapsed, 0.25) * this.speed * PACE;
     let steps = 0;
     const maxSteps = 15 * this.speed;
     while (this.acc >= DT && steps < maxSteps) {
@@ -99,7 +99,7 @@ export class ReplaySession implements Session {
   }
   advance(elapsed: number) {
     if (this.paused || this.game.gameOver) return;
-    this.acc += Math.min(elapsed, 0.25) * this.speed;
+    this.acc += Math.min(elapsed, 0.25) * this.speed * PACE;
     let steps = 0;
     const maxSteps = 15 * this.speed;
     while (this.acc >= DT && steps < maxSteps) {
@@ -156,7 +156,7 @@ export class NetSession implements Session {
   }
   advance(elapsed: number) {
     if (this.game.gameOver) return;
-    this.acc += Math.min(elapsed, 0.25);
+    this.acc += Math.min(elapsed, 0.25) * PACE;
     // catch up fast after a stall or a background tab, otherwise run in real time
     const maxSteps = this.lag > 3 ? TICKS_PER_TURN * Math.min(this.lag, 40) : 5;
     let steps = 0;

@@ -136,8 +136,13 @@ function unitRows(e: Unit): [string, string][] {
     ]);
   if (d.fuelDrone) rows.push(['Power', 'gasoline engine: draws on the fuel supply']);
   if (d.jet) rows.push(['Power', 'turbojet']);
-  if (d.troop && G.supply[e.team].food < 1)
-    rows.push(['Supply', 'hungry: fire at ' + Math.round(G.foodMul(e.team) * 100) + '%']);
+  if (d.troop)
+    rows.push([
+      'Rations',
+      Math.ceil(e.rations ?? 100) +
+        ' / 100' +
+        ((e.rations ?? 1) <= 0 ? ': out of food, fire ' + Math.round(G.rationMul(e) * 100) + '%, speed 80%' : ''),
+    ]);
   if (FUEL_USERS.has(e.type) && G.supply[e.team].fuel < 1)
     rows.push(['Supply', 'short of fuel: speed ' + Math.round(G.fuelMul(e) * 100) + '%']);
   if (d.morale)

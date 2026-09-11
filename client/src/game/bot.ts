@@ -1,5 +1,5 @@
 // The computer opponent. Team-parametric; uses the game's seeded RNG so it is deterministic.
-import { UA, RU, UNITS, UPGRADES, FUEL_USERS, DIG_TIME } from './data';
+import { UA, RU, UNITS, UPGRADES, FUEL_USERS, DIG_TIME, FOOD } from './data';
 import { dist } from './dmath';
 import type { Game } from './sim';
 import { MOVE, ATTACK } from './sim';
@@ -461,7 +461,7 @@ function botSpend(g: Game, bot: Bot) {
       (def.cap && g.typeCount(T, bot.pending) >= def.cap) ||
       (FUEL_USERS.has(bot.pending) && g.supply[T].fuelUsed + 1 > g.supply[T].fuelCap) ||
       (def.electric && g.supply[T].powerUsed + 1 > g.supply[T].powerCap) ||
-      (def.troop && g.supply[T].foodUsed + 1 > g.supply[T].foodCap + 2)
+      (def.troop && g.food[T] < FOOD.rations)
     ) {
       bot.pending = weightedPick(g, table);
       continue;
@@ -481,7 +481,10 @@ function botLaunch(g: Game, bot: Bot, group: Unit[]) {
   const contested = g.depots.concat(g.resources).filter(d => d.owner !== T);
   if (contested.length) {
     const want = (d: (typeof contested)[number]) =>
-      (g.supply[T].food < 1 && d.kind === 'wheat') || (g.supply[T].fuel < 1 && d.kind === 'gas') ? 0 : 1;
+      ((g.supply[T].foodStock < 150 || g.supply[T].hungry > 0) && d.kind === 'wheat') ||
+      (g.supply[T].fuel < 1 && d.kind === 'gas')
+        ? 0
+        : 1;
     contested.sort((a, b) => want(a) - want(b) || dist(a, bot.staging) - dist(b, bot.staging));
     target = contested[0];
     name = contested[0].name;

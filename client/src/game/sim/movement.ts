@@ -1,6 +1,6 @@
 // Movement: routing along roads, stepping toward a goal with stall detection, rivers crossed only at bridges,
 // and keeping ground units and buildings apart.
-import { PILOT } from '../data';
+import { PILOT, FOOD } from '../data';
 import { W, H, H_LAND } from '../map';
 import { hyp, clamp, datan2 } from '../dmath';
 import type { Unit, Pt } from '../types';
@@ -81,6 +81,7 @@ export function moveToward(g: Game, u: Unit, tx: number, ty: number, dt: number)
       (u.def.morale ? 0.7 + 0.3 * g.moraleMul(u) : 1) *
       g.fuelMul(u) *
       g.moveMul(u) *
+      (u.def.troop && (u.rations ?? 1) <= 0 ? FOOD.hungrySpeed : 1) *
       postureMul *
       dt
   );

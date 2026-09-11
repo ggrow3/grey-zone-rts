@@ -210,9 +210,10 @@ const CONTROLS: [string, string][] = [
         </div>
         <h4>Sites on the map</h4>
         <p>
-          Towns: captured by troops, send supply trucks, allow building nearby. Wheat fields: feed 6 squads each, add
-          recruits and support, burn under heavy fire. Gas wells and the Belgorod fuel depot: pay 5 funds a second and
-          fuel 6 vehicles each while the pipeline is intact.
+          Towns: captured by troops, send supply trucks, allow building nearby. Wheat fields: send a grain truck with
+          100 rations to your headquarters every 40 seconds (and 2 support for Ukraine), burn under heavy fire;
+          recruiting a squad takes 100 rations from the larder. Gas wells and the Belgorod fuel depot: pay 5 funds a
+          second and fuel 6 vehicles each while the pipeline is intact.
         </p>
       </template>
       <template v-else-if="tab === 'armies'">

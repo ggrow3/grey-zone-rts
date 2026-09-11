@@ -37,7 +37,7 @@ export interface StructDef {
 export const STRUCTS: Record<string, StructDef> = {
   hq: {
     label: 'Headquarters',
-    hp: 4500,
+    hp: 2800,
     r: 38,
     cost: 0,
     time: 0,
@@ -46,7 +46,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   barracks: {
     label: 'Barracks',
-    hp: 1000,
+    hp: 650,
     r: 26,
     cost: 500,
     time: 12,
@@ -56,7 +56,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   droneWorks: {
     label: 'Drone works',
-    hp: 1100,
+    hp: 700,
     r: 28,
     cost: 700,
     time: 14,
@@ -66,7 +66,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   armorPlant: {
     label: 'Armor plant',
-    hp: 1500,
+    hp: 950,
     r: 32,
     cost: 1000,
     time: 18,
@@ -76,7 +76,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   artyDepot: {
     label: 'Artillery depot',
-    hp: 1100,
+    hp: 700,
     r: 28,
     cost: 900,
     time: 16,
@@ -86,7 +86,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   radar: {
     label: 'Radar post',
-    hp: 700,
+    hp: 450,
     r: 18,
     cost: 300,
     time: 8,
@@ -95,7 +95,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   ewStation: {
     label: 'EW station',
-    hp: 650,
+    hp: 420,
     r: 18,
     cost: 450,
     time: 10,
@@ -105,7 +105,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   net: {
     label: 'Anti-drone net',
-    hp: 300,
+    hp: 220,
     r: 14,
     cost: 250,
     time: 8,
@@ -114,7 +114,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   netLine: {
     label: 'Road net tunnel',
-    hp: 300,
+    hp: 220,
     r: 14,
     cost: 600,
     time: 8,
@@ -124,7 +124,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   pump: {
     label: 'Pumping station',
-    hp: 500,
+    hp: 350,
     r: 14,
     cost: 400,
     time: 10,
@@ -132,7 +132,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   aidPost: {
     label: 'Field hospital',
-    hp: 400,
+    hp: 280,
     r: 14,
     cost: 350,
     time: 8,
@@ -143,7 +143,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   generator: {
     label: 'Generator set',
-    hp: 300,
+    hp: 220,
     r: 12,
     cost: 300,
     time: 8,
@@ -152,7 +152,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   powerPlant: {
     label: 'Power plant',
-    hp: 900,
+    hp: 600,
     r: 26,
     cost: 900,
     time: 20,
@@ -170,7 +170,7 @@ export const STRUCTS: Record<string, StructDef> = {
   },
   trench: {
     label: 'Trench',
-    hp: 300,
+    hp: 220,
     r: 10,
     cost: 0,
     time: 0,
@@ -199,7 +199,7 @@ export const BUILDABLE = [
 export const CIV_TYPES: Record<string, StructDef> = {
   apartments: {
     label: 'Apartments',
-    hp: 600,
+    hp: 420,
     r: 18,
     cost: 0,
     time: 0,
@@ -207,7 +207,7 @@ export const CIV_TYPES: Record<string, StructDef> = {
   },
   hospital: {
     label: 'Hospital',
-    hp: 500,
+    hp: 360,
     r: 16,
     cost: 0,
     time: 0,
@@ -217,7 +217,7 @@ export const CIV_TYPES: Record<string, StructDef> = {
   },
   school: {
     label: 'School',
-    hp: 400,
+    hp: 300,
     r: 14,
     cost: 0,
     time: 0,
@@ -225,7 +225,7 @@ export const CIV_TYPES: Record<string, StructDef> = {
   },
   power: {
     label: 'Substation',
-    hp: 450,
+    hp: 320,
     r: 14,
     cost: 0,
     time: 0,
@@ -234,7 +234,7 @@ export const CIV_TYPES: Record<string, StructDef> = {
   },
   market: {
     label: 'Market',
-    hp: 350,
+    hp: 260,
     r: 12,
     cost: 0,
     time: 0,

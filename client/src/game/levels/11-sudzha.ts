@@ -77,7 +77,7 @@ export const level11: Level = {
     },
     {
       title: 'The wheat by the border',
-      text: 'A neutral wheat field lies just north of Yunakivka, on the border. Stand a squad in it for five seconds: each field feeds six squads and adds recruits. You hold two fields already; make it three.',
+      text: 'A neutral wheat field lies just north of Yunakivka, on the border. Stand a squad in it for five seconds: each field sends a grain truck with 100 rations to the larder in Sumy every 40 seconds, and the squads at the front eat what the supply trucks bring to Yunakivka. You hold two fields already; make it three.',
       done: g => wheatHeld(g, UA) >= 3,
       marker: g => {
         const w = g.resources

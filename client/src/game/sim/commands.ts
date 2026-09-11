@@ -21,6 +21,7 @@ import {
   modesOf,
   PILOT,
   NET_LINE,
+  FOOD,
 } from '../data';
 import { W, H, H_LAND } from '../map';
 import { hyp, dist, clamp, datan2 } from '../dmath';
@@ -541,15 +542,21 @@ export function enqueue(g: Game, team: number, fac: Struct, type: string) {
         g.supply[team].powerCap +
         '. Keep the substation standing or build generator sets.'
     );
-  if (def.troop && g.supply[team].foodUsed + 1 > g.supply[team].foodCap)
-    g.notify(
+  if (def.troop && g.food[team] < FOOD.rations)
+    return g.notify(
       team,
-      'Warning: this squad will go hungry, ' + g.supply[team].foodCap + ' can be fed. Take more wheat fields.'
+      'No rations for another squad: the larder holds ' +
+        Math.floor(g.food[team]) +
+        ' of the ' +
+        FOOD.rations +
+        ' it marches with. Hold wheat fields and keep the grain trucks alive.'
     );
   if (def.cap && g.typeCount(team, type) >= def.cap)
     return g.notify(team, 'No more ' + def.label[team] + 's available: at most ' + def.cap + ' squads');
   if (def.air && fac.overheated) g.notify(team, 'Works overheated: the drone joins the backlog until it cools');
   g.funds[team] -= def.cost;
+  // a squad marches out with a full pack drawn from the larder
+  if (def.troop) g.food[team] -= FOOD.rations;
   fac.queue.push(type);
 }
 
@@ -560,6 +567,7 @@ function cancelQueued(g: Game, team: number, cmd: Cmd<'cancel'>) {
   if (!type) return;
   fac.queue.splice(cmd.index, 1);
   g.funds[team] += UNITS[type].cost;
+  if (UNITS[type].troop) g.food[team] += FOOD.rations;
   if (cmd.index === 0) fac.progress = 0;
 }
 

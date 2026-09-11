@@ -1,20 +1,10 @@
 // Supply: the power grids (buildings and pylons joined by union-find, each grid sharing its sources) and the
 // food, fuel, and drone-charging capacities that scale fire, speed, and recharging when they run short.
-import {
-  UA,
-  RU,
-  STRUCTS,
-  FUEL_USERS,
-  GAS_YIELD,
-  FOOD_BASE,
-  FOOD_PER_FIELD,
-  FUEL_BASE,
-  FUEL_PER_NODE,
-  POWER,
-} from '../data';
+import { UA, RU, STRUCTS, FUEL_USERS, GAS_YIELD, FUEL_BASE, FUEL_PER_NODE, POWER } from '../data';
 import { dist } from '../dmath';
 import type { Struct } from '../types';
 import type { Game } from './game';
+import { foodRate } from './food';
 
 /** nodes of a side's grid: its finished buildings (not trenches or nets) and its nation's substations */
 export function powerNodes(g: Game, T: number, building = false): Struct[] {
@@ -91,32 +81,24 @@ export function updatePower(g: Game) {
 export function updateSupply(g: Game) {
   for (const T of [UA, RU]) {
     const sp = g.supply[T];
-    let foodUsed = 0,
+    let squads = 0,
+      fed = 0,
       fuelUsed = 0,
       powerUsed = 0;
     for (const u of g.units) {
       if (u.dead || u.team !== T) continue;
-      if (u.def.troop) foodUsed++;
+      if (u.def.troop) {
+        squads++;
+        if ((u.rations ?? 1) > 0) fed++;
+      }
       if (FUEL_USERS.has(u.type)) fuelUsed++;
       if (u.def.electric) powerUsed++;
     }
-    const foodCap = FOOD_BASE + FOOD_PER_FIELD * g.wheatHeld(T),
-      fuelCap = FUEL_BASE + Math.round((FUEL_PER_NODE * g.gasIncome(T)) / GAS_YIELD);
+    const fuelCap = FUEL_BASE + Math.round((FUEL_PER_NODE * g.gasIncome(T)) / GAS_YIELD);
     const powerCap = g.powerCapGrid[T];
-    const food = foodUsed > foodCap ? foodCap / foodUsed : 1,
+    const food = squads ? fed / squads : 1,
       fuel = fuelUsed > fuelCap ? fuelCap / fuelUsed : 1,
       power = powerUsed > powerCap ? powerCap / powerUsed : 1;
-    if (food < 1 && sp.food >= 1)
-      g.notify(
-        T,
-        'Food shortage: ' +
-          foodUsed +
-          ' squads, ' +
-          foodCap +
-          ' fed. Hungry troops fight at ' +
-          Math.round((0.6 + 0.4 * food) * 100) +
-          '%. Hold more wheat fields.'
-      );
     if (fuel < 1 && sp.fuel >= 1)
       g.notify(
         T,
@@ -138,13 +120,12 @@ export function updateSupply(g: Game) {
           '. Recharging takes three times longer and no more battery drones can be built.'
       );
     if (power >= 1 && sp.power < 1) g.notify(T, 'Charging capacity restored');
-    if (food >= 1 && sp.food < 1) g.notify(T, 'Food supply restored');
     if (fuel >= 1 && sp.fuel < 1) g.notify(T, 'Fuel supply restored');
     sp.food = food;
     sp.fuel = fuel;
     sp.power = power;
-    sp.foodUsed = foodUsed;
-    sp.foodCap = foodCap;
+    sp.foodStock = g.food[T];
+    sp.foodRate = foodRate(g, T);
     sp.fuelUsed = fuelUsed;
     sp.fuelCap = fuelCap;
     sp.powerUsed = powerUsed;

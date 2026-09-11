@@ -52,7 +52,8 @@ systems in order:
 |---|---|
 | `weather.ts` | the weather front and the day cycle |
 | `vision.ts` | vision circles, spotting, the kill zone |
-| `economy.ts` | the power grids and the food, fuel, and charging capacities |
+| `food.ts` | rations: the larder, grain trucks, town stores, squads eating and going hungry |
+| `economy.ts` | the power grids and the fuel and charging capacities, the side-level supply figures |
 | `logistics.ts` | towns and captures, trucks, trade convoys, ammunition |
 | `structures.ts` | construction, production, repair, hospitals, nets, jamming |
 | `civilians.ts` | morale, civilian cars, support, defections |

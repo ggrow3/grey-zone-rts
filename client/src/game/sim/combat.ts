@@ -83,7 +83,7 @@ export function fireAt(g: Game, u: Unit, t: Entity) {
       u,
       t,
       d.dmg *
-        (d.troop ? COVER[u.cover || 'open'].give * g.foodMul(u.team) : 1) *
+        (d.troop ? COVER[u.cover || 'open'].give * g.rationMul(u) : 1) *
         g.moraleMul(u) *
         (!d.air && g.upgrades[u.team].ammo ? 1.15 : 1) *
         (1 + 0.06 * rankOf(u)) *

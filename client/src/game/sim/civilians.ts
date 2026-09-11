@@ -15,7 +15,7 @@ export function updateMorale(g: Game, dt: number) {
     if (u.morale === undefined) u.morale = 90;
     const losing = towns[u.team] < towns[1 - u.team];
     let dm = losing ? -(u.def.moraleLoss || 0) : 0.3;
-    dm -= (1 - g.supply[u.team].food) * 0.8;
+    if ((u.rations ?? 1) <= 0) dm -= 0.8;
     if (u.def.upkeep) {
       const pay = u.def.upkeep * dt;
       if (g.funds[u.team] >= pay) g.funds[u.team] -= pay;

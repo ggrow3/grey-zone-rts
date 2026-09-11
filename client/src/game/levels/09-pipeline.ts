@@ -59,7 +59,7 @@ export const level09: Level = {
     },
     {
       title: 'Liutyis',
-      text: 'Queue two Liutyi strike drones at the drone works (J): 300 funds each, 2 crew, a 350 warhead, buildings only. A pumping station has 500 hp, so it takes two.',
+      text: 'Queue two Liutyi strike drones at the drone works (J): 300 funds each, 2 crew, a 350 warhead, buildings only. A pumping station has 350 hp: one warhead flattens it, the second is insurance against their air defense.',
       done: has(UA, 'liutyi', 2),
       marker: own('droneWorks'),
     },
