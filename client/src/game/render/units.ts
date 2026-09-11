@@ -208,6 +208,20 @@ export function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View
     }
     c.restore();
   }
+  // confirmed kills, tallied beside the unit
+  if (u.kills && !u.def.kamikaze) {
+    c.save();
+    c.font = '600 8px "Barlow Condensed", sans-serif';
+    c.textAlign = 'left';
+    c.textBaseline = 'bottom';
+    c.lineWidth = 2.5;
+    c.lineJoin = 'round';
+    c.strokeStyle = 'rgba(12,14,10,0.9)';
+    c.strokeText(u.kills + '†', u.x + r + 2, u.y + r + 3);
+    c.fillStyle = '#ffd60a';
+    c.fillText(u.kills + '†', u.x + r + 2, u.y + r + 3);
+    c.restore();
+  }
   // a gun caught firing by enemy radar
   if (u.revealT && u.revealT > 0 && u.def.indirect) {
     c.save();

@@ -26,7 +26,11 @@ dotnet run --project server/GreyZone.Server
 cd client && npm install && npm run dev
 ```
 
-Open http://localhost:5173, create an account, and play. For a two-player test open a second browser tab (the login token is per tab, so each tab can be a different player), create a second account, and have both tabs join the queue in the lobby.
+Or start both with one command from the repository root: `.un-local.ps1` on Windows, `./run-local.sh` on macOS and Linux.
+
+Open http://localhost:5173, create an account, and play. Accounts live in a local SQLite file (`greyzone.db` under your home directory's `data` folder), so any username and password work the first time. For a two-player test open a second browser tab (the login token is per tab, so each tab can be a different player), create a second account, and have both tabs join the queue in the lobby.
+
+No .NET, or only interested in the solo game? Run the client alone (`cd client && npm run dev`) and press **Play offline** on the sign-in page: the levels and skirmishes run entirely in the browser; only the lobby and the game log need the server.
 
 ## Where things are, and how to change them
 

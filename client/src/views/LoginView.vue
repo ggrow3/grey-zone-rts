@@ -13,6 +13,11 @@ const username = ref(''),
   error = ref(''),
   busy = ref(false);
 
+function playOffline() {
+  auth.playOffline();
+  router.push('/');
+}
+
 async function submit() {
   error.value = '';
   if (mode.value === 'register' && password.value !== password2.value) {
@@ -84,6 +89,14 @@ async function submit() {
           {{ mode === 'login' ? 'Sign in' : 'Create account and play' }}
         </button>
       </form>
+      <div class="row" style="margin-top: 14px; align-items: center; gap: 10px">
+        <span class="dim" style="flex: 1"
+          >No account, or no game server running? The levels and skirmishes work without one.</span
+        >
+        <button type="button" @click="playOffline" title="Solo play only; progress is kept for this tab">
+          Play offline
+        </button>
+      </div>
     </div>
   </div>
 </template>

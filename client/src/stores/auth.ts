@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 
 // The token lives in sessionStorage so two browser tabs can be two different players.
 const KEY = 'greyzone.auth';
+/** the token of a player without an account: levels and skirmishes work, nothing is sent to the server */
+export const GUEST = 'offline';
 
 export const useAuth = defineStore('auth', () => {
   const token = ref<string | null>(null);
@@ -22,6 +24,7 @@ export const useAuth = defineStore('auth', () => {
   }
 
   const loggedIn = computed(() => !!token.value);
+  const offline = computed(() => token.value === GUEST);
 
   function set(t: string, u: string) {
     token.value = t;
@@ -63,8 +66,12 @@ export const useAuth = defineStore('auth', () => {
     set(r.token, r.username);
     await refresh();
   }
+  /** play without an account: solo only, progress kept for this tab */
+  function playOffline() {
+    set(GUEST, 'Commander');
+  }
   async function refresh() {
-    if (!token.value) return;
+    if (!token.value || token.value === GUEST) return;
     const res = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token.value } });
     if (res.status === 401) {
       logout();
@@ -81,5 +88,19 @@ export const useAuth = defineStore('auth', () => {
     if (!completedLevels.value.includes(id)) completedLevels.value.push(id);
   }
 
-  return { token, username, loggedIn, completedLevels, wins, losses, login, register, logout, refresh, markLevel };
+  return {
+    token,
+    username,
+    loggedIn,
+    offline,
+    completedLevels,
+    wins,
+    losses,
+    login,
+    register,
+    playOffline,
+    logout,
+    refresh,
+    markLevel,
+  };
 });

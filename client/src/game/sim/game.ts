@@ -797,11 +797,19 @@ export class Game {
     if (best) this.linkDrone(u, best);
     return best;
   }
-  /** where a battery drone goes to recharge: its squad, else the nearest headquarters or drone works */
+  /** where a battery drone goes to recharge: its own squad, else the nearest friendly infantry squad, headquarters, or drone works */
   landingSpot(u: Unit): Entity | null {
     if (u.operator && !u.operator.dead) return u.operator;
-    let best: Struct | null = null,
+    let best: Entity | null = null,
       bd = Infinity;
+    for (const o of this.units) {
+      if (o.dead || o.team !== u.team || !o.def.troop) continue;
+      const dd = dist(u, o);
+      if (dd < bd) {
+        bd = dd;
+        best = o;
+      }
+    }
     for (const st of this.structs) {
       if (st.dead || st.team !== u.team) continue;
       if (!(st.type === 'hq' || st.type === 'droneWorks' || st.type === 'launchSite')) continue;

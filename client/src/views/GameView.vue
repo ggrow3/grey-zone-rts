@@ -385,7 +385,7 @@ function attach() {
   on(window, 'keyup', e => controller.keyUp(e));
   // a closed tab still gets logged as abandoned: keepalive lets the request outlive the page
   const onHide = () => {
-    if (isNet.value || finished || !gameLogId || game.gameOver) return;
+    if (isNet.value || finished || !gameLogId || game.gameOver || auth.offline) return;
     finished = true;
     fetch(`/api/games/${gameLogId}/finish`, {
       method: 'POST',

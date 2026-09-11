@@ -7,6 +7,8 @@ export const AUTO_LARGE = [1, 1, 2, 4];
 /** drone operators a squad can hold, and drones each operator flies (doubled by Drone swarm control) */
 export const OPS_MAX = 4;
 export const DRONES_PER_OP = 3;
+/** a battery drone that lands beside an infantry squad swaps its battery in this fraction of the time the works takes */
+export const SQUAD_SWAP = 0.5;
 /** squad callsigns, handed out in order per side; a lost squad is named in the log */
 export const CALLSIGNS: [string[], string[]] = [
   [

@@ -1,6 +1,6 @@
 // One unit's tick: batteries and landing, the link to its squad, ambush, digging, shoot-and-scoot,
 // fire missions, target acquisition, carrying out its order, shooting, and (for kamikaze drones) the dive.
-import { DIG_TIME, PILOT } from '../data';
+import { DIG_TIME, PILOT, SQUAD_SWAP } from '../data';
 import { hyp, dist, datan2 } from '../dmath';
 import type { Unit, Entity } from '../types';
 import type { Game } from './game';
@@ -79,7 +79,8 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
         const dd = dist(u, spot);
         if (dd < 50) {
           u.landed = true;
-          u.rechargeT = d.recharge || 30;
+          // a squad swaps the battery by hand, faster than the works
+          u.rechargeT = (d.recharge || 30) * (spot.isUnit && spot.def.troop ? SQUAD_SWAP : 1);
           u.order = IDLE();
           u.target = null;
           g.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6 });

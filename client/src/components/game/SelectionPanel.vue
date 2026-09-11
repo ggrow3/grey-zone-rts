@@ -48,11 +48,16 @@ const swarmSel = computed(() => {
   const u = unitsSel.value;
   return u.length && u.every(x => g().swarmOf(x) === g().swarmOf(u[0]) && g().swarmOf(x)) ? g().swarmOf(u[0]) : null;
 });
+/** the selected units by type: how many, and their confirmed kills together */
 const counts = computed(() => {
-  const c: Record<string, number> = {};
-  for (const u of unitsSel.value) c[u.type] = (c[u.type] || 0) + 1;
+  const c: Record<string, [number, number]> = {};
+  for (const u of unitsSel.value) {
+    const e = (c[u.type] ||= [0, 0]);
+    e[0]++;
+    e[1] += u.kills || 0;
+  }
   return Object.entries(c)
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1][0] - a[1][0])
     .slice(0, 5);
 });
 const hpColor = (r: number) => (r > 0.5 ? 'var(--ok)' : r > 0.25 ? 'var(--warn)' : 'var(--ru)');
@@ -112,7 +117,8 @@ function unitRows(e: Unit): [string, string][] {
   }
   if (e.callsign)
     rows.push(['Callsign', e.callsign + (e.grief && e.grief > 0 ? ', shaken ' + Math.ceil(e.grief) + ' s' : '')]);
-  if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)] + ' (' + (e.kills || 0) + ' kills)']);
+  if (!d.auto && !d.kamikaze) rows.push(['Rank', RANK_NAMES[rankOf(e)]]);
+  if (!d.kamikaze) rows.push(['Kills', String(e.kills || 0)]);
   if (d.crew)
     rows.push(['Crew', G.crewLabel(d, e.team) + (d.air ? ', return when it is lost' : ', half are lost with it')]);
   if (!d.air && d.roadMul)
@@ -131,7 +137,9 @@ function unitRows(e: Unit): [string, string][] {
       'Power',
       'battery: lands to swap batteries after ' +
         d.endurance +
-        ' s' +
+        ' s, ' +
+        (d.recharge || 30) +
+        ' s at the works or half that beside a squad' +
         (G.supply[e.team].power < 1 ? ', charging slowed by the power shortage' : ''),
     ]);
   if (d.fuelDrone) rows.push(['Power', 'gasoline engine: draws on the fuel supply']);
@@ -414,7 +422,9 @@ function structRows(e: Struct): [string, string][] {
         @click="ctl.selection = unitsSel.filter(u => u.type === k)"
       >
         <span>{{ UNITS[k].label[ctl.team] }}</span
-        ><b>{{ n }}</b>
+        ><b
+          >{{ n[0] }} <small v-if="n[1]" class="dim">{{ n[1] }} kills</small></b
+        >
       </div>
     </template>
   </div>

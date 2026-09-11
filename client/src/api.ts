@@ -12,6 +12,8 @@ export class ApiError extends Error {
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const auth = useAuth();
+  // an offline player has no account on the server: nothing to send, nothing to fetch
+  if (auth.offline && !path.startsWith('/api/auth/')) throw new ApiError(0, 'Playing offline: no account');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (auth.token) headers.Authorization = 'Bearer ' + auth.token;
   const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });

@@ -130,7 +130,13 @@ onMounted(() => auth.refresh());
             Match with another player in the lobby. You each take a side and can talk to each other in chat while you
             play. Wins and losses go on the leaderboard.
           </p>
-          <router-link to="/lobby"><button type="button" class="primary">Go to the lobby</button></router-link>
+          <router-link v-if="!auth.offline" to="/lobby"
+            ><button type="button" class="primary">Go to the lobby</button></router-link
+          >
+          <p v-else class="dim">
+            You are playing offline. Online matches need an account and the game server: use Sign in at the top and
+            create one.
+          </p>
         </div>
         <div class="card">
           <h2>Two armies</h2>

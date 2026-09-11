@@ -26,7 +26,7 @@ export const level02: Level = {
   briefing: [
     'The drone works is running and the operators are ready. Everything that happens on this front happens because somebody saw it first.',
     'Put a Mavic up before you send a single FPV: kamikaze drones and guns can only hit what your side can see.',
-    'Every drone here runs on a battery. An FPV has seventy seconds in the air, a Mavic under two minutes; then it flies home, lands, and charges from the grid. The substation is what charges them, which is why the Gerans want it.',
+    'Every drone here runs on a battery. An FPV has seventy seconds in the air, a Mavic two minutes; then it flies to the nearest squad or back to the works, lands, and charges from the grid. The substation is what charges them, which is why the Gerans want it.',
     'Intelligence says the first Geran wave is coming for the substation east of the city. Fire groups reach the low ones, a Sting hunts the rest. Have both up before it arrives.',
     'Fly carefully, commander. Every drone is a squad on the sticks.',
   ],
@@ -58,12 +58,12 @@ export const level02: Level = {
     },
     {
       title: 'Batteries',
-      text: 'Select an FPV and read the panel: an FPV flies 70 seconds on a charge, a Mavic 110, a Sting 80. Rain drains a battery half again as fast and snow twice as fast, and a diving FPV stops draining. At a quarter charge a drone breaks off and flies home to its squad or the drone works; flat with nowhere to land, it falls out of the sky. Wait for one of your first FPVs to land.',
+      text: 'Select an FPV and read the panel: an FPV flies 70 seconds on a charge, a Mavic 120, a Sting 80. Rain drains a battery half again as fast and snow twice as fast, and a diving FPV stops draining. At a quarter charge a drone breaks off and flies to its own squad, else the nearest friendly infantry squad, else the drone works; flat with nowhere to land, it falls out of the sky. Keep a squad forward and your drones never fly far to land. Wait for one of your first FPVs to land.',
       done: g => g.units.some(u => u.team === UA && !u.dead && u.def.air && !!u.landed),
     },
     {
       title: 'Charging',
-      text: 'A landed drone swaps batteries: 25 seconds for an FPV, 30 for a Mavic, and it is airborne again on its own. The swap draws on the grid: each battery drone needs one point of spare power, and your headquarters gives 30 and the Kharkiv substation 60 minus what the buildings use. Read Charging in the top bar. Over the limit, every swap takes three times as long and the works builds no more battery drones. Home (the button in the panel) recalls every battery drone at once: press it before a snow front or when the enemy air defense is awake. Watch a drone take off again.',
+      text: 'A landed drone swaps batteries: 25 seconds for an FPV and 20 for a Mavic at the works, half that beside an infantry squad, and it is airborne again on its own. The swap draws on the grid: each battery drone needs one point of spare power, and your headquarters gives 30 and the Kharkiv substation 60 minus what the buildings use. Read Charging in the top bar. Over the limit, every swap takes three times as long and the works builds no more battery drones. Home (the button in the panel) recalls every battery drone at once: press it before a snow front or when the enemy air defense is awake. Watch a drone take off again.',
       done: g =>
         g.units.some(
           u => u.team === UA && !u.dead && u.def.air && !u.landed && u.rechargeT !== undefined && u.rechargeT <= 0
