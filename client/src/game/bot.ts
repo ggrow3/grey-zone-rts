@@ -43,8 +43,18 @@ function rollTraits(g: Game): BotTraits {
     taste,
     tempo: g.rand(0.75, 1.3),
     scatter: g.rand(40, 110),
+    doctrine: (['guns', 'air', 'armor', 'infantry', 'ew'] as const)[Math.floor(g.rng.next() * 5)],
   };
 }
+
+/** what each doctrine buys more of */
+const DOCTRINE: Record<BotTraits['doctrine'], Record<string, number>> = {
+  guns: { howitzer: 1.8, mlrs: 1.8, fwRecon: 1.6, mavic: 1.3 },
+  air: { fpv: 1.5, fiberFpv: 1.6, bomber: 1.6, interceptor: 1.3, lancet: 1.4, molniya: 1.4, liutyi: 1.4 },
+  armor: { tank: 2, ifv: 1.8, ugv: 1.6 },
+  infantry: { infantry: 1.4, merc: 1.5, dprk: 1.5, moto: 1.5, fireGroup: 1.3 },
+  ew: { jammer: 1.8, aa: 1.6, interceptor: 1.5, relay: 1.4 },
+};
 
 export function updateBot(g: Game, bot: Bot, dt: number) {
   const T = bot.team,
@@ -208,6 +218,12 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
             g.units
               .filter(e => e.team === E && !e.dead && e.def.indirect && e.seenBy[T])
               .map(e => ({ x: e.x, y: e.y, w: 3 }))
+          )
+          // trench lines it can see
+          .concat(
+            g.units
+              .filter(e => e.team === E && !e.dead && e.def.troop && e.cover === 'trench' && e.seenBy[T])
+              .map(e => ({ x: e.x, y: e.y, w: 2 }))
           )
           .filter(pnt => {
             const dd = dist(u, pnt);
@@ -431,41 +447,78 @@ function botSpend(g: Game, bot: Bot) {
   if (bot.saving) return;
   const count = g.units.filter(u => u.team === T && !u.dead && !u.def.auto).length;
   if (count > 90) return;
-  const recon = g.units.filter(u => u.team === T && !u.dead && u.def.recon).length;
+  // what it can see of the enemy, and what it has itself
+  const seen = g.units.filter(u => u.team === E && !u.dead && u.seenBy[T]);
+  const eAir = seen.filter(u => u.def.air && !u.def.large).length,
+    eHeavyAir = seen.filter(u => u.def.air && (u.def.large || u.def.fixedWing)).length,
+    eArmor = seen.filter(
+      u => !u.def.air && !u.def.troop && (u.type === 'tank' || u.type === 'ifv' || u.type === 'ugv')
+    ).length,
+    eInf = seen.filter(u => u.def.troop).length,
+    eDug = seen.filter(u => u.def.troop && u.cover === 'trench').length,
+    eGuns = seen.filter(u => u.def.indirect).length,
+    eAA = seen.filter(u => u.def.targets && u.def.targets.includes('air') && !u.def.air).length,
+    eJam = seen.filter(u => u.def.jam).length,
+    eNets = g.structs.filter(st => st.team === E && !st.dead && (st.type === 'net' || st.type === 'netLine')).length,
+    eGrid = g.structs.some(st => st.team === E && !st.dead && (st.type === 'powerPlant' || st.type === 'pump'));
+  const mine = g.units.filter(u => u.team === T && !u.dead);
+  const recon = mine.filter(u => u.def.recon).length,
+    myGuns = mine.filter(u => u.def.indirect).length,
+    myJam = mine.filter(u => u.def.jam).length,
+    myAA = mine.filter(u => u.type === 'aa').length,
+    myInt = mine.filter(u => u.type === 'interceptor').length;
   const enemyEW =
-    g.structs.some(s => s.team === E && !s.dead && s.build >= 1 && s.def.jam) ||
+    g.structs.some(st => st.team === E && !st.dead && st.build >= 1 && st.def.jam) ||
     g.units.some(u => u.team === E && !u.dead && u.def.jam);
   const autonomous = !g.needsOperator(UNITS.fpv, T);
   const slots = autonomous ? 99 : g.freeSlots(T),
     hasOp = slots > 0 ? 1 : 0,
     fiberOp = g.freeSlots(T) > 0 ? 1 : 0;
+  // guns want eyes: with artillery and little recon, the next drone is a spotter
+  const spotter = myGuns >= 1 && recon < 2 ? 1.5 : 0;
+  const gunCap = 2 + Math.floor(t / 400);
   const table: [string, number][] = (
     [
       ['fpv', (enemyEW ? 3 : 6) * hasOp],
-      ['fiberFpv', (enemyEW ? (t > 120 ? 4 : 0) : t > 240 ? 2 : 0) * fiberOp],
+      // fiber beats jamming and armor
+      [
+        'fiberFpv',
+        ((enemyEW ? (t > 120 ? 4 : 0) : t > 240 ? 2 : 0) + (eArmor >= 2 ? 1.5 : 0) + (eJam >= 1 ? 1 : 0)) * fiberOp,
+      ],
       ['moto', t > 45 ? 3 : 0],
       ['infantry', slots < 2 ? 6 : 2],
-      ['fireGroup', t > 60 ? 2 : 0],
-      ['mavic', (recon < 3 ? 1 : 0) * hasOp],
-      ['fwRecon', (recon < 3 && t > 90 ? 0.7 : 0) * hasOp],
-      ['interceptor', (t > 150 ? 1.5 : 0) * hasOp],
-      ['bomber', (t > 240 ? 1.5 : 0) * hasOp],
+      // fire groups against a drone-heavy enemy
+      ['fireGroup', (t > 60 ? 2 : 0) + (eAir >= 4 ? 1.5 : 0)],
+      ['mavic', ((recon < 3 ? 1 : 0) + spotter) * hasOp],
+      ['fwRecon', ((recon < 3 && t > 90 ? 0.7 : 0) + spotter) * hasOp],
+      // interceptors and air defense scale with the enemy's air
+      ['interceptor', ((t > 120 ? 1 : 0) + Math.min(3, eAir / 3) - (myInt > eAir ? 1 : 0)) * hasOp],
+      ['aa', (t > 90 ? 1.2 : 0.7) + (eAir >= 6 && myAA < 4 ? 1.5 : 0) + (eHeavyAir >= 1 ? 1 : 0)],
+      // bombers and rockets crack dug-in infantry and nets
+      ['bomber', ((t > 180 ? 1 : 0) + (eDug >= 3 || eNets >= 2 ? 1.5 : 0)) * hasOp],
+      ['mlrs', (t > 300 ? 0.5 : 0) + (eInf >= 8 || eDug >= 4 ? 1.5 : 0)],
+      // howitzers for trench lines and buildings near the front, and to answer enemy guns
+      [
+        'howitzer',
+        myGuns >= gunCap ? 0 : (t > 150 ? (enemyEW ? 2 : 1.2) : 0) + (eDug >= 3 ? 1.5 : 0) + (eGuns > myGuns ? 1.2 : 0),
+      ],
       // North Koreans do not fly drones, mercenaries do: when pilots are short, buy the ones that fly
       ['dprk', T === RU && t > 90 && g.typeCount(RU, 'dprk') < UNITS.dprk.cap! ? (slots < 2 ? 0.5 : 1.5) : 0],
       ['merc', t > 150 && g.typeCount(T, 'merc') < UNITS.merc.cap! && g.funds[T] > 400 ? (slots < 2 ? 3 : 1) : 0],
-      ['lancet', (T === RU && t > 120 ? 1.5 : 0) * hasOp],
-      ['molniya', (T === RU && t > 180 ? 1.5 : 0) * hasOp],
-      ['liutyi', T === UA && t > 300 ? 0.6 : 0],
-      ['jammer', t > 120 ? 1.5 : 0],
-      ['aa', t > 90 ? 1.5 : 0.7],
-      ['ifv', t > 150 ? 1.2 : 0],
-      ['tank', t > 300 ? 0.7 : 0],
-      ['ugv', T === UA && t > 200 ? 1 : 0],
+      // Lancets hunt guns, air defense, and jammers; Liutyis go for the grid and the refinery
+      ['lancet', ((T === RU && t > 120 ? 1 : 0) + (T === RU && (eGuns >= 1 || eAA >= 2 || eJam >= 1) ? 2 : 0)) * hasOp],
+      ['molniya', (T === RU && t > 180 ? 1.2 : 0) * hasOp],
+      ['liutyi', (T === UA && t > 300 ? 0.6 : 0) + (T === UA && t > 300 && eGrid ? 1 : 0)],
+      // jammers against a drone-heavy enemy
+      ['jammer', (t > 120 ? 1 : 0) + (eAir >= 6 && myJam < 2 ? 1.5 : 0)],
+      // armor against massed infantry and enemy armor; robots to take dug-in towns
+      ['ifv', (t > 150 ? 1 : 0) + (eInf >= 8 ? 0.8 : 0)],
+      ['tank', (t > 240 ? 0.6 : 0) + (eInf >= 8 ? 1 : 0) + (eArmor >= 2 ? 0.8 : 0)],
+      ['ugv', (T === UA && t > 200 ? 1 : 0) + (T === UA && eDug >= 3 ? 1 : 0)],
       ['relay', T === UA && t > 240 && g.typeCount(UA, 'relay') < 2 && !autonomous ? 0.6 : 0],
-      ['howitzer', t > 200 ? (enemyEW ? 2 : 1.2) : 0],
-      ['mlrs', t > 500 ? 0.6 : 0],
     ] as [string, number][]
   )
+    .map(([k, w]) => [k, w * (DOCTRINE[bot.traits?.doctrine ?? 'air'][k] ?? 1)] as [string, number])
     .map(([k, w]) => [k, w * (bot.traits?.taste[k] ?? 1)] as [string, number])
     .filter(x => x[1] > 0);
   if (!table.length) return;

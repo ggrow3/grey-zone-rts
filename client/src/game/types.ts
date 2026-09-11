@@ -311,6 +311,8 @@ export interface BotTraits {
   tempo: number;
   /** how far from the exact spot its columns stop */
   scatter: number;
+  /** the arm it leans on this game: guns, air, armor, infantry, or electronic warfare */
+  doctrine: 'guns' | 'air' | 'armor' | 'infantry' | 'ew';
 }
 
 export interface Notice {
