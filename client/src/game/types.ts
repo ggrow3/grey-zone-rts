@@ -295,6 +295,22 @@ export interface Bot {
   warnAt?: Pt;
   /** purchases paused while it saves for a road net */
   saving?: boolean;
+  /** the personality rolled for this game (see rollTraits in bot.ts) */
+  traits?: BotTraits;
+}
+
+/** what makes one game's bot differ from the next: rolled from the seeded generator on its first turn */
+export interface BotTraits {
+  /** multiplies the force it wants before a sortie: under 1 attacks early and often, over 1 masses up */
+  patience: number;
+  /** chance it goes for the nearest objective rather than one of the next two */
+  focus: number;
+  /** per-unit multipliers on the shopping list: a drone-heavy, armor-heavy, or infantry-heavy commander */
+  taste: Record<string, number>;
+  /** multiplies the pauses between raids, strikes, and research: under 1 is a busier commander */
+  tempo: number;
+  /** how far from the exact spot its columns stop */
+  scatter: number;
 }
 
 export interface Notice {

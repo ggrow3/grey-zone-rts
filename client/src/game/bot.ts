@@ -5,7 +5,7 @@ import type { Game } from './sim';
 import { MOVE, ATTACK } from './sim';
 import { planRoute } from './sim/movement';
 import { spawnShaheds } from './sim/strikes';
-import type { Bot, Unit, Pt } from './types';
+import type { Bot, BotTraits, Unit, Pt } from './types';
 
 export function makeBot(team: number, staging: Pt): Bot {
   return {
@@ -33,10 +33,25 @@ function weightedPick(g: Game, table: [string, number][]): string {
   return table[table.length - 1][0];
 }
 
+/** roll a personality: the same seed gives the same commander, another seed a different one */
+function rollTraits(g: Game): BotTraits {
+  const taste: Record<string, number> = {};
+  for (const k of Object.keys(UNITS)) taste[k] = g.rand(0.55, 1.6);
+  return {
+    patience: g.rand(0.7, 1.4),
+    focus: g.rand(0.45, 0.95),
+    taste,
+    tempo: g.rand(0.75, 1.3),
+    scatter: g.rand(40, 110),
+  };
+}
+
 export function updateBot(g: Game, bot: Bot, dt: number) {
   const T = bot.team,
     E = 1 - T,
     t = g.gameTime;
+  if (!bot.traits) bot.traits = rollTraits(g);
+  const tr = bot.traits;
   bot.spendT -= dt;
   if (bot.spendT <= 0) {
     bot.spendT = 1;
@@ -57,7 +72,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   );
   // bad weather and darkness ground the enemy's drones: that is when to move
   const badLight = g.weather.kind === 'fog' || g.weather.kind === 'rain' || g.weather.kind === 'snow' || g.isNight();
-  const threshold = Math.min(2600, 700 + t * 2) * (badLight ? 0.5 : 1) * (g.rush && T === RU ? 0.5 : 1);
+  const threshold = Math.min(2600, 700 + t * 2) * tr.patience * (badLight ? 0.5 : 1) * (g.rush && T === RU ? 0.5 : 1);
   if (badLight) bot.attackT += dt;
   const homeHq = g.structs.find(s => s.team === T && s.type === 'hq');
   const guard = homeHq
@@ -72,7 +87,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
     !g.botPassive &&
     t > 60 &&
     sortie.length >= 3 &&
-    (sortieValue >= threshold || (bot.attackT > 45 && sortieValue >= 300))
+    (sortieValue >= threshold || (bot.attackT > 45 * tr.patience && sortieValue >= 300))
   ) {
     botLaunch(g, bot, sortie);
     bot.attackT = 0;
@@ -214,7 +229,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   }
   bot.raidT = (bot.raidT === undefined ? 120 : bot.raidT) - dt;
   if (bot.raidT <= 0 && t > 150 && !g.botPassive) {
-    bot.raidT = 100;
+    bot.raidT = g.rand(70, 130) * tr.tempo;
     const targets = g.pumpSites.filter(ps => ps.team === E && ps.struct && !ps.struct.dead);
     if (targets.length) {
       targets.sort((a, b) => dist(a, bot.staging) - dist(b, bot.staging));
@@ -337,7 +352,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   // aviation and missiles: glide bombs on the enemy's trench lines, missiles on the grid and the factories, deep strikes on refineries
   bot.strikeT = (bot.strikeT === undefined ? 90 : bot.strikeT) - dt;
   if (bot.strikeT <= 0 && !g.botPassive) {
-    bot.strikeT = T === RU ? g.rand(60, 90) : g.rand(110, 150);
+    bot.strikeT = (T === RU ? g.rand(60, 90) : g.rand(110, 150)) * tr.tempo;
     const enemyStructs = g.structs.filter(s => !s.dead && s.team === E);
     if (g.funds[T] >= 800 && g.kabT[T] <= 0) {
       const trenches = enemyStructs.filter(s => s.def.trench),
@@ -367,7 +382,7 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
   }
   bot.resT = (bot.resT === undefined ? 200 : bot.resT) - dt;
   if (bot.resT <= 0) {
-    bot.resT = 90;
+    bot.resT = 90 * tr.tempo;
     const prio = [
       'launchRail',
       'auto1',
@@ -398,7 +413,9 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
     // short of pilots: the autonomy branch comes first
     const shortOfPilots = g.needsOperator(UNITS.fpv, T) && g.freeSlots(T) < 3;
     const order = shortOfPilots ? ['auto1', 'auto2', 'auto3', ...prio.filter(k => !k.startsWith('auto'))] : prio;
-    const pick = order.find(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6);
+    // not always the first thing on the list: one of the next three it can afford
+    const ready = order.filter(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6).slice(0, 3);
+    const pick = ready.length ? ready[Math.floor(g.rng.next() * ready.length)] : undefined;
     if (pick) {
       g.funds[T] = Math.max(0, g.funds[T] - UPGRADES[pick].cost * 0.6);
       g.upgrades[T][pick] = true;
@@ -448,7 +465,9 @@ function botSpend(g: Game, bot: Bot) {
       ['howitzer', t > 200 ? (enemyEW ? 2 : 1.2) : 0],
       ['mlrs', t > 500 ? 0.6 : 0],
     ] as [string, number][]
-  ).filter(x => x[1] > 0);
+  )
+    .map(([k, w]) => [k, w * (bot.traits?.taste[k] ?? 1)] as [string, number])
+    .filter(x => x[1] > 0);
   if (!table.length) return;
   if (!bot.pending) bot.pending = weightedPick(g, table);
   for (let guard = 0; guard < 4 && bot.pending; guard++) {
@@ -490,8 +509,11 @@ function botLaunch(g: Game, bot: Bot, group: Unit[]) {
         ? 0
         : 1;
     contested.sort((a, b) => want(a) - want(b) || dist(a, bot.staging) - dist(b, bot.staging));
-    target = contested[0];
-    name = contested[0].name;
+    // usually the nearest, sometimes one of the next two: the same commander does not always go the same way
+    const tr = bot.traits!;
+    const i = g.rng.next() < tr.focus ? 0 : Math.min(contested.length - 1, 1 + Math.floor(g.rng.next() * 2));
+    target = contested[i];
+    name = contested[i].name;
   } else {
     const es = g.structs.filter(s => s.team === E && !s.dead);
     if (!es.length) return;
@@ -502,7 +524,8 @@ function botLaunch(g: Game, bot: Bot, group: Unit[]) {
   // in the dark or in weather the infantry creeps; in daylight it marches
   const badLight = g.weather.kind !== 'clear' || g.isNight();
   for (const u of group) {
-    u.order = MOVE(target.x + g.rand(-70, 70), target.y + g.rand(-70, 70));
+    const sc = bot.traits?.scatter ?? 70;
+    u.order = MOVE(target.x + g.rand(-sc, sc), target.y + g.rand(-sc, sc));
     if (u.def.dmg > 0 || u.def.kamikaze) u.order.amove = true;
     u.target = null;
     planRoute(g, u, u.order.x, u.order.y);
