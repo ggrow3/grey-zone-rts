@@ -8,8 +8,14 @@ const auth = useAuth();
 const route = useRoute();
 const router = useRouter();
 const inGame = computed(() => ['level', 'skirmish', 'match'].includes(String(route.name)));
-onMounted(() => { if (auth.loggedIn) auth.refresh(); });
-async function logout() { await hub.disconnect(); auth.logout(); router.push({ name: 'login' }); }
+onMounted(() => {
+  if (auth.loggedIn) auth.refresh();
+});
+async function logout() {
+  await hub.disconnect();
+  auth.logout();
+  router.push({ name: 'login' });
+}
 </script>
 
 <template>
@@ -21,7 +27,9 @@ async function logout() { await hub.disconnect(); auth.logout(); router.push({ n
         <router-link to="/lobby">Lobby</router-link>
         <router-link to="/history">Game log</router-link>
         <span class="spacer" />
-        <span class="user">{{ auth.username }} <small>({{ auth.wins }}W / {{ auth.losses }}L)</small></span>
+        <span class="user"
+          >{{ auth.username }} <small>({{ auth.wins }}W / {{ auth.losses }}L)</small></span
+        >
         <button type="button" @click="logout">Sign out</button>
       </template>
     </nav>

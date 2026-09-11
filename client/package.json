@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "vue-tsc -b && tsx scripts/validate.ts && tsx scripts/sim-check.ts",
+    "validate": "tsx scripts/validate.ts",
+    "sim:check": "tsx scripts/sim-check.ts",
+    "sim:play": "tsx scripts/sim-play.ts",
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"scripts/**/*.ts\""
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
@@ -18,6 +23,8 @@
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
     "vue-tsc": "^3.3.11"

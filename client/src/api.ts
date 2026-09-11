@@ -1,7 +1,14 @@
 // Thin fetch wrapper for the C# REST API (see docs/PROTOCOL.md).
 import { useAuth } from './stores/auth';
 
-export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const auth = useAuth();
@@ -11,7 +18,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 401 && auth.token && !path.startsWith('/api/auth/')) auth.logout();
   if (!res.ok) {
     let msg = res.statusText;
-    try { const j = await res.json(); if (j && j.error) msg = j.error; } catch { /* no body */ }
+    try {
+      const j = await res.json();
+      if (j && j.error) msg = j.error;
+    } catch {
+      /* no body */
+    }
     throw new ApiError(res.status, msg || 'Request failed');
   }
   if (res.status === 204) return undefined as T;
@@ -24,9 +36,25 @@ export const api = {
 };
 
 export interface GameLogEntry {
-  id: string; mode: 'level' | 'skirmish' | 'multiplayer'; levelId?: string;
+  id: string;
+  mode: 'level' | 'skirmish' | 'multiplayer';
+  levelId?: string;
   players: { username: string; side: number }[];
-  startedAt: string; endedAt?: string; durationSeconds?: number; result?: string; winnerUsername?: string;
+  startedAt: string;
+  endedAt?: string;
+  durationSeconds?: number;
+  result?: string;
+  winnerUsername?: string;
 }
-export interface Me { username: string; wins: number; losses: number; completedLevels: string[] }
-export interface LeaderboardRow { username: string; wins: number; losses: number; gamesPlayed: number }
+export interface Me {
+  username: string;
+  wins: number;
+  losses: number;
+  completedLevels: string[];
+}
+export interface LeaderboardRow {
+  username: string;
+  wins: number;
+  losses: number;
+  gamesPlayed: number;
+}
