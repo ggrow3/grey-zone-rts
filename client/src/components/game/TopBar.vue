@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { fmtTime } from '../../game/summary';
 import type { Game } from '../../game/sim';
 import { UA, RU, UNITS, FOOD, FUEL_PER_NODE, FUEL_BASE, POWER, WEATHER_TEXT, MISSIONS } from '../../game/data';
@@ -20,6 +20,11 @@ const emit = defineEmits<{
   (e: 'basemap'): void;
   (e: 'leave'): void;
 }>();
+const menuOpen = ref(false);
+function pick(panel: 'manual' | 'legend' | 'log' | 'audio') {
+  menuOpen.value = false;
+  emit('toggle', panel);
+}
 const sky = computed(() => {
   void props.tick;
   const w = g().weather;
@@ -32,6 +37,9 @@ const sky = computed(() => {
       (g().isNight() ? 'dawn' : 'dusk') +
       ' in ' +
       fmtTime(g().phaseLeft()),
+    short: w.warned
+      ? WEATHER_TEXT[w.next].label + ' ' + left + ' s'
+      : (g().isNight() ? 'dawn ' : 'dusk ') + fmtTime(g().phaseLeft()),
     title: WEATHER_TEXT[w.kind].effect,
     bad: w.kind !== 'clear' || g().isNight(),
   };
@@ -67,7 +75,7 @@ const slots = computed(() => {
   const fs = g().freeSlots(PL()),
     gr = g().units.filter(u => u.team === PL() && !u.dead && u.grounded).length;
   return {
-    text: fs + ' free (' + g().opCap(PL()) + ' per operator)' + (gr ? ', ' + gr + ' grounded' : ''),
+    text: '· ' + fs + ' ops' + (gr ? ', ' + gr + ' grounded' : ''),
     color: gr ? 'var(--ru)' : fs < 3 ? 'var(--warn)' : '',
   };
 });
@@ -75,7 +83,7 @@ const people = computed(() => {
   void props.tick;
   const fp = g().freePeople(PL());
   return {
-    text: Math.floor(fp) + ' free / ' + Math.floor(g().people[PL()].total),
+    text: Math.floor(fp) + '/' + Math.floor(g().people[PL()].total) + ' free',
     color: fp < 3 ? 'var(--ru)' : fp < 10 ? 'var(--warn)' : '',
   };
 });
@@ -85,18 +93,18 @@ const supply = computed(() => {
   const sp = g().supply[PL()];
   return {
     text:
-      'rations ' +
+      'food ' +
       Math.floor(sp.foodStock) +
       ' (' +
       (sp.foodRate >= 0 ? '+' : '') +
       sp.foodRate.toFixed(1) +
       '/s)' +
       (sp.hungry ? ', ' + sp.hungry + ' hungry' : '') +
-      ', fuel ' +
+      ' · fuel ' +
       sp.fuelUsed +
       '/' +
       sp.fuelCap +
-      ', power ' +
+      ' · pwr ' +
       sp.powerUsed +
       '/' +
       sp.powerCap,
@@ -150,11 +158,16 @@ function gasClass(r: { owner: number }) {
 
 <template>
   <div id="top" :key="tick">
-    <div class="stat">
-      <span class="lbl">Funds</span><span class="val">{{ Math.floor(game.funds[team]) }}</span>
-    </div>
-    <div class="stat">
-      <span class="lbl">Income</span><span class="val">+{{ game.expectedIncome(team).toFixed(0) }}/s</span>
+    <div
+      class="stat"
+      :title="
+        'Funds and income a second; trade convoys have brought ' +
+        game.tradeTotal[team] +
+        (game.captured[team] ? ' (' + game.captured[team] + ' enemy trucks taken)' : '')
+      "
+    >
+      <span class="lbl">Funds</span><span class="val">{{ Math.floor(game.funds[team]) }}</span
+      ><span class="val small dim">+{{ game.expectedIncome(team).toFixed(0) }}/s</span>
     </div>
     <div class="stat">
       <span class="lbl">Towns</span
@@ -197,53 +210,49 @@ function gasClass(r: { owner: number }) {
       "
     >
       <span class="lbl">Score</span><span class="val">{{ Math.round(game.stats.score[team]) }}</span
-      ><span class="val small dim">{{ game.stats.kills[team] }} killed · {{ game.stats.lost[team] }} lost</span>
+      ><span class="val small dim">{{ game.stats.kills[team] }}k · {{ game.stats.lost[team] }}l</span>
     </div>
-    <div class="stat">
-      <span class="lbl">Forces</span><span class="val">{{ forces }}</span>
+    <div
+      class="stat"
+      :title="
+        'Units in the field; personnel free of the total; free drone operator slots (' +
+        game.opCap(team) +
+        ' drones per operator)'
+      "
+    >
+      <span class="lbl">Forces</span><span class="val">{{ forces }}</span
+      ><span class="val small" :style="{ color: people.color }">{{ people.text }}</span
+      ><span class="val small" :style="{ color: slots.color }">{{ slots.text }}</span>
     </div>
-    <div class="stat">
-      <span class="lbl">Personnel</span
-      ><span class="val small" :style="{ color: people.color }">{{ people.text }}</span>
-    </div>
-    <div class="stat">
-      <span class="lbl">Operators</span><span class="val small" :style="{ color: slots.color }">{{ slots.text }}</span>
-    </div>
-    <div class="stat" v-if="team === UA">
+    <div class="stat" v-if="team === UA" title="Public support (income and aid), and the civilian sites still standing">
       <span class="lbl">Support</span
       ><span class="val" :style="{ color: game.support < 50 ? 'var(--ru)' : game.support < 75 ? 'var(--warn)' : '' }"
         >{{ Math.round(game.support) }}%</span
-      >
-    </div>
-    <div class="stat" v-if="team === UA">
-      <span class="lbl">Civilian sites</span
-      ><span class="val small">{{ civTotal - game.civ.lost[0] }} / {{ civTotal }}</span>
-    </div>
-    <div class="stat">
-      <span class="lbl">Trade</span
-      ><span class="val small"
-        >+{{ game.tradeTotal[team]
-        }}<span v-if="game.captured[team]">, {{ game.captured[team] }} trucks taken</span></span
-      >
+      ><span class="val small dim">· {{ civTotal - game.civ.lost[0] }}/{{ civTotal }}</span>
     </div>
     <div class="stat">
       <span class="lbl">Supply</span
       ><span class="val small" :style="{ color: supply.color }" :title="supplyTitle">{{ supply.text }}</span>
     </div>
     <div class="spacer" />
-    <div class="stat" :title="sky.title">
+    <div class="stat" :title="sky.title + '. ' + sky.sub">
       <span class="lbl">Sky</span><span class="val small" :class="{ warn: sky.bad }">{{ sky.label }}</span
-      ><span class="dim" style="font-size: 11px">{{ sky.sub }}</span>
+      ><span class="dim" style="font-size: 10px">{{ sky.short }}</span>
     </div>
     <div
       class="stat"
       v-if="mission"
       :title="
-        'Optional goal: ' + mission.reward + ' funds and 20 score when met. ' + game.missionsDone[team] + ' met so far.'
+        mission.text +
+        '. Optional goal: ' +
+        mission.reward +
+        ' funds and 20 score when met. ' +
+        game.missionsDone[team] +
+        ' met so far.'
       "
     >
-      <span class="lbl">Goal</span><span class="val small">{{ mission.text }}</span
-      ><span class="dim" style="font-size: 11px">{{ mission.prog }}</span>
+      <span class="lbl">Goal</span><span class="val small clip">{{ mission.text }}</span
+      ><span class="dim" style="font-size: 10px">{{ mission.prog }}</span>
     </div>
     <div class="stat" v-if="hold">
       <span class="lbl">{{ hold.team === team ? 'All towns held' : 'Enemy holds all towns' }}</span
@@ -255,29 +264,40 @@ function gasClass(r: { owner: number }) {
     <div class="stat">
       <span class="val">{{ fmtTime(game.gameTime) }}</span>
     </div>
-    <button
-      type="button"
-      @click="emit('basemap')"
-      title="Cycle the background: drawn terrain, street map tiles, satellite imagery"
-    >
-      Map: {{ basemap }}
-    </button>
-    <button
-      type="button"
-      @click="emit('toggle', 'manual')"
-      title="Every unit, building, and the strategy behind them (M)"
-    >
-      Manual
-    </button>
-    <button type="button" @click="emit('toggle', 'legend')" title="Unit shapes (L)">Legend</button>
-    <button type="button" @click="emit('toggle', 'log')" title="Battle log (K)">Log</button>
-    <button type="button" @click="emit('toggle', 'audio')" title="Sound effects and unit voices (N)">
-      Sound: {{ audio === 'on' ? 'on' : audio === 'sfx' ? 'no voice' : 'off' }}
-    </button>
     <button type="button" v-if="canPause" @click="emit('toggle', 'pause')">{{ paused ? 'Resume' : 'Pause' }}</button>
     <button type="button" v-if="canPause" title="Simulation speed for solo games (])" @click="emit('toggle', 'speed')">
       {{ speed }}x
     </button>
-    <button type="button" class="danger" @click="emit('leave')">Leave</button>
+    <div class="menu">
+      <button
+        type="button"
+        :class="{ on: menuOpen }"
+        @click="menuOpen = !menuOpen"
+        title="Manual, legend, log, sound, map, leave"
+      >
+        Menu
+      </button>
+      <div class="dd" v-if="menuOpen">
+        <button type="button" @click="pick('manual')" title="Every unit, building, and the strategy behind them">
+          Manual (M)
+        </button>
+        <button type="button" @click="pick('legend')" title="Unit shapes">Legend (L)</button>
+        <button type="button" @click="pick('log')" title="Battle log">Log (K)</button>
+        <button type="button" @click="pick('audio')" title="Sound effects and unit voices">
+          Sound: {{ audio === 'on' ? 'on' : audio === 'sfx' ? 'no voice' : 'off' }} (N)
+        </button>
+        <button
+          type="button"
+          @click="
+            menuOpen = false;
+            emit('basemap');
+          "
+          title="Cycle the background: drawn terrain, street map tiles, satellite imagery"
+        >
+          Map: {{ basemap }}
+        </button>
+        <button type="button" class="danger" @click="emit('leave')">Leave the game</button>
+      </div>
+    </div>
   </div>
 </template>

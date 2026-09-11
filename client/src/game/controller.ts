@@ -17,6 +17,8 @@ export class Controller {
   cmdTab: 'build' | 'procure' | 'market' = 'build';
   /** next left click on the map picks the strike point (glide bomb) or the enemy building (missile) */
   strikeMode: 'kab' | 'iskander' | null = null;
+  /** watching two bots: selection and camera work, orders are dropped */
+  spectator = false;
   /** next left click is an attack-move destination (Q) */
   get amoveMode(): boolean {
     return this.view.amoveMode;
@@ -72,6 +74,7 @@ export class Controller {
     this.onSelectionChange();
   }
   submit(cmd: Command) {
+    if (this.spectator) return;
     this.session.submit(cmd);
   }
   ids(list: Entity[]): number[] {

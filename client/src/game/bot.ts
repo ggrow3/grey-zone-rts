@@ -395,7 +395,10 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       'aid',
       'samNet',
     ];
-    const pick = prio.find(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6);
+    // short of pilots: the autonomy branch comes first
+    const shortOfPilots = g.needsOperator(UNITS.fpv, T) && g.freeSlots(T) < 3;
+    const order = shortOfPilots ? ['auto1', 'auto2', 'auto3', ...prio.filter(k => !k.startsWith('auto'))] : prio;
+    const pick = order.find(k => g.upgAvailable(T, k) && g.funds[T] >= UPGRADES[k].cost * 0.6);
     if (pick) {
       g.funds[T] = Math.max(0, g.funds[T] - UPGRADES[pick].cost * 0.6);
       g.upgrades[T][pick] = true;
@@ -430,8 +433,9 @@ function botSpend(g: Game, bot: Bot) {
       ['fwRecon', (recon < 3 && t > 90 ? 0.7 : 0) * hasOp],
       ['interceptor', (t > 150 ? 1.5 : 0) * hasOp],
       ['bomber', (t > 240 ? 1.5 : 0) * hasOp],
-      ['dprk', T === RU && t > 90 && g.typeCount(RU, 'dprk') < UNITS.dprk.cap! ? 1.5 : 0],
-      ['merc', t > 150 && g.typeCount(T, 'merc') < UNITS.merc.cap! && g.funds[T] > 400 ? 1 : 0],
+      // North Koreans do not fly drones, mercenaries do: when pilots are short, buy the ones that fly
+      ['dprk', T === RU && t > 90 && g.typeCount(RU, 'dprk') < UNITS.dprk.cap! ? (slots < 2 ? 0.5 : 1.5) : 0],
+      ['merc', t > 150 && g.typeCount(T, 'merc') < UNITS.merc.cap! && g.funds[T] > 400 ? (slots < 2 ? 3 : 1) : 0],
       ['lancet', (T === RU && t > 120 ? 1.5 : 0) * hasOp],
       ['molniya', (T === RU && t > 180 ? 1.5 : 0) * hasOp],
       ['liutyi', T === UA && t > 300 ? 0.6 : 0],

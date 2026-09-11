@@ -117,6 +117,14 @@ onMounted(() => auth.refresh());
             <router-link :to="{ name: 'skirmish', query: { side, diff, start, map } }"
               ><button type="button" class="primary">Start skirmish</button></router-link
             >
+            <router-link :to="{ name: 'skirmish', query: { side, diff, start, map, watch: 1 } }"
+              ><button
+                type="button"
+                title="Both sides played by the computer; you watch from the chosen side's chair, free to look around and select, and no order of yours is obeyed"
+              >
+                Watch the bots play
+              </button></router-link
+            >
             <router-link v-if="hasReplay" :to="{ name: 'skirmish', query: { replay: 1 } }"
               ><button type="button" title="Watch your last solo game again, every order replayed">
                 Watch last replay

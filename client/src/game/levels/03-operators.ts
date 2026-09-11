@@ -57,7 +57,7 @@ export const level03: Level = {
     },
     {
       title: 'Swarm control',
-      text: 'Open the research tree (T) and buy Terminal guidance, then Drone swarm control: every operator now flies six drones instead of three. Full autonomy, the last step on that branch, frees the drones from the squads altogether, the way Russian drones already are.',
+      text: 'Open the research tree (T) and buy Terminal guidance, then Drone swarm control: every operator now flies six drones instead of three. Full autonomy, the last step on that branch, frees the drones from the squads altogether.',
       done: researched(UA, 'auto2'),
     },
     {

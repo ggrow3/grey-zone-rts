@@ -52,7 +52,7 @@ export const level04: Level = {
     },
     {
       title: 'Research',
-      text: 'Open Procurement (T) and buy Terminal guidance. Drone swarm control after it lets one squad fly more drones; Full autonomy frees them entirely, the way Russian drones already are.',
+      text: 'Open Procurement (T) and buy Terminal guidance. Drone swarm control after it lets one squad fly more drones; Full autonomy frees them entirely.',
       done: researched(UA, 'auto1'),
     },
     {

@@ -31,7 +31,7 @@ export const UPGRADES: Record<string, UpgradeDef> = {
   },
   auto3: {
     label: 'Full autonomy',
-    desc: 'Your drones fly themselves like the Russian ones: no squad, no control range',
+    desc: 'Your drones fly themselves: no squad, no control range',
     cost: 2200,
     requires: 'auto2',
     branch: 'Drones',

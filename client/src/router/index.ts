@@ -24,6 +24,7 @@ const router = createRouter({
         difficulty: Number(r.query.diff ?? 0.7),
         start: String(r.query.start || 'standard'),
         replay: r.query.replay === '1',
+        watch: r.query.watch === '1',
         map: String(r.query.map || 'kharkiv'),
       }),
     },

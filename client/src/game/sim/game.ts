@@ -736,10 +736,10 @@ export class Game {
   autoTier(team: number): number {
     return this.upgrades[team].auto3 ? 3 : this.upgrades[team].auto2 ? 2 : this.upgrades[team].auto1 ? 1 : 0;
   }
-  /** Russian drones are automated from the start; Ukrainian drones need a squad until Full autonomy */
+  /** drones on both sides need a squad on the sticks until that side researches Full autonomy */
   needsOperator(def: UnitDef, team: number): boolean {
     if (def.tether) return true;
-    return !!def.operated && team === UA && this.autoTier(UA) < 3;
+    return !!def.operated && this.autoTier(team) < 3;
   }
   operatorsOf(team: number): Unit[] {
     return this.units.filter(u => u.team === team && !u.dead && u.def.operator);

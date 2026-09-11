@@ -137,6 +137,6 @@ export const STRATEGY: [string, string][] = [
   ],
   [
     'Playing Russia',
-    'Your drones are autonomous from the start, your Lancets hunt artillery, Molniyas are cheap long reach, and Geran waves cost you nothing. Your weakness is people: defections bleed you, North Koreans break when you lose towns. Take the wheat and gas early, keep the pipeline from Kursk intact.',
+    'Your infantry and mercenaries fly your drones (North Koreans do not) until you buy Full autonomy, your Lancets hunt artillery, Molniyas are cheap long reach, and Geran waves cost you nothing. Your weakness is people: defections bleed you, North Koreans break when you lose towns. Take the wheat and gas early, keep the pipeline from Kursk intact.',
   ],
 ];

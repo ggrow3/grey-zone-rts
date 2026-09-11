@@ -201,6 +201,7 @@ export const UNITS: Record<string, UnitDef> = {
     factory: 'barracks',
     cost: 260,
     crew: 0,
+    operator: true,
     time: 10,
     cap: 6,
     hp: 100,

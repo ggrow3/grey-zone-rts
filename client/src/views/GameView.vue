@@ -42,6 +42,8 @@ const props = defineProps<{
   matchId?: string;
   start?: string;
   replay?: boolean;
+  /** a skirmish with both sides played by the bot; the player watches from side 0's chair */
+  watch?: boolean;
   /** the map for a skirmish; levels bring their own */
   map?: string;
 }>();
@@ -189,7 +191,7 @@ function setupSolo() {
   game = markRaw(
     new Game({
       seed: seedUsed,
-      bots: [side === 1, side === 0],
+      bots: props.watch ? [true, true] : [side === 1, side === 0],
       difficulty,
       passive,
       noGerans,
@@ -199,6 +201,7 @@ function setupSolo() {
     })
   );
   session = new LocalSession(game, side);
+  if (props.watch) return; // a bot-versus-bot game is nobody's record
   api
     .post<{ id: string }>('/api/games', { mode: props.mode, levelId: props.levelId, side, difficulty })
     .then(r => {
@@ -273,6 +276,7 @@ function attach() {
   ctx = c.getContext('2d')!;
   mmctx = mm.getContext('2d')!;
   const controller = markRaw(new Controller(session, team.value));
+  controller.spectator = !!props.watch;
   controller.onMessage = msg;
   controller.onSelectionChange = () => {
     hudTick.value++;
@@ -517,7 +521,13 @@ function endCutscene() {
   else controller.view.cam.y += 60;
   controller.clampCam();
   camStart = { x: controller.view.cam.x, y: controller.view.cam.y };
-  msg(level.value ? 'Mission started' : 'Skirmish started');
+  msg(
+    level.value
+      ? 'Mission started'
+      : props.watch
+        ? 'Watching: both sides are played by the computer'
+        : 'Skirmish started'
+  );
 }
 
 // ================================================================== level objectives

@@ -282,11 +282,14 @@ table.log th {
   height: 100%;
 }
 #top {
-  height: 46px;
+  /* one row on a wide screen, two on a narrow one; the stage below takes what is left */
+  min-height: 34px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 22px;
-  padding: 0 14px;
+  gap: 2px 10px;
+  padding: 2px 10px;
+  font-size: 12px;
   background: var(--hud);
   border-bottom: 1px solid var(--hud-edge);
   overflow: hidden;
@@ -295,29 +298,40 @@ table.log th {
 .stat {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 5px;
 }
 .stat .lbl {
   color: var(--ink-dim);
+  font-size: 11px;
 }
 .stat .val {
   font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   font-weight: 600;
-  font-size: 22px;
+  font-size: 17px;
   letter-spacing: 0.01em;
 }
 .stat .val.small {
-  font-size: 16px;
+  font-size: 13px;
+}
+.stat .val.clip {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#top button {
+  padding: 3px 8px;
+  font-size: 12px;
 }
 .sq {
   display: inline-flex;
-  gap: 5px;
+  gap: 3px;
   align-items: center;
 }
 .sq i {
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border: 1px solid #000;
   background: #6b6b60;
 }
@@ -335,6 +349,27 @@ table.log th {
 }
 #top .spacer {
   flex: 1;
+}
+#top .menu {
+  position: relative;
+}
+#top .menu .dd {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  background: var(--hud);
+  border: 1px solid var(--hud-edge);
+}
+#top .menu .dd button {
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  padding: 6px 10px;
 }
 #stage {
   position: relative;

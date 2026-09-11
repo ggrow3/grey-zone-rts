@@ -11,7 +11,7 @@ export const level07: Level = {
   passiveUntil: Infinity,
   noGeransUntil: Infinity,
   blurb:
-    'Command the Russian side. Your drones fly themselves, Pyongyang sends infantry, the Kharkiv highway is full of Ukrainian trucks to take, and the air force is a phone call away: glide bombs, Lancets, and an Iskander.',
+    'Command the Russian side. Your infantry and mercenaries fly the drones, Pyongyang sends infantry that cannot, the Kharkiv highway is full of Ukrainian trucks to take, and the air force is a phone call away: glide bombs, Lancets, and an Iskander.',
   concepts: [
     'Autonomous drones',
     'North Korean infantry',
@@ -25,7 +25,7 @@ export const level07: Level = {
   ],
   briefing: [
     'Belgorod group, listen up. You hold Zhuravlyovka south of the city, and Kozacha Lopan across the border is Ukrainian, with two squads dug in.',
-    'Your drones fly themselves: no operators, no control range. Pyongyang has sent infantry; they cost nothing from your pool and they fight, but their morale breaks if you start losing towns.',
+    'Your drones are flown by squads, like the Ukrainian ones: an operator in an infantry or mercenary squad flies three within 650, and only Full autonomy (T) frees them. Pyongyang has sent infantry; they cost nothing from your pool and they fight, but they do not fly drones, and their morale breaks if you start losing towns.',
     'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road, halfway up and out of sight of the city, and take it, cargo and all.',
     'Then the motorcycles go in, and the aviation follows: a KAB on the trenches, a Lancet for their guns, an Iskander for a building that matters. Za Rodinu, commander.',
   ],
@@ -45,8 +45,8 @@ export const level07: Level = {
   },
   objectives: [
     {
-      title: 'They fly themselves',
-      text: 'Click the drone works and press Z three times. Your drones need no squad: Ukraine pays 4,400 funds of research to get that.',
+      title: 'Squads on the sticks',
+      text: 'Click the drone works and press Z three times. Each FPV is flown by an operator in one of your infantry squads (three drones each, within 650); mercenaries fly too, North Koreans do not. Press O on a squad to add operators from your pool. Full autonomy, 4,400 funds down the Drones branch, frees them from the squads.',
       done: g => g.stats.drones[RU] >= 3,
       marker: own('droneWorks', RU),
     },

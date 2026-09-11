@@ -252,10 +252,11 @@ const CONTROLS: [string, string][] = [
         </p>
         <h4>Operators</h4>
         <p>
-          Ukrainian drones are flown by infantry squads. A squad starts with one operator and can take up to four (press
-          O with the squad selected; each one is a person from your pool). Every operator flies three drones, six after
-          Drone swarm control, so a squad of four flies a dozen. Drones link to the nearest squad with a free slot
-          within 900 and must stay inside its control range.
+          Drones on both sides are flown by infantry squads (for Russia its regular infantry and mercenaries; North
+          Koreans do not fly). A squad starts with one operator and can take up to four (press O with the squad
+          selected; each one is a person from your pool). Every operator flies three drones, six after Drone swarm
+          control, so a squad of four flies a dozen. Drones link to the nearest squad with a free slot within 900 and
+          must stay inside its control range.
         </p>
         <h4>Flying a drone yourself</h4>
         <p>

@@ -422,7 +422,7 @@ export const KHARKIV_MAP: MapData = {
   firstTowns: ['Lyptsi', 'Zhuravlyovka'],
   briefing: [
     [
-      'Kharkiv group. The full war: no scripted enemy, no pauses. Belgorod is building from the first second, and its drones fly themselves.',
+      'Kharkiv group. The full war: no scripted enemy, no pauses. Belgorod is building from the first second.',
       'Take Lyptsi first, put a Mavic and a Sting over the substation before the four-minute mark, and keep your strikes off civilians: support is income.',
       'Destroy the headquarters in Belgorod, or hold all six towns for three minutes. Slava Ukraini, commander.',
     ],

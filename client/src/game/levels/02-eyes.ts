@@ -37,7 +37,7 @@ export const level02: Level = {
     hqOf(g, UA),
   ],
   sideNote:
-    'Ukraine: every drone is flown by a squad until you research Full autonomy; each operator in a squad flies three. Russian drones fly themselves from the start.',
+    'Both sides: every drone is flown by a squad until that side researches Full autonomy; each operator in a squad flies three. Russia flies with its regular infantry and mercenaries.',
   objectives: [
     {
       title: 'Fly FPVs',

@@ -361,7 +361,7 @@ export const SUMY_MAP: MapData = {
       'Destroy the headquarters at Rylsk, or hold all six towns for three minutes. Slava Ukraini, commander.',
     ],
     [
-      'Kursk group, forward headquarters Rylsk. Sumy is building from the first second and its drones have humans on the sticks; yours fly themselves.',
+      'Kursk group, forward headquarters Rylsk. Sumy is building from the first second; both sides fly their drones from the squads until someone buys Full autonomy.',
       "Hold Sudzha and the metering station, take Korenevo's wheat, and send the Lancets after anything that shoots. The Seym crossings are yours to keep.",
       'Destroy the headquarters in Sumy, or hold all six towns for three minutes. Za Rodinu, commander.',
     ],
