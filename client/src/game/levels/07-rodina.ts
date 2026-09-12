@@ -22,12 +22,14 @@ export const level07: Level = {
     'Hull down',
     'Launch rails and Lancets',
     'Iskander missiles',
+    'The enemy reads your defense',
   ],
   briefing: [
     'Belgorod group, listen up. You hold Zhuravlyovka south of the city, and Kozacha Lopan across the border is Ukrainian, with two squads dug in.',
     'Your drones are flown by squads, like the Ukrainian ones: an operator in an infantry or mercenary squad flies three within 650, and only Full autonomy (T) frees them. Pyongyang has sent infantry; they cost nothing from your pool and they fight, but they do not fly drones, and their morale breaks if you start losing towns.',
     'A Ukrainian supply truck drives the Kharkiv highway every forty seconds. Sit a squad on that road, halfway up and out of sight of the city, and take it, cargo and all.',
     'Then the motorcycles go in, and the aviation follows: a KAB on the trenches, a Lancet for their guns, an Iskander for a building that matters. Za Rodinu, commander.',
+    'Intelligence: the Ukrainian commander reads what you show it. Dig your squads in and it buys howitzers, rockets, and assault robots to take the town; raise a power plant and it sends Liutyis for it; fly a fleet and it buys Stings and jammers.',
   ],
   shots: g => [hqOf(g, RU), at(g, 'Zhuravlyovka'), g.map.geo(50.2377, 36.2651), at(g, 'Kozacha Lopan')],
   sideNote:

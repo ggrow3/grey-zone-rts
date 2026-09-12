@@ -21,12 +21,14 @@ export const level06: Level = {
     'Passive air defense',
     'Lancets hunt guns',
     'Rocket salvos',
+    'What its guns shoot at',
   ],
   briefing: [
     'Shells are falling on Lyptsi. Two Russian howitzers north of Zhuravlyovka are working the town blind, and our squads are in their trenches.',
     'Our radar post catches a muzzle flash for a few seconds after every shot. Their radars are down, so they cannot do the same to you.',
     'Answer with the howitzer, blind at first, then fly the Mavic forward and watch the scatter tighten. Twelve shells, then wait for the truck.',
     'When the guns fall silent, the Lancets come for yours. Have a Sting and a fire group with the battery before they do, and switch the air defense radar off until they are close.',
+    'Intelligence: enemy guns shell the buildings they know, the towns you hold, any trench line their drones can see, and any gun of yours their radar catches firing. Dig in where they cannot see, or the rockets come for the line.',
   ],
   shots: g => [at(g, 'Lyptsi'), at(g, 'Zhuravlyovka'), g.find(g.tags.gun) || at(g, 'Lyptsi'), at(g, 'Lyptsi')],
   sideNote:

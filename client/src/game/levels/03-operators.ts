@@ -19,12 +19,14 @@ export const level03: Level = {
     'Swarm control and repeaters',
     'Swarms',
     'Relay carriers',
+    "The enemy's spotters",
   ],
   briefing: [
     'A drone is only as good as the human flying it. One operator, three drones: that is the arithmetic of this war.',
     'Reinforcements have arrived from the mobilization pool. Put them into a squad and that squad flies a dozen drones at once.',
     'Procurement has cleared Terminal guidance, Drone swarm control, and Signal repeaters. Buy them, bind the drones into a swarm, and the squad becomes a squadron.',
     "The armor plant can build a relay carrier: a ground drone with a mast that carries the squads' control range forward. Build the pilots first, commander. The airframes are cheap.",
+    'Intelligence: the moment the enemy fields a gun with few eyes it buys a spotter. A Mavic loitering over your base is the first sign a battery is coming; shoot the eyes before the shells.',
   ],
   shots: g => [
     { x: hqOf(g, UA).x, y: hqOf(g, UA).y - 200 },

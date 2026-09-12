@@ -20,12 +20,14 @@ export const level05: Level = {
     'Your own jammers and EW stations',
     'Silent posture',
     'Ambush posture',
+    'Jamming draws fiber',
   ],
   briefing: [
     'Zhuravlyovka, just over the border. A Russian jammer truck has parked there with three dug-in squads around it, and every radio drone we send falls out of the sky.',
     'The answer is a spool of fiber. Fiber-optic FPVs cannot be jammed, but they are tethered to the squad that flies them, five hundred pixels and not one more.',
     'Bring the squads up to Lyptsi first, then queue the fibers. Kill the jammer, and the radio drones work again.',
     'Then take the town and make it theirs to lose: a jammer of your own, an EW station, and fibers sitting in ambush on the road. The enemy will not stay quiet after that.',
+    'Intelligence: jam its drones and it switches to fiber. The enemy buys fiber-optic FPVs when it sees a jammer; they cannot be jammed, but a net catches them and a fire group shoots them.',
   ],
   shots: g => [
     at(g, 'Zhuravlyovka'),

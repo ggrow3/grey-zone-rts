@@ -21,12 +21,14 @@ export const level12: Level = {
     'Iskander on a base',
     'Geran waves',
     'Taking a fortified town',
+    'Show one thing, prepare another',
   ],
   briefing: [
     'Kursk group, forward headquarters Rylsk. Sudzha is ours, with three squads in the trenches, and it is being shelled from Yunakivka.',
     'The Ukrainian howitzer fires from the fields between Yunakivka and Sudzha, with a radar post and air defense behind it at the village. Our radar at Rylsk catches its flash for a few seconds after every shot.',
     'Aviation is ready: a KAB for their trenches, a Lancet for the gun, an Iskander for the radar. Your own howitzer answers from the woods and moves after every mission.',
     'Then take Yunakivka and the war comes to Sumy. Za Rodinu, commander.',
+    'Intelligence: the Sumy commander sees your dug-in squads and buys guns, rockets, and robots; it sees your armor and buys fiber FPVs and tanks. Show it one thing while you prepare another, and kill its spotters so it buys blind.',
   ],
   shots: g => [at(g, 'Sudzha'), at(g, 'Yunakivka'), g.find(g.tags.gun) || at(g, 'Yunakivka'), at(g, 'Sudzha')],
   sideNote:

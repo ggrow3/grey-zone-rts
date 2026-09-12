@@ -34,12 +34,14 @@ export const level11: Level = {
     'Assault robots and relay carriers',
     'Capturing gas',
     'Holding a salient',
+    'The salient is read',
   ],
   briefing: [
     'Sumy group. This is the Kursk salient: open wheat country between the Psel behind you and the Seym behind them, and one good road through Yunakivka to Sudzha.',
     'The fields are the kill zone. Anything in the open under an armed enemy drone bleeds. The road goes under nets, the squads go through the woods, and the robots go first.',
     'Sudzha holds three dug-in squads under a net and an air defense vehicle, and just north-east of it the gas metering station that pays Russia twelve funds a second.',
     'Take the town, take the station, and hold both. The Kursk group at Rylsk will want them back. Slava Ukraini, commander.',
+    'Intelligence: the Kursk group reads the salient. A thin line of dug-in squads draws howitzers and rockets, a drone-heavy push draws jammers and air defense, armor draws fiber FPVs and tanks. Change what it sees and it changes what it buys.',
   ],
   shots: g => [hqOf(g, UA), at(g, 'Yunakivka'), at(g, 'Sudzha'), at(g, 'Sudzha gas metering station')],
   sideNote:

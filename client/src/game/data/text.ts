@@ -139,4 +139,8 @@ export const STRATEGY: [string, string][] = [
     'Playing Russia',
     'Your infantry and mercenaries fly your drones (North Koreans do not) until you buy Full autonomy, your Lancets hunt artillery, Molniyas are cheap long reach, and Geran waves cost you nothing. Your weakness is people: defections bleed you, North Koreans break when you lose towns. Take the wheat and gas early, keep the pipeline from Kursk intact.',
   ],
+  [
+    'How the enemy thinks',
+    'The computer commander is not a script. When a game starts it rolls a doctrine (guns, air, armor, infantry, or electronic warfare) and a temperament: how much force it masses before a sortie, whether it goes for the nearest objective or one of the next two, what it likes to buy, how busy its raids and research are. Then it reads the battlefield every second and buys the answer to what it can see: trench lines and massed infantry draw howitzers, rockets, and bombers; a fleet of drones draws Stings, air defense, jammers, and fire groups; armor and jammers draw fiber FPVs; your guns draw counter-battery and, from Russia, Lancets; a standing plant or pipeline draws Liutyis; dug-in towns draw assault robots; a battery without eyes buys a spotter. Its guns shell the buildings it knows, the towns you hold, the trench lines its drones see, and any gun its radar catches. So the game with it is about what you let it see: kill its spotters and it buys blind, show it one thing while you build another, and expect every move to be answered within a minute or two.',
+  ],
 ];

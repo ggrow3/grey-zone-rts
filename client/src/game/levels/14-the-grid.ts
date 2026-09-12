@@ -34,12 +34,14 @@ export const level14: Level = {
     'Waves at the substation',
     'Truck escorts',
     'Mercenaries and wages',
+    'Fleets draw air defense',
   ],
   briefing: [
     'Kursk group. Sudzha is ours but it is dark: the grid ends at Rylsk, and a barracks with no power builds nothing.',
     'A generator set beside a building is the cheap island; a pylon line from the substation is the real thing. The enemy has run one from Sumy to a forward base at Yunakivka: two pylons across open fields.',
     'Two FPVs break a pylon. Everything past the break stops: their radar sees 30%, their barracks stalls, their jammer goes quiet.',
     'Then the plant, the wave at their substation, the rockets, and the mercenaries, and Yunakivka is yours. Za Rodinu, commander.',
+    'Intelligence: fly a big FPV fleet and the enemy scales its Stings, air defense, and jammers to it. Keep the fleet small and out of sight until the wave goes in, and it will not have bought the answer in time.',
   ],
   shots: g => [at(g, 'Sudzha'), at(g, 'Yunakivka'), hqOf(g, UA), hqOf(g, RU)],
   sideNote:

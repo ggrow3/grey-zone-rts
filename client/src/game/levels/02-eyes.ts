@@ -22,6 +22,7 @@ export const level02: Level = {
     'Batteries, recharging, and recall',
     'Charging capacity from the grid',
     'Air defense layers',
+    'The enemy counts your drones',
   ],
   briefing: [
     'The drone works is running and the operators are ready. Everything that happens on this front happens because somebody saw it first.',
@@ -29,6 +30,7 @@ export const level02: Level = {
     'Every drone here runs on a battery. An FPV has seventy seconds in the air, a Mavic two minutes; then it flies to the nearest squad or back to the works, lands, and charges from the grid. The substation is what charges them, which is why the Gerans want it.',
     'Intelligence says the first Geran wave is coming for the substation east of the city. Fire groups reach the low ones, a Sting hunts the rest. Have both up before it arrives.',
     'Fly carefully, commander. Every drone is a squad on the sticks.',
+    'Intelligence: the enemy commander is not scripted. It counts what it sees, and a cloud of FPVs over its base makes it buy fire groups, Stings, and jammers of its own. Keep the Mavic high, show it less, and it answers less.',
   ],
   shots: g => [
     g.structs.find(s => s.team === 0 && s.type === 'droneWorks') || hqOf(g, UA),

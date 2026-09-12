@@ -21,12 +21,14 @@ export const level10: Level = {
     'Hull down at a crossing',
     'Road net tunnels',
     'Holding a crossing',
+    'Nets draw bombers',
   ],
   briefing: [
     'Shebekino, on the Nezhegol. Across the river, Vovchansk is Ukrainian, three squads in trenches under an anti-drone net.',
     'Rivers stop everything on the ground. The only way across is the bridge on the Vovchansk road; the squads will find it on their own.',
     'The net eats FPVs, so this is a job for the heavy bomber, the rockets, and a KAB: they all come down from above. Hire a mercenary squad to lead the crossing; they are good, as long as they are paid.',
     'Take the town and hold the crossing when they come back for it: armor hull down at the bridge and a net tunnel over the road behind it. Ura, commander.',
+    'Intelligence: net the roads and the enemy answers with heavy bombers that fly over the nets; a dug-in line draws rockets. Nothing you build goes unanswered, so build the counter to the counter: Stings over the nets.',
   ],
   shots: g => [
     at(g, 'Shebekino'),

@@ -23,12 +23,14 @@ export const level13: Level = {
     'Thermal cameras',
     'Pilot mode dives',
     'The day cycle',
+    'Blind the enemy',
   ],
   briefing: [
     'Night on the Psel. Russian squads are probing across the border toward Yunakivka, and in the dark your ground units see 60% as far and your drones 85%.',
     "The dark is the enemy's friend and it can be yours: squads that creep are seen only within 150, an FPV in ambush is seen only within 60, and a jammer that is silent is not seen at all.",
     'Thermal cameras give the drones the night back. Buy them, put a Sting on guard over the wells, and fly one FPV yourself down onto the road they come by.',
     'Hold until the light changes, then take Sudzha before the next night. Slava Ukraini, commander.',
+    "Intelligence: the enemy's spotters fly by thermal at night too, and it only buys against what it sees. The fewer of your squads its Mavics find, the less it brings; kill the eyes first.",
   ],
   shots: g => [at(g, 'Yunakivka'), place(g, 'Sverdlikovo'), at(g, 'Gas wells'), at(g, 'Sudzha')],
   sideNote:

@@ -22,12 +22,14 @@ export const level09: Level = {
     'Hull down',
     'Assault robots',
     'Robot logistics',
+    'Deep strikes follow the economy',
   ],
   briefing: [
     'Gas is fuel, and fuel is armor. Two wells south of the city feed two pipelines, and three pumping stations keep them flowing. Enemy FPVs are already diving at the nearest one.',
     'Hold the pumps with fire groups and air defense. While any pump is down, the gas income stops and the vehicles run dry.',
     'Then take the war to their line: the pump north-east of Belgorod is the only one they have. Two Liutyis will do it, if they fly around the city and its guns. A third can go farther still, at a refinery deep inside Russia.',
     'Cut their line, keep yours, and the armor plant can turn out tanks and robots. Slava Ukraini, commander.',
+    'Intelligence: while your plant and pipeline stand, the enemy spends on Liutyis and Lancets to reach them. The richer your economy, the more it invests in deep strikes; air defense over the plant is not optional.',
   ],
   shots: g => [
     g.pumpSites[1],

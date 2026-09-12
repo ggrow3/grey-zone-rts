@@ -23,12 +23,14 @@ export const level08: Level = {
     'FPV ambushes',
     'Hunting trucks',
     'Layered defense',
+    'Enemy doctrines',
   ],
   briefing: [
     'Night over Kharkiv. Their air-defense battery has moved east; what stands between you and the city grid tonight is a handful of fire groups and one Sting.',
     'Put an Orlan over the city first. It flies above the machine guns, and it sees everything. Ground units see 60% as far in the dark, which is why the dark is when the infantry moves.',
     'The Geran wave costs six hundred and the crews need ninety seconds to reload: three drones and four decoys, the first two aimed at the substation. Kill the grid and their drones stop charging.',
     'Then send the Molniyas south to hunt over the gas wells, creep the squads up the highway, and be ready. Kharkiv answers at dawn.',
+    'Intelligence: every enemy commander rolls a doctrine when the game starts, guns, air, armor, infantry, or electronic warfare, and a temperament, patient or hasty. Read its first purchases and its first sortie and answer them; no two games play the same.',
   ],
   shots: g => [hqOf(g, RU), hqOf(g, UA), substation(g, 0) || hqOf(g, UA), at(g, 'Gas wells')],
   sideNote:

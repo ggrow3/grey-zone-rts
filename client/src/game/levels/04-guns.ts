@@ -21,12 +21,14 @@ export const level04: Level = {
     'Ammunition trucks',
     'Rocket artillery',
     'Holding ground',
+    'Guns draw guns',
   ],
   briefing: [
     'The enemy is awake now, and the border is a kill zone. Anything that drives the highway gets hunted.',
     'Nets over the towns and a field hospital in the woods behind them keep the trucks and the squads alive. Trade convoys pay for everything else.',
     'The artillery depot has a howitzer ready. It carries twelve shells; ammunition trucks and the depot refill it. Put a Mavic ahead of it and it shells whatever the drone sees, and moves after every mission so the counter-battery fire lands on empty ground.',
     'Three towns by the end of the day, commander. Hold all six for three minutes and the war is over.',
+    'Intelligence: the enemy answers guns with guns. Once it sees a howitzer of yours it buys howitzers for counter-battery and, as Russia, Lancets to hunt them. Shoot and scoot, and keep a Sting over the battery.',
   ],
   shots: g => [
     at(g, 'Lyptsi'),
