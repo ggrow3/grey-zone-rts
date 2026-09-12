@@ -971,6 +971,10 @@ export class Game {
       !u.ambushed
     );
   }
+  /** a built net of either side hangs over this spot: shells cannot go out through the cable */
+  underNet(p: { x: number; y: number }): boolean {
+    return this.structs.some(n => !n.dead && n.build >= 1 && n.def.netR && dist(n, p) <= n.def.netR!);
+  }
   inVision(team: number, x: number, y: number): boolean {
     const list = this.vision[team];
     for (let i = 0; i < list.length; i++) {

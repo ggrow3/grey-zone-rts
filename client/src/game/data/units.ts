@@ -715,7 +715,7 @@ export const UNITS: Record<string, UnitDef> = {
     vsInf: 1.2,
     vsStruct: 1.3,
     blurb:
-      'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it. Park it in a wood: in the open a gun is seen from far off, every shot shows it to radar for six seconds, and drones hit it 45% harder. Shells splash friend and foe alike: keep your own troops out of the beaten zone.',
+      'Long range, slow reload, splash damage. Needs a recon drone to see its targets. Carries 12 shells: ammunition trucks and the artillery depot refill it. Park it in a wood: in the open a gun is seen from far off, every shot shows it to radar for six seconds, and drones hit it 45% harder. Shells splash friend and foe alike: keep your own troops out of the beaten zone. It cannot fire from under an anti-drone net; park it beside one, not inside.',
   },
   mlrs: {
     label: ['Rocket artillery', 'Rocket artillery'],
@@ -743,7 +743,7 @@ export const UNITS: Record<string, UnitDef> = {
     vsInf: 1.3,
     vsStruct: 1.1,
     blurb:
-      'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more. Fire from a wood and move after every mission. Six rockets with wide scatter: your own troops near the target die with the enemy.',
+      'Six-rocket salvos across most of the map. Long reload. Carries three salvos; trucks bring more. Fire from a wood and move after every mission. Six rockets with wide scatter: your own troops near the target die with the enemy. It cannot fire from under an anti-drone net; park it beside one, not inside.',
   },
 
   // ------------------------------------------------------------ Logistics and civilians: never built by the player

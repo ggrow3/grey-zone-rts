@@ -158,6 +158,14 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
     return;
   }
 
+  // guns under a net: the cable stops shells going out as well as drones coming in
+  if (d.indirect) {
+    const blocked = g.underNet(u);
+    if (blocked && !u.netBlocked && u.team >= 0)
+      g.notify(u.team, d.label[u.team] + ' cannot fire from under a net: move it out from under the cable');
+    u.netBlocked = blocked;
+    if (blocked) u.salvoLeft = 0;
+  }
   if (u.salvoLeft > 0) {
     if (u.salvoAt) {
       u.salvoT -= dt;
@@ -216,7 +224,7 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
     const dd = dist(u, u.order);
     if (dd > range) moveToward(g, u, u.order.x, u.order.y, dt);
     else if (minR && dd < minR) moveAway(u, u.order, dt);
-    else if (u.cool <= 0 && hasAmmo(g, u)) {
+    else if (u.cool <= 0 && hasAmmo(g, u) && !u.netBlocked) {
       const vis = acquireFor(g, u, range, minR);
       if (vis && vis.isUnit) fireAt(g, u, vis);
       else {
@@ -291,7 +299,7 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
     }
   }
 
-  if (tgt && d.dmg > 0 && u.cool <= 0 && hasAmmo(g, u)) {
+  if (tgt && d.dmg > 0 && u.cool <= 0 && hasAmmo(g, u) && !(d.indirect && u.netBlocked)) {
     const dd = dist(u, tgt) - (tgt.isStruct ? tgt.r * 0.5 : 0);
     if (dd <= range && dd >= minR && g.canSee(u, tgt) && g.canHitTarget(u, tgt)) fireAt(g, u, tgt);
   }

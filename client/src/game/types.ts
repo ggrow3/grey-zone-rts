@@ -69,6 +69,8 @@ export interface Unit {
   lastHitBy?: number;
   /** confirmed kills (veterancy) */
   kills?: number;
+  /** a gun that cannot fire because a net hangs over it (warned once until it moves out) */
+  netBlocked?: boolean;
   /** drone operators in a squad (1 to OPS_MAX); each extra one is a person from the pool */
   ops?: number;
   /** rounds left for artillery; ammoTruckId tracks the truck already on its way */

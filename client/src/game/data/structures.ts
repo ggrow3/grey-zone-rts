@@ -259,7 +259,7 @@ export const BUILDING_NOTES: Record<string, string> = {
   artyDepot: 'Howitzers and rocket launchers. Fuel users too.',
   radar: 'Sees far and shoots nothing. Put your shooters under it.',
   ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.',
-  net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over. Steel cable on poles: drone warheads and dropped bombs do a quarter damage to it; a howitzer, rockets, a tank, or a glide bomb bring it down.',
+  net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over. Steel cable on poles: drone warheads and dropped bombs do a quarter damage to it; a howitzer, rockets, a tank, or a glide bomb bring it down. The cable works both ways: a gun parked under a net cannot fire.',
   netLine:
     'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.',
   aidPost: 'Heals troops within its radius. Place it in a wood behind the line.',

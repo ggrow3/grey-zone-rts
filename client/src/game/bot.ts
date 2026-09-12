@@ -200,6 +200,17 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       // the computer's guns shoot and scoot once the enemy has radar to catch them
       for (const u of arty)
         if (!u.mode && g.structs.some(s => !s.dead && s.team === E && s.type === 'radar')) u.mode = 'scoot';
+      // a gun that ends up under a net cannot fire: walk it out from under the cable
+      for (const u of arty)
+        if (u.netBlocked && u.order.kind !== 'move') {
+          const net = g.structs.filter(n => !n.dead && n.def.netR).sort((a, b) => dist(a, u) - dist(b, u))[0];
+          if (net) {
+            const dx = u.x - net.x,
+              dy = u.y - net.y,
+              len = Math.max(1, dist(u, net));
+            u.order = MOVE(net.x + (dx / len) * (net.def.netR! + 60), net.y + (dy / len) * (net.def.netR! + 60));
+          }
+        }
       for (const u of arty)
         if (u.order.kind === 'idle' && dist(u, fb) > 90) {
           u.order = MOVE(fb.x + g.rand(-50, 50), fb.y + g.rand(-30, 30));

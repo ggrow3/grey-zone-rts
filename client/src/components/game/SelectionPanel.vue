@@ -96,6 +96,7 @@ function unitRows(e: Unit): [string, string][] {
     if (strong.length) rows.push(['Strong against', strong.join(', ')]);
     if (weak.length) rows.push(['Weak against', weak.join(', ')]);
   }
+  if (d.indirect && e.netBlocked) rows.push(['Under a net', 'cannot fire: move out from under the cable']);
   if (d.ammo)
     rows.push([
       'Shells',
