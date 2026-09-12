@@ -14,7 +14,7 @@ import { hpBar } from './shapes';
 import { drawUnit, drawModeTag } from './units';
 import { drawStruct, drawDepot, drawResource } from './structures';
 import { drawEffects, drawProjectiles } from './effects';
-import { drawIncoming, drawPilotHud } from './hud';
+import { drawIncoming, drawPilotHud, drawHover } from './hud';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -98,6 +98,7 @@ export class Renderer {
     // screen space
     drawIncoming(ctx, g, v, now);
     if (v.pilot) drawPilotHud(ctx, g, v, now);
+    else drawHover(ctx, g, v);
     this.drawScaleBar(ctx, g, v, cam);
     if (v.drag) this.drawDragBox(ctx, v, cam);
   }

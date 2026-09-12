@@ -1,6 +1,8 @@
-// Screen-space overlays: announced enemy columns and the pilot's view.
-import { drawR, PILOT } from '../data';
+// Screen-space overlays: announced enemy columns, the pilot's view, and the name of what the cursor rests on.
+import { drawR, PILOT, TARGET_WORDS, RANK_NAMES } from '../data';
 import type { Game } from '../sim';
+import { rankOf } from '../sim';
+import type { Entity } from '../types';
 import { parallaxOf, toWorld } from './view';
 import type { View } from './view';
 
@@ -179,4 +181,82 @@ export function drawPilotHud(c: CanvasRenderingContext2D, g: Game, v: View, now:
   c.strokeText(line2, vw / 2, vh - 16);
   c.fillStyle = tgt ? '#ff8a80' : v.pilotDive ? '#ffb060' : '#e8e4d4';
   c.fillText(line2, vw / 2, vh - 16);
+}
+
+/** the enemy unit or building under the cursor, if the player's side can see it */
+export function hovered(g: Game, v: View): Entity | null {
+  if (!v.mouse.inside || v.drag || v.placing) return null;
+  const PL = v.team,
+    w = toWorld(v, v.mouse.x, v.mouse.y);
+  let best: Entity | null = null,
+    bd = Infinity;
+  for (const u of g.units) {
+    if (u.dead || u.team === PL || !u.seenBy[PL]) continue;
+    const dd = Math.hypot(parallaxOf(u, v).x - w.x, parallaxOf(u, v).y - w.y) + (u.def.air ? 3 : 0);
+    if (dd <= drawR(u.def) + 6 / v.cam.z && dd < bd) {
+      bd = dd;
+      best = u;
+    }
+  }
+  if (!best)
+    for (const s of g.structs) if (s.team !== PL && !s.dead && Math.hypot(s.x - w.x, s.y - w.y) <= s.r + 4) best = s;
+  return best;
+}
+
+/** a label beside the cursor naming the enemy under it: type, health, rank, what it can hit and how far */
+export function drawHover(c: CanvasRenderingContext2D, g: Game, v: View) {
+  const e = hovered(g, v);
+  if (!e) return;
+  const PL = v.team;
+  const lines: string[] = [];
+  if (e.isUnit) {
+    const d = e.def;
+    lines.push(d.label[PL]);
+    lines.push(
+      'health ' +
+        Math.ceil(e.hp) +
+        ' / ' +
+        d.hp +
+        (d.auto || d.kamikaze ? '' : ', ' + RANK_NAMES[rankOf(e)].toLowerCase() + ', ' + (e.kills || 0) + ' kills')
+    );
+    if (d.kamikaze) lines.push('one-way dive, warhead ' + d.dmg);
+    else if (d.dmg)
+      lines.push(
+        'hits ' + (d.targets ? d.targets.map(k => TARGET_WORDS[k]).join(', ') : 'nothing') + ' within ' + g.rangeOf(e)
+      );
+    else if (d.recon) lines.push('recon: what it sees, their guns can shell');
+    else if (d.jam) lines.push('jammer: drops radio drones near it');
+    if (e.cover === 'trench') lines.push('dug in');
+    if (e.landed) lines.push('landed, swapping batteries');
+  } else {
+    lines.push(e.def.label + (e.build < 1 ? ' (under construction)' : ''));
+    lines.push('health ' + Math.ceil(e.hp) + ' / ' + e.def.hp);
+  }
+  const { cam, vw, dpr } = v;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.font = '12px "Barlow", "Arial Narrow", sans-serif';
+  const pad = 6,
+    lh = 15,
+    w = Math.max(...lines.map(t => c.measureText(t).width)) + pad * 2,
+    h = lines.length * lh + pad * 2 - 3;
+  const p = e.isUnit ? parallaxOf(e, v) : { x: e.x, y: e.y };
+  let x = (p.x - cam.x) * cam.z + 14,
+    y = (p.y - cam.y) * cam.z - h / 2;
+  if (x + w > vw - 6) x = (p.x - cam.x) * cam.z - w - 14;
+  y = Math.max(6, y);
+  c.fillStyle = 'rgba(14,16,12,0.9)';
+  c.strokeStyle = 'rgba(255,107,107,0.8)';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.roundRect(x, y, w, h, 3);
+  c.fill();
+  c.stroke();
+  c.textAlign = 'left';
+  c.textBaseline = 'top';
+  lines.forEach((t, i) => {
+    c.fillStyle = i === 0 ? '#ff8c8c' : '#e6e2d3';
+    if (i === 0) c.font = '600 13px "Barlow Condensed", "Arial Narrow", sans-serif';
+    else c.font = '12px "Barlow", "Arial Narrow", sans-serif';
+    c.fillText(t, x + pad, y + pad + i * lh);
+  });
 }
