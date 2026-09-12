@@ -99,7 +99,9 @@ export function updateHealing(g: Game, dt: number) {
     if (g.rng.next() < dt * 1.2) g.effects.push({ kind: 'heal', x: u.x + g.rand(-8, 8), y: u.y - 10, t: 0, dur: 0.8 });
   }
   for (const s of g.structs) {
-    if (s.dead || s.civ || s.team < 0 || s.build < 1 || s.def.trench || s.hp >= s.def.hp) continue;
+    // nets and pylons do not mend themselves: a repair crew has to drive out
+    if (s.dead || s.civ || s.team < 0 || s.build < 1 || s.def.trench || s.def.netR || s.def.pylon || s.hp >= s.def.hp)
+      continue;
     if (g.units.some(e => !e.dead && e.team === 1 - s.team && !e.def.auto && dist(e, s) < 420)) continue;
     s.hp = Math.min(s.def.hp, s.hp + s.def.hp * 0.004 * dt);
   }

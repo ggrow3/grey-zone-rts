@@ -108,6 +108,12 @@ export const NET_LINE = {
   /** the share of a drone's damage a net or net tunnel takes: steel cable shrugs off warheads, shells and tank rounds bring it down */
   droneDamage: 0.25,
 };
+/** repair crews: a truck from the headquarters mends damaged nets and pylons; nothing else does */
+export const REPAIR = {
+  /** seconds between crews leaving, and how much a crew mends a second while parked at the break */
+  period: 25,
+  rate: 30,
+};
 /** factory hotkeys, in the order of the building's `produces` list */
 export const HOTKEYS = ['Z', 'X', 'C', 'V', 'B', 'H', 'J', 'U', 'I'];
 

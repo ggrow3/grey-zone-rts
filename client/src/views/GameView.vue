@@ -16,7 +16,9 @@ import type { Level } from '../game/levels';
 import { UA, TEAMS } from '../game/data';
 import { MM_W, MM_H } from '../game/map';
 import { loadReplay, saveReplay } from '../game/replay';
-import { endScreenStats, scoreGraph } from '../game/summary';
+import { endScreenStats, scoreGraph, endReport } from '../game/summary';
+import { advise } from '../game/advisor';
+import { loadCampaign, applyCampaign, recordCampaign } from '../game/campaign';
 import type { ScoreGraph } from '../game/summary';
 import { briefingFor } from '../game/briefings';
 import { hub } from '../net/hub';
@@ -48,13 +50,15 @@ const props = defineProps<{
   map?: string;
 }>();
 
-type Panel = 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed';
+type Panel = 'tech' | 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed' | 'advisor';
 interface Result {
   won: boolean;
   title: string;
   text: string;
   stats: [string, string][];
   graph: ScoreGraph;
+  /** what hurt most, the best unit, the turning point */
+  report: string[];
 }
 
 const router = useRouter();
@@ -102,6 +106,19 @@ let ctx: CanvasRenderingContext2D, mmctx: CanvasRenderingContext2D;
 let seedUsed = 0;
 let raf = 0,
   last = 0;
+// the advisor: on for players who have not finished many levels, remembered once switched
+function advisorDefault(): boolean {
+  try {
+    const s = localStorage.getItem('greyzone.advisor');
+    if (s) return s === '1';
+  } catch {
+    /* ignore */
+  }
+  return auth.completedLevels.length < 6;
+}
+const advisorOn = ref(advisorDefault());
+let advisorT = 60;
+let campaignRecorded = false;
 let msgTimer = 0,
   hudT = 0,
   objT = 0;
@@ -201,6 +218,11 @@ function setupSolo() {
     })
   );
   session = new LocalSession(game, side);
+  // the campaign: veterans, research, and support from the last level of this side
+  if (props.mode === 'level' && !props.replay && !props.watch) {
+    const c = loadCampaign(side);
+    if (c) game.notify(side, applyCampaign(game, side, c));
+  }
   if (props.watch) return; // a bot-versus-bot game is nobody's record
   api
     .post<{ id: string }>('/api/games', { mode: props.mode, levelId: props.levelId, side, difficulty })
@@ -415,7 +437,15 @@ function onToggle(p: Panel) {
   else if (p === 'legend') showLegend.value = !showLegend.value;
   else if (p === 'pause') togglePause();
   else if (p === 'log') showLog.value = !showLog.value;
-  else if (p === 'audio') {
+  else if (p === 'advisor') {
+    advisorOn.value = !advisorOn.value;
+    try {
+      localStorage.setItem('greyzone.advisor', advisorOn.value ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    msg(advisorOn.value ? 'Advisor on: a suggestion every 45 seconds' : 'Advisor off');
+  } else if (p === 'audio') {
     audio.cycle();
     audioMode.value = audio.mode;
     msg('Sound: ' + (audio.mode === 'on' ? 'effects and voice' : audio.mode === 'sfx' ? 'effects only' : 'off'));
@@ -446,6 +476,14 @@ function frame(now: number) {
   controller.handleCamera(elapsed);
   controller.prune();
   for (const n of game.drainNotices(team.value)) msg(n);
+  if (advisorOn.value && !result.value && !paused.value && !cut.value && !props.watch) {
+    advisorT -= elapsed;
+    if (advisorT <= 0) {
+      advisorT = 45;
+      const tip = advise(game, team.value);
+      if (tip) msg('Advisor: ' + tip);
+    }
+  }
   if (msgTimer > 0) {
     msgTimer -= elapsed;
     if (msgTimer <= 0) msgShow.value = false;
@@ -568,15 +606,30 @@ function advanceObjective() {
       .post('/api/progress', { levelId: l.id })
       .then(() => auth.markLevel(l.id))
       .catch(() => {});
+    keepCampaign(true);
   }
 }
 
 // ================================================================== the end of the game
 function showResult(won: boolean, title: string, text: string) {
-  result.value = { won, title, text, stats: endScreenStats(game, team.value), graph: scoreGraph(game) };
+  result.value = {
+    won,
+    title,
+    text,
+    stats: endScreenStats(game, team.value),
+    graph: scoreGraph(game),
+    report: endReport(game, team.value),
+  };
   ctl.value!.view.placing = null;
   ctl.value!.view.bombardMode = false;
   keepReplay();
+}
+
+/** a level's outcome goes into the campaign once: the first result counts */
+function keepCampaign(won: boolean) {
+  if (props.mode !== 'level' || !level.value || props.replay || props.watch || campaignRecorded) return;
+  campaignRecorded = true;
+  recordCampaign(game, team.value, level.value.id, won);
 }
 
 /** keep the finished solo game so it can be watched again */
@@ -602,6 +655,7 @@ function onGameOver() {
     : 'Enemy forces broke through and reached your command post.';
   showResult(won, won ? 'Enemy headquarters destroyed' : 'Headquarters lost', text);
   finishSolo(won ? 'won' : 'lost');
+  keepCampaign(won);
 }
 
 function onMatchEnded(m: { winnerTeam: number; reason: string; winnerUsername?: string }) {
@@ -702,6 +756,7 @@ function continuePlaying() {
         :speed="speed"
         :basemap="basemap"
         :audio="audioMode"
+        :advisor="advisorOn"
         :opponent="opponent || undefined"
         @toggle="onToggle"
         @basemap="cycleBasemap"
@@ -748,6 +803,9 @@ function continuePlaying() {
                 ><span>{{ l }}</span>
               </div>
             </div>
+            <ul class="report" v-if="result.report.length">
+              <li v-for="r in result.report" :key="r">{{ r }}</li>
+            </ul>
             <div class="graph">
               <div class="dim" style="font-size: 12px">
                 Score over time · <span class="ua">Ukraine</span> · <span class="ru">Russia</span> · top

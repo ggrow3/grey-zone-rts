@@ -13,15 +13,16 @@ const props = defineProps<{
   speed: number;
   basemap: string;
   audio: string;
+  advisor: boolean;
   opponent?: string;
 }>();
 const emit = defineEmits<{
-  (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed'): void;
+  (e: 'toggle', panel: 'manual' | 'legend' | 'pause' | 'audio' | 'log' | 'speed' | 'advisor'): void;
   (e: 'basemap'): void;
   (e: 'leave'): void;
 }>();
 const menuOpen = ref(false);
-function pick(panel: 'manual' | 'legend' | 'log' | 'audio') {
+function pick(panel: 'manual' | 'legend' | 'log' | 'audio' | 'advisor') {
   menuOpen.value = false;
   emit('toggle', panel);
 }
@@ -283,6 +284,13 @@ function gasClass(r: { owner: number }) {
         </button>
         <button type="button" @click="pick('legend')" title="Unit shapes">Legend (L)</button>
         <button type="button" @click="pick('log')" title="Battle log">Log (K)</button>
+        <button
+          type="button"
+          @click="pick('advisor')"
+          title="A suggestion every 45 seconds about the most pressing gap: no spotter for your guns, no air defense under enemy drones, an empty larder"
+        >
+          Advisor: {{ advisor ? 'on' : 'off' }}
+        </button>
         <button type="button" @click="pick('audio')" title="Sound effects and unit voices">
           Sound: {{ audio === 'on' ? 'on' : audio === 'sfx' ? 'no voice' : 'off' }} (N)
         </button>

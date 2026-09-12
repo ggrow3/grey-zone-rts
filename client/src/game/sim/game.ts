@@ -74,7 +74,7 @@ import { computeVision, updateKillZone } from './vision';
 import { powerReach, updatePower, updateSupply } from './economy';
 import { updateHold, updateMissions } from './goals';
 import { updateFood } from './food';
-import { updateAmmo, updateDepots, updateTrade } from './logistics';
+import { updateAmmo, updateDepots, updateTrade, updateRepairs } from './logistics';
 import { updateStruct, updateHealing, updateNets, updateJamming } from './structures';
 import { updateStrikes } from './strikes';
 import { updateUnit } from './units';
@@ -164,6 +164,8 @@ export class Game {
   /** rations in each headquarters larder; grain trucks fill it, supply trucks and the squads nearby draw on it */
   food = [FOOD.start, FOOD.start];
   foodWarnT = [0, 0];
+  /** seconds until the next repair crew may leave */
+  repairT = [10, 10];
   foodWasHungry = [false, false];
   /** international support for Ukraine (0 to 100): scales its income, falls when civilians are hit */
   support = 100;
@@ -238,6 +240,13 @@ export class Game {
     /** points: kills and captures scaled by what the target cost, civilian harm taken away */
     score: [0, 0],
     friendlyFire: [0, 0],
+    /** what destroyed each side's units, by the killer's type ('strike' for bombs and missiles) */
+    lostTo: [{}, {}] as [Record<string, number>, Record<string, number>],
+    /** the unit with the most confirmed kills each side has fielded, dead or alive */
+    best: [null, null] as [
+      { label: string; callsign: string; kills: number } | null,
+      { label: string; callsign: string; kills: number } | null,
+    ],
   };
   /** the optional goal each side is working on, the gap before the next, and how many were completed */
   missions: [Mission | null, Mission | null] = [null, null];
@@ -337,6 +346,7 @@ export class Game {
     updateFood(this, dt);
     updateSupply(this);
     updateDepots(this, dt);
+    updateRepairs(this, dt);
     updateJamming(this, dt);
     updateNets(this, dt);
     updateCivilians(this, dt);

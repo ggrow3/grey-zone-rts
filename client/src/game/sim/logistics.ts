@@ -1,6 +1,6 @@
 // Trucks: supply runs to held towns, grain and oil from the sites, trade convoys to the border and back,
 // ammunition trucks for the guns, capture of unescorted trucks, and the pumping stations' repair crews.
-import { UA, RU, UNITS, TRUCK_LOAD, TRUCK_PERIOD, TEAMS, SCORE, FOOD } from '../data';
+import { UA, RU, UNITS, TRUCK_LOAD, TRUCK_PERIOD, TEAMS, SCORE, FOOD, REPAIR } from '../data';
 import { W } from '../map';
 import { hyp, dist } from '../dmath';
 import type { Unit, Struct, Site, Pt } from '../types';
@@ -8,6 +8,7 @@ import type { Game } from './game';
 import { MOVE } from './orders';
 import { planRoute, stepMove } from './movement';
 import { killUnit } from './combat';
+import { remember } from './entity';
 
 /** artillery shells: slow refill beside the depot or headquarters, trucks for guns in the field */
 export function updateAmmo(g: Game, dt: number) {
@@ -101,6 +102,7 @@ export function updateDepots(g: Game, dt: number) {
         g.capturesN[team]++;
         const cap = first[team];
         if (cap) {
+          remember(cap, 'took ' + d.name);
           g.bark('capture', cap);
           const friend = g.units.find(
             o => o !== cap && !o.dead && o.team === team && o.def.troop && dist(o, cap) < 220
@@ -131,6 +133,59 @@ export function updateDepots(g: Game, dt: number) {
     ps.struct = g.makeStruct('pump', ps.team, ps.x, ps.y, false);
     g.structs.push(ps.struct);
     g.notify(ps.team, 'Repair crews are rebuilding the pumping station');
+  }
+}
+
+/** a damaged net or pylon of this side that no crew is on its way to */
+function needsRepair(g: Game, team: number): Struct | null {
+  const taken = new Set<number>();
+  for (const u of g.units)
+    if (!u.dead && u.type === 'repairTruck' && u.team === team && u.dest) taken.add((u.dest as Struct).id);
+  let best: Struct | null = null,
+    bd = Infinity;
+  const hq = g.hq(team);
+  for (const s of g.structs) {
+    if (
+      s.dead ||
+      s.team !== team ||
+      s.build < 1 ||
+      !(s.def.netR || s.def.pylon) ||
+      s.hp >= s.def.hp - 1 ||
+      taken.has(s.id)
+    )
+      continue;
+    const dd = hq ? dist(hq, s) : 0;
+    if (dd < bd) {
+      bd = dd;
+      best = s;
+    }
+  }
+  return best;
+}
+
+/** repair crews: when a net or pylon is damaged a truck leaves the headquarters for it */
+export function updateRepairs(g: Game, dt: number) {
+  for (const T of [UA, RU]) {
+    g.repairT[T] -= dt;
+    if (g.repairT[T] > 0) continue;
+    g.repairT[T] = REPAIR.period;
+    const hq = g.hq(T);
+    if (!hq || g.freePeople(T) < 1) continue;
+    const target = needsRepair(g, T);
+    if (!target) continue;
+    const u = g.makeUnit('repairTruck', T, hq.x + g.rand(-20, 20), hq.y + (T === UA ? -(hq.r + 22) : hq.r + 22));
+    u.cargo = 'repair';
+    u.dest = target;
+    u.order = MOVE(target.x, target.y);
+    planRoute(g, u, target.x, target.y);
+    g.units.push(u);
+    g.notify(
+      T,
+      'Repair crew leaving for the ' +
+        target.def.label.toLowerCase() +
+        ' near ' +
+        g.map.nearestPlace(target.x, target.y)
+    );
   }
 }
 
@@ -284,6 +339,46 @@ export function updateTruck(g: Game, u: Unit, dt: number) {
       }
       g.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6, green: true });
       killUnit(g, u, true);
+    }
+    return;
+  }
+  if (u.cargo === 'repair') {
+    // the crew: drive to the break, park, mend it, then the next one, then home
+    let target = dest as Struct | null;
+    if (!target || target.dead || target.hp >= target.def.hp - 0.5) {
+      target = needsRepair(g, u.team);
+      u.dest = target;
+      if (!target) {
+        const hq = g.hq(u.team);
+        if (!hq || dist(u, hq) < hq.r + 90) {
+          killUnit(g, u, true);
+          return;
+        }
+        if (u.order.kind !== 'move' || hyp(u.order.x - hq.x, u.order.y - hq.y) > 60) {
+          u.order = MOVE(hq.x, hq.y + (u.team === UA ? -(hq.r + 24) : hq.r + 24));
+          planRoute(g, u, u.order.x, u.order.y);
+        }
+        stepMove(g, u, u.order.x, u.order.y, dt);
+        return;
+      }
+      u.order = MOVE(target.x, target.y);
+      planRoute(g, u, target.x, target.y);
+    }
+    // the crew works from the roadside: within cable reach of the break
+    if (dist(u, target) > target.r + 64) {
+      stepMove(g, u, u.order.x, u.order.y, dt);
+      if (hyp(u.x - px, u.y - py) < 0.15) {
+        u.stuck = (u.stuck || 0) + dt;
+        if (u.stuck > 12) killUnit(g, u, true);
+      } else u.stuck = 0;
+      return;
+    }
+    target.hp = Math.min(target.def.hp, target.hp + REPAIR.rate * dt);
+    if (g.rng.next() < dt * 1.5)
+      g.effects.push({ kind: 'heal', x: target.x + g.rand(-10, 10), y: target.y - 8, t: 0, dur: 0.8 });
+    if (target.hp >= target.def.hp) {
+      g.effects.push({ kind: 'mark', x: target.x, y: target.y, t: 0, dur: 0.6, green: true });
+      g.notify(u.team, target.def.label + ' repaired near ' + g.map.nearestPlace(target.x, target.y));
     }
     return;
   }

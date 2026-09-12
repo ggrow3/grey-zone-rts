@@ -3,6 +3,12 @@ import type { UnitDef } from '../data';
 import type { Entity, Unit } from '../types';
 
 export const ADJ = ['Ukrainian', 'Russian'];
+/** a line in a unit's record (towns taken, notable kills), kept to the last eight */
+export function remember(u: Unit, line: string) {
+  (u.history ||= []).push(line);
+  if (u.history.length > 8) u.history.shift();
+}
+
 /** veteran rank from confirmed kills: 0 recruit, 1 trained, 2 veteran, 3 elite */
 export function rankOf(u: Unit): number {
   return Math.min(3, Math.floor((u.kills || 0) / 2));

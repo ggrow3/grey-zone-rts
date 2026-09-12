@@ -6,12 +6,25 @@ import { factionFacts } from '../game/factions';
 import { MAPS, DEFAULT_MAP } from '../game/maps';
 import { STARTS } from '../game/data';
 import { hasReplay as replaySaved } from '../game/replay';
+import { loadCampaign, clearCampaign, describeCampaign } from '../game/campaign';
 
 const auth = useAuth();
 const side = ref(0),
   diff = ref(0.7),
   start = ref('standard');
 const hasReplay = ref(replaySaved());
+const campaignTick = ref(0);
+const campaigns = computed(() => {
+  void campaignTick.value;
+  return [0, 1]
+    .map(side => ({ side, c: loadCampaign(side) }))
+    .filter(x => x.c)
+    .map(x => ({ side: x.side, text: describeCampaign(x.c!) }));
+});
+function resetCampaign(side: number) {
+  clearCampaign(side);
+  campaignTick.value++;
+}
 const groups = computed(() => [
   { side: 0, name: 'As Ukraine', levels: LEVELS.filter(l => l.side === 0) },
   { side: 1, name: 'As Russia', levels: LEVELS.filter(l => l.side === 1) },
@@ -58,8 +71,16 @@ onMounted(() => auth.refresh());
         <h2>Learn: {{ LEVELS.length }} levels on two fronts</h2>
         <p class="dim">
           Each teaches a handful of ideas in ten to fifteen minutes, on both sides of the border and on both maps.
-          Progress is saved to your account.
+          Progress is saved to your account. The levels are a campaign: veteran squads, research, and support carry from
+          one level to the next, and a lost level makes the next one harder instead of blocking it.
         </p>
+        <div v-for="c in campaigns" :key="c.side" class="dim campaign">
+          <b :class="c.side === 0 ? 'ua' : 'ru'">Campaign as {{ c.side === 0 ? 'Ukraine' : 'Russia' }}:</b>
+          {{ c.text }}
+          <button type="button" @click="resetCampaign(c.side)" title="Start the campaign over with fresh squads">
+            Reset
+          </button>
+        </div>
         <div v-for="grp in groups" :key="grp.side" class="levelgroup">
           <h3 :class="grp.side === 0 ? 'ua' : 'ru'">{{ grp.name }}</h3>
           <div

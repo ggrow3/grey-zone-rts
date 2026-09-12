@@ -45,6 +45,62 @@ export function endScreenStats(game: Game, team: number): [string, string][] {
   ];
 }
 
+/** three sentences a player wants after a game: what hurt most, who fought best, when it turned */
+export function endReport(game: Game, team: number): string[] {
+  const PL = team,
+    EN = 1 - PL,
+    lines: string[] = [];
+  const lost = Object.entries(game.stats.lostTo[PL]).sort((a, b) => b[1] - a[1]);
+  if (lost.length)
+    lines.push(
+      'What hurt you most: ' +
+        lost
+          .slice(0, 2)
+          .map(
+            ([k, n]) =>
+              n +
+              ' of your units to ' +
+              (k === 'strike' ? 'bombs and missiles' : UNITS[k] ? UNITS[k].label[EN].toLowerCase() + 's' : k)
+          )
+          .join(', ') +
+        '.'
+    );
+  const best = game.stats.best[PL];
+  if (best && best.kills)
+    lines.push(
+      'Your best unit: ' +
+        best.label +
+        (best.callsign ? ' "' + best.callsign + '"' : '') +
+        ', ' +
+        best.kills +
+        ' kills.'
+    );
+  // the turning point: the ten seconds in which the score gap moved the most
+  const h = game.history;
+  let bi = -1,
+    bd = 0;
+  for (let i = 1; i < h.length; i++) {
+    const d = h[i].score[PL] - h[i].score[EN] - (h[i - 1].score[PL] - h[i - 1].score[EN]);
+    if (Math.abs(d) > Math.abs(bd)) {
+      bd = d;
+      bi = i;
+    }
+  }
+  if (bi > 0 && Math.abs(bd) >= 20) {
+    const t = h[bi].t;
+    const near = game.log.filter(e => e.at <= t && e.at >= t - 12 && e.kind !== 'info').sort((a, b) => b.at - a.at)[0];
+    lines.push(
+      'The turning point: ' +
+        fmtTime(t) +
+        ', ' +
+        (bd > 0 ? 'in your favor' : 'against you') +
+        (near ? ' (' + near.text.replace(/\.$/, '') + ')' : '') +
+        '.'
+    );
+  }
+  return lines;
+}
+
 export interface ScoreGraph {
   /** SVG polyline points for each side in a 300 x 80 box */
   ua: string;

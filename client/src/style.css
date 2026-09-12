@@ -1258,3 +1258,19 @@ details.about p {
   font-size: 13px;
   line-height: 1.5;
 }
+.campaign {
+  font-size: 13px;
+  margin: 2px 0 10px;
+}
+.campaign button {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+#overlay .report {
+  margin: 10px 0 4px;
+  padding-left: 18px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}

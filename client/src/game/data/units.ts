@@ -763,6 +763,23 @@ export const UNITS: Record<string, UnitDef> = {
     auto: true,
     blurb: 'Carries funds from headquarters to each town you hold. Drones love them.',
   },
+  repairTruck: {
+    label: ['Repair crew', 'Repair crew'],
+    shape: 'truck',
+    r: 9,
+    factory: null,
+    cost: 0,
+    crew: 1,
+    time: 0,
+    hp: 70,
+    speed: 70,
+    roadMul: 1.8,
+    vision: 120,
+    dmg: 0,
+    auto: true,
+    blurb:
+      'A truck with a crew and a spool of cable. Leaves the headquarters when a net or a pylon is damaged, parks at the break and mends it. Nothing else repairs nets or pylons, so the enemy hunts it.',
+  },
   civcar: {
     label: ['Civilian vehicle', 'Civilian vehicle'],
     shape: 'car',

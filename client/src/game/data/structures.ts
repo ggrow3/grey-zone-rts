@@ -259,7 +259,7 @@ export const BUILDING_NOTES: Record<string, string> = {
   artyDepot: 'Howitzers and rocket launchers. Fuel users too.',
   radar: 'Sees far and shoots nothing. Put your shooters under it.',
   ewStation: 'Drops radio-controlled drones inside its bubble. Fiber FPVs and frequency hopping get through.',
-  net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over. Steel cable on poles: drone warheads and dropped bombs do a quarter damage to it; a howitzer, rockets, a tank, or a glide bomb bring it down. The cable works both ways: a gun parked under a net cannot fire.',
+  net: 'Catches 85% of the FPVs that fly into it. Bombers and Gerans go over. Steel cable on poles: drone warheads and dropped bombs do a quarter damage to it; a howitzer, rockets, a tank, or a glide bomb bring it down. The cable works both ways: a gun parked under a net cannot fire. A damaged net is mended only by a repair crew from the headquarters.',
   netLine:
     'Five nets strung along the nearest road in one order: a safe corridor for trucks through the kill zone, as both armies now build by the kilometer.',
   aidPost: 'Heals troops within its radius. Place it in a wood behind the line.',
@@ -268,7 +268,7 @@ export const BUILDING_NOTES: Record<string, string> = {
   powerPlant:
     'A 90-power thermal plant: the biggest source you can build, and the biggest target after the headquarters. Gerans and missiles come for it.',
   pylon:
-    'Forty funds of steel that carries the grid 190 farther. A line of them powers a forward base; two FPVs or one shell break one, and a broken line stalls everything past it. Pylons mend themselves when nothing hostile is near.',
+    'Forty funds of steel that carries the grid 190 farther. A line of them powers a forward base; two FPVs or one shell break one, and a broken line stalls everything past it. A repair crew drives out from the headquarters to mend a damaged pylon; kill the truck and the line stays broken.',
   pump: 'Part of the pipeline: while any pump is down, gas income and fuel stop. Repair crews rebuild it after the area is quiet.',
   trench:
     'Dug by troops (E). Troops in it take 45% less damage and 75% less from drones (85% less when dug inside a wood), and are seen only within 110. Anyone can use it.',

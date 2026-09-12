@@ -18,6 +18,7 @@ import type { UnitDef } from '../data';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from '../dmath';
 import type { Unit, Struct, Entity, Projectile } from '../types';
 import type { Game } from './game';
+import { remember } from './entity';
 import { rankOf, isVehicle, matchup, ADJ } from './entity';
 
 export function acquireFor(g: Game, src: Unit, maxR: number, minR: number): Entity | null {
@@ -289,6 +290,18 @@ export function credit(g: Game, src: Unit | undefined, victim: Entity) {
   if (!src || src.dead || src.def.kamikaze) return;
   const before = rankOf(src);
   src.kills = (src.kills || 0) + 1;
+  const best = g.stats.best[src.team];
+  if (!best || src.kills > best.kills)
+    g.stats.best[src.team] = { label: src.def.label[src.team], callsign: src.callsign || '', kills: src.kills };
+  // the record keeps the kills worth telling: armor, guns, buildings, anything dear
+  if (victim.isStruct || (victim.isUnit && (victim.def.cost >= 250 || victim.def.indirect)))
+    remember(
+      src,
+      'destroyed a ' +
+        (victim.isStruct ? victim.def.label.toLowerCase() : victim.def.label[src.team].toLowerCase()) +
+        ' near ' +
+        g.map.nearestPlace(victim.x, victim.y)
+    );
   if (rankOf(src) > before) {
     g.stats.vets[src.team]++;
     g.notify(
@@ -319,7 +332,13 @@ export function killUnit(g: Game, u: Unit, silent?: boolean, byTeam?: number, by
     return;
   }
   g.stats.lost[u.team]++;
-  if (u.type === 'truck' && byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) g.stats.trucksKilled[byTeam]++;
+  if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) {
+    const lt = g.stats.lostTo[u.team],
+      k = by ? by.type : 'strike';
+    lt[k] = (lt[k] || 0) + 1;
+  }
+  if ((u.type === 'truck' || u.type === 'repairTruck') && byTeam !== undefined && byTeam >= 0 && byTeam !== u.team)
+    g.stats.trucksKilled[byTeam]++;
   if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team && !u.def.air)
     g.alert(u.team, u.x, u.y, u.def.label[u.team] + ' lost');
   if (byTeam !== undefined && byTeam >= 0 && byTeam !== u.team) {

@@ -69,6 +69,11 @@ function unitRows(e: Unit): [string, string][] {
     rows: [string, string][] = [];
   // kills first: the tally people look for
   if (!d.kamikaze) rows.push(['Kills', (e.kills || 0) + (d.auto ? '' : ', ' + RANK_NAMES[rankOf(e)])]);
+  if (e.tours || (e.history && e.history.length))
+    rows.push([
+      'Record',
+      (e.tours ? e.tours + (e.tours > 1 ? ' tours, ' : ' tour, ') : '') + (e.history || []).slice(-3).join(', '),
+    ]);
   if (d.kamikaze) {
     rows.push(['Warhead', String(d.dmg)], ['Attack', 'one-way dive, dies on impact']);
   } else if (d.dmg) {
