@@ -105,6 +105,8 @@ export const NET_LINE = {
   count: 5,
   spacing: 150,
   snap: 70,
+  /** the share of a drone's damage a net or net tunnel takes: steel cable shrugs off warheads, shells and tank rounds bring it down */
+  droneDamage: 0.25,
 };
 /** factory hotkeys, in the order of the building's `produces` list */
 export const HOTKEYS = ['Z', 'X', 'C', 'V', 'B', 'H', 'J', 'U', 'I'];

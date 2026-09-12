@@ -117,7 +117,7 @@ export const STRATEGY: [string, string][] = [
   ],
   [
     'Air defense',
-    'Drones dodge bullets, so guns need volume and research. Jammers and EW stations do not miss: radio drones inside the bubble fall unless they are fiber-optic. Nets catch FPVs over a spot. Stings hunt on their own. Layer them.',
+    'Drones dodge bullets, so guns need volume and research. Jammers and EW stations do not miss: radio drones inside the bubble fall unless they are fiber-optic. Nets catch FPVs over a spot, and drones barely scratch them (a quarter damage): it takes guns, armor, or a glide bomb to clear a net. Stings hunt on their own. Layer them.',
   ],
   [
     'Ground and cover',

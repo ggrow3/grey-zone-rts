@@ -12,6 +12,7 @@ import {
   unitPoints,
   structPoints,
   SCORE,
+  NET_LINE,
 } from '../data';
 import type { UnitDef } from '../data';
 import { hyp, dist, clamp, dsin, dcos, datan2 } from '../dmath';
@@ -256,6 +257,8 @@ export function applyDamage(g: Game, t: Entity, amt: number, team: number, drone
   if (t.dead) return;
   if (drone && t.isUnit && isVehicle(t) && t.team >= 0 && g.upgrades[t.team].cages) amt *= 0.65;
   if (drone && t.isUnit && t.def.robot) amt *= 0.6;
+  // nets are cable and poles: a warhead or a dropped bomb does little; guns and armor cut them
+  if (drone && t.isStruct && t.def.netR) amt *= NET_LINE.droneDamage;
   if (t.isUnit) amt *= 1 - 0.06 * rankOf(t);
   if (t.isUnit) {
     const m = g.modeOf(t);
