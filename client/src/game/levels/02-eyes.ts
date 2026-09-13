@@ -65,7 +65,7 @@ export const level02: Level = {
     },
     {
       title: 'Charging',
-      text: 'A landed drone swaps batteries: 25 seconds for an FPV and 20 for a Mavic at the works, half that beside an infantry squad, and it is airborne again on its own. The swap draws on the grid: each battery drone needs one point of spare power, and your headquarters gives 30 and the Kharkiv substation 60 minus what the buildings use. Read Charging in the top bar. Over the limit, every swap takes three times as long and the works builds no more battery drones. Home (the button in the panel) recalls every battery drone at once: press it before a snow front or when the enemy air defense is awake. Watch a drone take off again.',
+      text: 'A landed drone swaps batteries: 25 seconds for an FPV and 20 for a Mavic at the works, half that beside an infantry squad, and it is airborne again on its own. The swap draws on the grid: each battery drone needs one point of spare power, and your headquarters gives 30 and the Kharkiv substation 60 minus what the buildings use. Read Charging in the top bar. Over the limit, every swap takes three times as long and the works builds no more battery drones. Home (the button in the panel) recalls every battery drone at once: press it before a snow front or when the enemy air defense is awake. Squads also carry drones: select drones and press I and they land on their squad and ride along, full and not draining, out of reach of guns and jammers, until you select the squad and press I again to launch them. Watch a drone take off again.',
       done: g =>
         g.units.some(
           u => u.team === UA && !u.dead && u.def.air && !u.landed && u.rechargeT !== undefined && u.rechargeT <= 0

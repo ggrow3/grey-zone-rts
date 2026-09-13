@@ -187,8 +187,8 @@ export class Renderer {
     for (const u of g.units) if (!u.def.air && (u.seenBy[PL] || u.team === PL)) drawUnit(ctx, u, now, v);
     drawProjectiles(ctx, g.projectiles);
     // low aircraft first, then the high ones on top: a layered sky
-    for (const u of g.units) if (u.def.air && u.seenBy[PL] && altOf(u) < 2) drawUnit(ctx, u, now, v);
-    for (const u of g.units) if (u.def.air && u.seenBy[PL] && altOf(u) === 2) drawUnit(ctx, u, now, v);
+    for (const u of g.units) if (u.def.air && u.seenBy[PL] && !u.carriedBy && altOf(u) < 2) drawUnit(ctx, u, now, v);
+    for (const u of g.units) if (u.def.air && u.seenBy[PL] && !u.carriedBy && altOf(u) === 2) drawUnit(ctx, u, now, v);
     drawEffects(ctx, g.effects, PL, g);
     drawEffects(ctx, this.localFx, PL);
   }

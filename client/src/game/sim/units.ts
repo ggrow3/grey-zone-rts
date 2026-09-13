@@ -58,17 +58,32 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
   if (d.endurance) {
     if (u.batt === undefined) u.batt = d.endurance;
     if (u.landed) {
-      u.rechargeT! -= dt * (u.team >= 0 && g.supply[u.team].power < 1 ? 1 / 3 : 1);
-      if (u.rechargeT! <= 0 && !(g.quadsGrounded() && d.electric && !d.large)) {
-        u.landed = false;
+      // riding on a squad: move with it; the battery does not drain
+      if (u.carriedBy) {
+        if (u.carriedBy.dead) {
+          u.carriedBy = null;
+          u.stowed = false;
+        } else {
+          u.x = u.carriedBy.x + ((u.id % 3) - 1) * 5;
+          u.y = u.carriedBy.y + 6;
+          u.angle = u.carriedBy.angle;
+        }
+      }
+      if (u.rechargeT! > 0) u.rechargeT! -= dt * (u.team >= 0 && g.supply[u.team].power < 1 ? 1 / 3 : 1);
+      if (u.rechargeT! <= 0) {
         u.batt = d.endurance;
-        u.grace = 0;
+        // stowed drones stay aboard until launched; the rest take off when charged
+        if (!u.stowed && !(g.quadsGrounded() && d.electric && !d.large)) {
+          u.landed = false;
+          u.carriedBy = null;
+          u.grace = 0;
+        }
       }
       return;
     }
     const diving = (d.kamikaze && u.target && !u.target.dead) || u.ambushed;
     if (!diving) u.batt -= dt * (g.weather.kind === 'rain' ? 1.5 : g.weather.kind === 'snow' ? 2 : 1);
-    if (!diving && u.batt < d.endurance * 0.25) {
+    if (!diving && (u.batt < d.endurance * 0.25 || u.stowing)) {
       const spot = g.landingSpot(u);
       if (!spot) {
         if (u.batt <= 0) {
@@ -79,8 +94,13 @@ export function updateUnit(g: Game, u: Unit, dt: number) {
         const dd = dist(u, spot);
         if (dd < 50) {
           u.landed = true;
-          // a squad swaps the battery by hand, faster than the works
+          // a squad swaps the battery by hand, faster than the works, and carries the drone meanwhile
           u.rechargeT = (d.recharge || 30) * (spot.isUnit && spot.def.troop ? SQUAD_SWAP : 1);
+          if (spot.isUnit && spot.def.troop) {
+            u.carriedBy = spot;
+            u.stowed = !!u.stowing;
+          }
+          u.stowing = false;
           u.order = IDLE();
           u.target = null;
           g.effects.push({ kind: 'mark', x: u.x, y: u.y, t: 0, dur: 0.6 });

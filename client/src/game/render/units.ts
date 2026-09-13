@@ -191,6 +191,23 @@ export function drawUnit(c: CanvasRenderingContext2D, u: Unit, now = 0, v?: View
     c.fillText('x' + u.ops, u.x + r + 2, u.y - r);
     c.restore();
   }
+  // drones riding on a squad: a small count at its shoulder
+  if (u.def.troop) {
+    const carried = u.carrying || 0;
+    if (carried) {
+      c.save();
+      c.font = '600 8px "Barlow Condensed", sans-serif';
+      c.textAlign = 'right';
+      c.textBaseline = 'bottom';
+      c.lineWidth = 2.5;
+      c.lineJoin = 'round';
+      c.strokeStyle = 'rgba(12,14,10,0.9)';
+      c.strokeText(carried + '\u25b4', u.x - r - 2, u.y - r + 2);
+      c.fillStyle = '#9fd6e8';
+      c.fillText(carried + '\u25b4', u.x - r - 2, u.y - r + 2);
+      c.restore();
+    }
+  }
   // veterancy chevrons
   const rank = rankOf(u);
   if (rank > 0) {

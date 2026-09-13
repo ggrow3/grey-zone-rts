@@ -60,6 +60,8 @@ const counts = computed(() => {
     .sort((a, b) => b[1][0] - a[1][0])
     .slice(0, 5);
 });
+/** drones riding on this squad */
+const carriedCount = (u: Unit) => u.carrying || 0;
 const hpColor = (r: number) => (r > 0.5 ? 'var(--ok)' : r > 0.25 ? 'var(--warn)' : 'var(--ru)');
 
 function unitRows(e: Unit): [string, string][] {
@@ -190,14 +192,18 @@ function unitRows(e: Unit): [string, string][] {
   if (d.endurance)
     rows.push([
       'Flight time',
-      e.landed
-        ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s'
-        : e.ambushed
-          ? Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s, not draining'
-          : Math.ceil(e.batt === undefined ? d.endurance : e.batt) +
-            ' s of ' +
-            d.endurance +
-            (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : ''),
+      e.landed && e.carriedBy && e.stowed && (e.rechargeT || 0) <= 0
+        ? 'carried by ' + UNITS[e.carriedBy.type].label[e.team] + ', full charge, not draining: I launches it'
+        : e.landed && e.carriedBy
+          ? 'riding on ' + UNITS[e.carriedBy.type].label[e.team] + ', charged in ' + Math.ceil(e.rechargeT || 0) + ' s'
+          : e.landed
+            ? 'landed, airborne again in ' + Math.ceil(e.rechargeT || 0) + ' s'
+            : e.ambushed
+              ? Math.ceil(e.batt === undefined ? d.endurance : e.batt) + ' s, not draining'
+              : Math.ceil(e.batt === undefined ? d.endurance : e.batt) +
+                ' s of ' +
+                d.endurance +
+                (e.batt !== undefined && e.batt < d.endurance * 0.25 ? ', heading home' : ''),
     ]);
   if (d.operated)
     rows.push([
@@ -315,6 +321,32 @@ function structRows(e: Struct): [string, string][] {
           <span>{{ r[0] }}</span
           ><b>{{ r[1] }}</b>
         </div>
+        <button
+          v-if="(one as Unit).def.endurance && !(one as Unit).landed"
+          type="button"
+          class="strike"
+          style="border-color: #3a6a7a"
+          title="The drone flies to its squad and rides along: no battery drain, no exposure, launched again with I"
+          @click="ctl.stowOrLaunch()"
+        >
+          Stow on squad (I)
+        </button>
+        <button
+          v-if="((one as Unit).landed && (one as Unit).carriedBy) || carriedCount(one as Unit)"
+          type="button"
+          class="strike"
+          style="border-color: #3a6a7a"
+          title="Carried drones take off where the squad stands"
+          @click="ctl.stowOrLaunch()"
+        >
+          Launch
+          {{
+            carriedCount(one as Unit)
+              ? carriedCount(one as Unit) + (carriedCount(one as Unit) > 1 ? ' carried drones' : ' carried drone')
+              : ''
+          }}
+          (I)
+        </button>
         <div v-if="(one as Unit).def.operator" class="forms">
           <button type="button" @click="ctl.setOps(1)" title="One person from the pool joins as a drone operator (O)">
             + operator (O)</button
@@ -367,6 +399,19 @@ function structRows(e: Struct): [string, string][] {
           </button>
         </div>
       </template>
+      <button
+        v-if="unitsSel.some(u => (u.def.endurance && !u.landed) || (u.landed && u.carriedBy) || carriedCount(u))"
+        type="button"
+        class="strike"
+        style="border-color: #3a6a7a"
+        @click="ctl.stowOrLaunch()"
+      >
+        {{
+          unitsSel.some(u => (u.landed && u.carriedBy) || carriedCount(u))
+            ? 'Launch carried drones (I)'
+            : 'Stow drones on squads (I)'
+        }}
+      </button>
       <div v-if="unitsSel.some(u => u.def.operator)" class="forms">
         <button type="button" @click="ctl.setOps(1)">+ operator (O)</button
         ><button type="button" @click="ctl.setOps(-1)">− operator</button>

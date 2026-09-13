@@ -347,6 +347,11 @@ export class Game {
     updateSupply(this);
     updateDepots(this, dt);
     updateRepairs(this, dt);
+    // how many drones each squad carries, for the badge and the panel
+    for (const u of this.units) if (u.def.troop) u.carrying = 0;
+    for (const u of this.units)
+      if (!u.dead && u.landed && u.carriedBy && !u.carriedBy.dead)
+        u.carriedBy.carrying = (u.carriedBy.carrying || 0) + 1;
     updateJamming(this, dt);
     updateNets(this, dt);
     updateCivilians(this, dt);

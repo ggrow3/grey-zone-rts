@@ -73,6 +73,10 @@ export function applyCommand(g: Game, team: number, cmd: Command) {
       return launchMissile(g, team, cmd);
     case 'recall':
       return recallDrones(g, team);
+    case 'stow':
+      return stowDrones(g, team, cmd);
+    case 'launch':
+      return launchDrones(g, team, cmd);
     case 'mode':
       return setMode(g, team, cmd);
     case 'steer':
@@ -343,6 +347,43 @@ function strikeNearest(g: Game, team: number, cmd: Cmd<'strike'>) {
 function setSwarmFormation(g: Game, team: number, cmd: Cmd<'swarmFormation'>) {
   const sw = g.swarms.find(s => s.id === cmd.swarmId && s.team === team && !s.dead);
   if (sw) sw.formation = cmd.formation;
+}
+
+/** Stow: the drones fly to their squads and ride along, batteries full and not draining */
+function stowDrones(g: Game, team: number, cmd: Cmd<'stow'>) {
+  let n = 0;
+  for (const id of cmd.ids) {
+    const u = g.find(id);
+    if (!u || !u.isUnit || u.team !== team || u.dead || !u.def.air || !u.def.endurance || u.landed) continue;
+    if (!g.landingSpot(u)) continue;
+    u.stowing = true;
+    u.ambushed = false;
+    u.target = null;
+    if (u.order.kind === 'attack') u.order = IDLE();
+    n++;
+  }
+  g.notify(team, n ? plural(n, 'drone') + ' flying to the squads to be carried' : 'No airborne battery drone selected');
+}
+
+/** Launch: carried drones take off where their squads stand */
+function launchDrones(g: Game, team: number, cmd: Cmd<'launch'>) {
+  let n = 0;
+  const ids = new Set(cmd.ids);
+  for (const u of g.units) {
+    if (u.dead || u.team !== team || !u.landed) continue;
+    if (!ids.has(u.id) && !(u.carriedBy && ids.has(u.carriedBy.id))) continue;
+    const d = u.def;
+    // launch with what has been charged so far, a quarter at the least
+    const charged = d.recharge ? 1 - Math.max(0, u.rechargeT || 0) / d.recharge : 1;
+    u.batt = d.endurance! * Math.max(0.25, charged);
+    u.landed = false;
+    u.stowed = false;
+    u.stowing = false;
+    u.carriedBy = null;
+    u.grace = 0;
+    n++;
+  }
+  g.notify(team, n ? plural(n, 'drone') + ' launched' : 'No carried drone to launch');
 }
 
 /** Home: every airborne battery drone flies home for fresh batteries */

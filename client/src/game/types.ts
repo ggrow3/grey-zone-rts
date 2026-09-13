@@ -93,6 +93,13 @@ export interface Unit {
   diveAt?: Pt | null;
   /** an FPV sitting on the ground in ambush, motors off */
   ambushed?: boolean;
+  /** a landed drone riding on this squad: it moves with it and its battery does not drain */
+  carriedBy?: Unit | null;
+  /** told to stow: flies to its squad and stays aboard after the battery swap until launched */
+  stowing?: boolean;
+  stowed?: boolean;
+  /** drones riding on this squad right now (counted each tick) */
+  carrying?: number;
   /** the spot a guarding interceptor returns to */
   post?: Pt | null;
   /** shoot-and-scoot: a fire mission was just completed; the point the gun is moving to before it fires again */
@@ -361,6 +368,10 @@ export type Command =
   | { kind: 'iskander'; targetId: number }
   /** every airborne battery drone flies home for fresh batteries (Home) */
   | { kind: 'recall' }
+  /** battery drones fly to their squads and ride along until launched */
+  | { kind: 'stow'; ids: number[] }
+  /** carried drones take off: the ids are drones, or the squads carrying them */
+  | { kind: 'launch'; ids: number[] }
   /** switch the posture of units that have that mode */
   | { kind: 'mode'; ids: number[]; mode: string }
   /** a human pilot's stick input for one drone: fly toward (x, y), attack targetId, or (kamikaze) dive into the point */

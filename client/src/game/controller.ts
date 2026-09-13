@@ -670,6 +670,19 @@ export class Controller {
   deepStrike() {
     this.submit({ kind: 'deep' });
   }
+  /** I: carried drones (or the squads carrying them) launch; otherwise the selected battery drones fly to their squads */
+  stowOrLaunch() {
+    const sel = this.selUnits();
+    const g = this.game;
+    const carrying = sel
+      .filter(u => u.landed && u.carriedBy)
+      .concat(sel.filter(s => s.def.troop && g.units.some(o => !o.dead && o.carriedBy === s)));
+    if (carrying.length) return this.submit({ kind: 'launch', ids: this.ids(carrying) });
+    const drones = sel.filter(u => u.def.air && u.def.endurance && !u.landed);
+    if (!drones.length)
+      return this.onMessage('Select airborne battery drones to stow, or a squad carrying drones to launch them');
+    this.submit({ kind: 'stow', ids: this.ids(drones) });
+  }
   setOps(delta: 1 | -1) {
     const squads = this.selUnits().filter(u => u.def.operator);
     if (!squads.length) return this.onMessage('Select an infantry squad first');
@@ -718,6 +731,7 @@ export class Controller {
     else if (e.code === 'KeyL') this.onToggle('legend');
     else if (e.code === 'KeyN') this.onToggle('audio');
     else if (e.code === 'KeyO') this.setOps(e.shiftKey ? -1 : 1);
+    else if (e.code === 'KeyI') this.stowOrLaunch();
     else if (e.code === 'KeyK') this.onToggle('log');
     else if (e.code === 'KeyE' && !this.selFactories().length) {
       if (this.selUnits().some(x => x.def.troop)) this.digIn();

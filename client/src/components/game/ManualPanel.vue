@@ -100,6 +100,10 @@ const CONTROLS: [string, string][] = [
   ],
   [']', 'solo games: simulation speed 1x, 2x, 3x'],
   ['Home', 'recall every battery drone for fresh batteries: do it before the snow'],
+  [
+    'I',
+    'stow the selected drones on their squads (they ride along, batteries full, out of reach), or launch the drones a selected squad carries',
+  ],
   ['Shift-click a product', 'queue five'],
   ['Click a type in a mixed selection', 'keep only that type'],
   ['F', 'selected kamikaze drones dive at the nearest target they can see; a swarm spreads its dives'],
