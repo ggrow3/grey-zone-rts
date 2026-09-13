@@ -365,6 +365,32 @@ export function updateBot(g: Game, bot: Bot, dt: number) {
       }
     }
   }
+  // attack drones ride with the squads: idle ones stow between sorties, and a squad launches its load
+  // when it meets the enemy or comes under fire
+  bot.carryT = (bot.carryT === undefined ? 20 : bot.carryT) - dt;
+  if (bot.carryT <= 0) {
+    bot.carryT = 4;
+    const stow: number[] = [];
+    for (const d of g.units) {
+      if (d.dead || d.team !== T || !d.def.air || !d.def.endurance || d.landed || d.grounded || d.stowing) continue;
+      if (!(d.def.kamikaze || d.type === 'bomber')) continue;
+      if (d.target || d.order.kind !== 'idle' || d.ambushed || (d.batt ?? d.def.endurance) < d.def.endurance * 0.3)
+        continue;
+      const spot = g.landingSpot(d);
+      if (spot && spot.isUnit && spot.def.troop && dist(d, spot) < 400) stow.push(d.id);
+    }
+    if (stow.length) g.apply(T, { kind: 'stow', ids: stow });
+    const launch: number[] = [];
+    for (const s of g.units) {
+      if (s.dead || s.team !== T || !s.def.troop || !s.carrying) continue;
+      const contact =
+        s.hp < s.def.hp * 0.9 ||
+        g.units.some(e => e.team === E && !e.dead && e.seenBy[T] && !e.def.air && dist(e, s) < 450) ||
+        g.structs.some(st => st.team === E && !st.dead && dist(st, s) < 450);
+      if (contact) launch.push(s.id);
+    }
+    if (launch.length) g.apply(T, { kind: 'launch', ids: launch });
+  }
   // squads take on extra operators when people are spare, so more drones can fly
   bot.opsT = (bot.opsT === undefined ? 40 : bot.opsT) - dt;
   if (bot.opsT <= 0) {

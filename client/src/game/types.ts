@@ -310,6 +310,8 @@ export interface Bot {
   saving?: boolean;
   /** the personality rolled for this game (see rollTraits in bot.ts) */
   traits?: BotTraits;
+  /** stowing idle attack drones on the squads and launching them at the front */
+  carryT?: number;
 }
 
 /** what makes one game's bot differ from the next: rolled from the seeded generator on its first turn */
